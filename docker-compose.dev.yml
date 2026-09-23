@@ -6,6 +6,7 @@ services:
   eqemu-server:
     restart: unless-stopped
     image: eqemulator/eqemu-server:v16-dev
+    entrypoint: ["/bin/bash", "-c", "/home/eqemu/assets/scripts/dev-entrypoint.pl; /bin/bash"]
     volumes:
       - ./server:/home/eqemu/server:delegated
       - ./code:/home/eqemu/code:delegated

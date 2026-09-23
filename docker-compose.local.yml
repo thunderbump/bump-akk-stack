@@ -1,0 +1,21 @@
+services:
+  eqemu-server:
+    ports: !override
+      - ${IP_ADDRESS}:2222:22/tcp
+      - ${IP_ADDRESS}:2222:22/udp
+      - ${IP_ADDRESS}:3000-3010:3000-3010
+      - ${IP_ADDRESS}:18080:8080
+      - ${IP_ADDRESS}:9001:9001/tcp
+      - ${IP_ADDRESS}:9001:9001/udp
+      - ${IP_ADDRESS}:9000:9000/tcp
+      - ${IP_ADDRESS}:9000:9000/udp
+      - ${IP_ADDRESS}:5999:5999/tcp
+      - ${IP_ADDRESS}:5999:5999/udp
+      - ${IP_ADDRESS}:5998:5998/tcp
+      - ${IP_ADDRESS}:5998:5998/udp
+      - ${IP_ADDRESS}:6000:6000/tcp
+      - ${IP_ADDRESS}:7778:7778/tcp
+      - ${IP_ADDRESS}:7778:7778/udp
+      - ${IP_ADDRESS}:9500:9500/tcp
+      - ${IP_ADDRESS}:9500:9500/udp
+      - ${IP_ADDRESS}:${PORT_RANGE_LOW:-7000}-${PORT_RANGE_HIGH}:${PORT_RANGE_LOW:-7000}-${PORT_RANGE_HIGH}/udp
