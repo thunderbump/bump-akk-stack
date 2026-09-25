@@ -1,0 +1,263 @@
+{
+  "suite_passed": true,
+  "started_at": 1790361870.0436952,
+  "cases": [
+    {
+      "case": "supervisor",
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "ready": true,
+        "clean": true,
+        "bounded_cleanup": true,
+        "absent": true,
+        "serial_bounded": true,
+        "outcome": true,
+        "service": true
+      },
+      "uuid": "e63d415d-abe0-428b-8e31-f7bc186786ac",
+      "unit_properties": {
+        "RuntimeMaxUSec": "20min",
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "ExecMainCode": "1",
+        "ExecMainStatus": "1",
+        "Slice": "eqemuvmrecoveryctl.slice",
+        "MemoryMax": "1006632960",
+        "MemorySwapMax": "0",
+        "LoadState": "loaded",
+        "ActiveState": "failed",
+        "SubState": "failed",
+        "FragmentPath": "/run/systemd/transient/eqemu-vm-recovery-supervisor.service",
+        "DropInPaths": "",
+        "Transient": "yes"
+      },
+      "report_sha256": "64f51d9e2a2dc257a262b38a9fa8e78299d2f5df9daecd1630d9ba9e2fdab183",
+      "cleanup_sha256": "a39ded4f8d36738814d9ae529b408e9353c5ad98ca3b9c7028db459fe29b3602",
+      "supervisor_properties": {
+        "RuntimeMaxUSec": "11min 40s",
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "signal",
+        "ExecMainCode": "2",
+        "ExecMainStatus": "9",
+        "Slice": "eqemuvmrecoveryctl.slice",
+        "MemoryMax": "67108864",
+        "MemorySwapMax": "0",
+        "LoadState": "loaded",
+        "ActiveState": "failed",
+        "SubState": "failed",
+        "FragmentPath": "/run/systemd/transient/eqemu-vm-recovery-parent.service",
+        "DropInPaths": "",
+        "Transient": "yes"
+      }
+    },
+    {
+      "case": "stale",
+      "case_passed": true,
+      "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677",
+      "killed_cleanup_pid": 56363,
+      "unit_properties": {
+        "RuntimeMaxUSec": "20min",
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "ExecMainCode": "1",
+        "ExecMainStatus": "1",
+        "Slice": "eqemuvmrecoveryctl.slice",
+        "MemoryMax": "1006632960",
+        "MemorySwapMax": "0",
+        "LoadState": "loaded",
+        "ActiveState": "failed",
+        "SubState": "failed",
+        "FragmentPath": "/run/systemd/transient/eqemu-vm-recovery-stale.service",
+        "DropInPaths": "",
+        "Transient": "yes"
+      },
+      "refused_damaged_copies": [
+        "uuid",
+        "name",
+        "profile",
+        "controller_sha256"
+      ],
+      "first_recovery": {
+        "changed": true,
+        "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677"
+      },
+      "second_recovery": {
+        "changed": false,
+        "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677"
+      },
+      "receipt_hashes_unchanged": true,
+      "pre_injection_pulses": 1
+    },
+    {
+      "case": "io",
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "ready": true,
+        "clean": true,
+        "bounded_cleanup": true,
+        "absent": true,
+        "serial_bounded": true,
+        "outcome": true,
+        "service": true
+      },
+      "uuid": "d23aac25-501a-40ae-ac4f-8b7d5f19bb52",
+      "unit_properties": {
+        "RuntimeMaxUSec": "infinity",
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "success",
+        "ExecMainCode": "0",
+        "ExecMainStatus": "0",
+        "Slice": "",
+        "MemoryMax": "infinity",
+        "MemorySwapMax": "infinity",
+        "LoadState": "not-found",
+        "ActiveState": "inactive",
+        "SubState": "dead",
+        "FragmentPath": "",
+        "DropInPaths": "",
+        "Transient": "no"
+      },
+      "report_sha256": "be54f84a65e71c7cc6724cbe31de06c00b53ffd6c395c92df0dd1cad28f82f3f",
+      "cleanup_sha256": "ef48b3c5ef99976c1f5ab66839f186437e3b3e47d96ae32be4170edae275feed"
+    },
+    {
+      "case": "pair",
+      "case_passed": true,
+      "same_endpoint": "172.29.31.2:8080",
+      "same_database": "/opt/eqemu-proof/world.db",
+      "left": {
+        "case": "left",
+        "case_passed": true,
+        "checks": {
+          "identity": true,
+          "ready": true,
+          "clean": true,
+          "bounded_cleanup": true,
+          "absent": true,
+          "serial_bounded": true,
+          "outcome": true,
+          "service": true
+        },
+        "uuid": "6ef62fdb-9706-41d5-ad31-9904aada2cbe",
+        "unit_properties": {
+          "RuntimeMaxUSec": "20min",
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "exit-code",
+          "ExecMainCode": "1",
+          "ExecMainStatus": "1",
+          "Slice": "eqemuvmrecoveryctl.slice",
+          "MemoryMax": "1006632960",
+          "MemorySwapMax": "0",
+          "LoadState": "loaded",
+          "ActiveState": "failed",
+          "SubState": "failed",
+          "FragmentPath": "/run/systemd/transient/eqemu-vm-recovery-left.service",
+          "DropInPaths": "",
+          "Transient": "yes"
+        },
+        "report_sha256": "6995d7199697d75af28a842071d0ca49ede11220340b24283390b91846ae38da",
+        "cleanup_sha256": "6139dec3d9f245cb6ed838b5ffbc8d3c6a0ff0c095172aed354bf65cb3266810"
+      },
+      "right": {
+        "case": "right",
+        "case_passed": true,
+        "checks": {
+          "identity": true,
+          "ready": true,
+          "clean": true,
+          "bounded_cleanup": true,
+          "absent": true,
+          "serial_bounded": true,
+          "outcome": true,
+          "service": true
+        },
+        "uuid": "222f5dbd-96ca-4fca-8410-ef3218b43160",
+        "unit_properties": {
+          "RuntimeMaxUSec": "infinity",
+          "MainPID": "0",
+          "ControlPID": "0",
+          "Result": "success",
+          "ExecMainCode": "0",
+          "ExecMainStatus": "0",
+          "Slice": "",
+          "MemoryMax": "infinity",
+          "MemorySwapMax": "infinity",
+          "LoadState": "not-found",
+          "ActiveState": "inactive",
+          "SubState": "dead",
+          "FragmentPath": "",
+          "DropInPaths": "",
+          "Transient": "no"
+        },
+        "report_sha256": "76597eef81e57403cb4b197b56fb8607613464dae7cd2d5266a27e11e582306e",
+        "cleanup_sha256": "f7aca6436e07924393708d19d538e2f5ae0f9beb9f40dac89c46da41d2dc1021"
+      },
+      "third_rejection": "Worker admission cap reached",
+      "third_allocated": false,
+      "survivor_observations": [
+        {
+          "kind": "probe",
+          "nonce": "0c18f59c45574506bae5025082560111",
+          "identity": "eqemu-recovery-right-v1",
+          "http": "eqemu-recovery-right-v1",
+          "counter": 3,
+          "database": "/opt/eqemu-proof/world.db",
+          "endpoint": "172.29.31.2:8080",
+          "at": 1790362782.519851
+        },
+        {
+          "kind": "probe",
+          "nonce": "9a6265bbad82438eba383723367811a2",
+          "identity": "eqemu-recovery-right-v1",
+          "http": "eqemu-recovery-right-v1",
+          "counter": 4,
+          "database": "/opt/eqemu-proof/world.db",
+          "endpoint": "172.29.31.2:8080",
+          "at": 1790362787.603719
+        },
+        {
+          "kind": "probe",
+          "nonce": "b4d266a35bee43fcb82f116df4dfded4",
+          "identity": "eqemu-recovery-right-v1",
+          "http": "eqemu-recovery-right-v1",
+          "counter": 5,
+          "database": "/opt/eqemu-proof/world.db",
+          "endpoint": "172.29.31.2:8080",
+          "at": 1790362792.7293518
+        }
+      ],
+      "left_cleanup_finished_at": 1790362778.556628,
+      "shared_controller_budget": {
+        "memory.max": "1073741824",
+        "memory.swap.max": "0",
+        "memory.current": "19439616",
+        "memory.peak": "815820800",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+      }
+    }
+  ],
+  "cases_passed": true,
+  "finished_at": 1790362804.538894,
+  "cleanup": {
+    "complete": true,
+    "rescued": [],
+    "started_at": 1790362804.6061523,
+    "controller_budget": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.current": "17227776",
+      "memory.peak": "815820800",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+    },
+    "controller_slice_file_removed": true,
+    "finished_at": 1790362804.8111062
+  },
+  "service_result": "success"
+}

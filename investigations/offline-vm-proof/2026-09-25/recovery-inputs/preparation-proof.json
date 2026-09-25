@@ -1,0 +1,76 @@
+{
+  "prepared_at": 1790356240.9021792,
+  "privileged_vm_run": false,
+  "acceptance_tests": 17,
+  "static_check": {
+    "fixed_workers": true,
+    "all_domain_schemas": true,
+    "all_policy_syntax": true,
+    "all_input_hashes": true,
+    "vm_started": false
+  },
+  "manifest": {
+    "suite_sha256": "c6dfba2adfdb6b7281d99d7728665fc7f286257ac797b8cf143fc56108745cf5",
+    "workers": {
+      "supervisor-worker.py": "cb598891896ce01b53f932ae1a2f97f4f7476bb74e8be241cb1334ed2fb057c6",
+      "stale-worker.py": "ea87cf16738ef04c9b9195d14d2e0d52d6f4f17e155ca46e256aa9df79e0ed2e",
+      "io-worker.py": "e0b02d033db7dcbfc0c06eb0bcbfe116147cda0c2a0aba89878ed7b68e096369",
+      "left-worker.py": "5ecfe14961dce2d369137227d7615829dc4894a7a893dc87e8c46ba35db95462",
+      "right-worker.py": "d48cbc176ae4511b8e76cc785179265d44e3cb32288b78b325c23e804ee4f75e",
+      "third-worker.py": "5e3ed82f50e2eeab894c2558883acf500da9288cf392b1e8a19c491988473fdc"
+    }
+  },
+  "probes": {
+    "controller-slice-proof.json": {
+      "passed": true,
+      "memory_max": 1073741824,
+      "swap_max": 0,
+      "policy_retained_until_exit": true,
+      "cgroup_removed": true,
+      "at": 1790355546.6818695
+    },
+    "recovery-services-proof.json": {
+      "passed": true,
+      "supervisor": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "signal",
+        "ExecMainCode": "2",
+        "ExecMainStatus": "9",
+        "ActiveState": "failed"
+      },
+      "worker": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "ExecMainCode": "1",
+        "ExecMainStatus": "1",
+        "ActiveState": "failed"
+      },
+      "interrupted_cleanup": {
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "signal",
+        "ExecMainCode": "2",
+        "ExecMainStatus": "15",
+        "ActiveState": "failed"
+      },
+      "at": 1790355925.2916243
+    },
+    "guest-protocol-proof.json": {
+      "passed": true,
+      "counter_sequence": [
+        1,
+        2,
+        3,
+        3
+      ],
+      "fresh_nonces": true,
+      "raw_pty": true,
+      "actual_sqlite": true,
+      "docker_stubbed": true,
+      "poweroff_stubbed": true,
+      "at": 1790355976.3137789
+    }
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "case": "stale",
+  "case_passed": true,
+  "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677",
+  "killed_cleanup_pid": 56363,
+  "unit_properties": {
+    "RuntimeMaxUSec": "20min",
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "exit-code",
+    "ExecMainCode": "1",
+    "ExecMainStatus": "1",
+    "Slice": "eqemuvmrecoveryctl.slice",
+    "MemoryMax": "1006632960",
+    "MemorySwapMax": "0",
+    "LoadState": "loaded",
+    "ActiveState": "failed",
+    "SubState": "failed",
+    "FragmentPath": "/run/systemd/transient/eqemu-vm-recovery-stale.service",
+    "DropInPaths": "",
+    "Transient": "yes"
+  },
+  "refused_damaged_copies": [
+    "uuid",
+    "name",
+    "profile",
+    "controller_sha256"
+  ],
+  "first_recovery": {
+    "changed": true,
+    "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677"
+  },
+  "second_recovery": {
+    "changed": false,
+    "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677"
+  },
+  "receipt_hashes_unchanged": true,
+  "pre_injection_pulses": 1
+}

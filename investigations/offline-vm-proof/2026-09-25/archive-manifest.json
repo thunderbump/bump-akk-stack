@@ -1,0 +1,92 @@
+{
+  "scope": "Reference source and synthetic evidence archive; not an installable worker or AFK adapter",
+  "source_files": {
+    "check-disk-preparation.py": "c812220106ad3df33fca05426342b616b7d952eda60885b9678f19d29b8d9cb9",
+    "check-domain-cleanup.py": "b74477950197aec5fbb530164140a63309af893a07d72b8f05d1ceac801acc4b",
+    "check-io-policy.py": "8b6fabf7a8bc9cef28f0f0421a1d9d352b2a04572ff30aad65d7b8a01e88ebff",
+    "first-trial-inputs/guest_trial.py": "f882fc7eedf51724f6b083f51d4a0d1ffa2f73b6b804afe7876da2a98366c075",
+    "first-vm-trial.py": "d1282bf26dc69e061d7ce65871d3464604b24a6be5fdc31714b5667b153c0b23",
+    "lifetime-inputs/cancel-worker.py": "e0ca294cabf709f17fef5dac552b80206c4981e4c72192f8e472522874919c83",
+    "lifetime-inputs/check-disk-preparation.py": "be13366670f114ae2cae6844e2e874e26a1db74bb4aa6f1b7d138457b9e96185",
+    "lifetime-inputs/check-systemd.py": "2eed8e72762326940bfa944440243ca32215e7797138d7b21e00eb28f4308761",
+    "lifetime-inputs/death-worker.py": "3bf69fe57e1f7633d513d36ed3fa5a71259154dbc786baf013ff39d71eb3982a",
+    "lifetime-inputs/guest_trial.py": "6de5fefdb41aa88aef156d2bdf2b32d1c97a463a209f92669f5c1503978855f2",
+    "lifetime-inputs/prepare.py": "a681c4b11fe5a302f488c1d446cdcea2d9aee761a083852e8ccdc2c94e79c9fb",
+    "lifetime-inputs/test-domain-names.py": "aa22579fca2eac6a25f4144a035b7a70355e6be21a45953e5c875dad121adb26",
+    "lifetime-inputs/test-lifetime.py": "995074ae985a2ad2de73c858dff136073e0e0dc16da2f781286221e2eda500a2",
+    "lifetime-inputs/timeout-worker.py": "02eb90d282721e45b82ed3d0c4ec20b48b4d2e92fb850979fe98e03064a6f27f",
+    "lifetime-inputs/verify-completed-suite.py": "58eaf1f352edd27af5c3027baf963d9261fa51c123c58b9a73a1a94981c0e033",
+    "lifetime-tests.py": "42aa6c7b17244845d796f525ecca53c713d579406960a5995596fcf0eff76951",
+    "pressure-inputs/check-host-controls.py": "0efed5e00ccc40aa48763ccfcbb404893bf38df8b559f791a5d4d069160cb1a2",
+    "pressure-inputs/check-parent-task-limit.py": "73c291c0248dc0d46cec787a7a93366258cf786efff38d5052385c9244f7d42d",
+    "pressure-inputs/duplicate-worker.py": "7bdda47c7a60b3fbca9d50557879455d1597b284b333f18dcceba14628b70c56",
+    "pressure-inputs/evidence.py": "fb2d192fbd0b73643533fc1fd2c330144b522dfe07bc84456ee35ad810c90bb9",
+    "pressure-inputs/flood-worker.py": "e2b7b0ded26dd8cefe1b348e85141e2778daa0b8d2e3a71a907ef29bf34ea03a",
+    "pressure-inputs/forged-worker.py": "2fb17daca47a762f7fbd959e10aeebea17ff4e31c9fbcb843020832bf584e5ee",
+    "pressure-inputs/guest-suffix.py": "a6e814fbd0fb491a9c50b263f44e90848848881560d899596c610be5f84af7a0",
+    "pressure-inputs/host-pressure.py": "915a44acdd923ee075c37bc8335463e79f89d1a31ea98d67618d991edc9e0d60",
+    "pressure-inputs/malformed-worker.py": "c0cfa79695a6c1fb4a2f14e6bb2bdd03d31f52c6a1759e4574b2441add446ef0",
+    "pressure-inputs/oom-worker.py": "0dfd5ed3c9a2da25204f7292c6832da9e2f99be9b409e823c7fcd94d24bec79c",
+    "pressure-inputs/oversized-worker.py": "1a78719c6399195116eb466d1a714fe9520e4883ec773976a6bf925ccf8efb47",
+    "pressure-inputs/prepare.py": "3a8bc008fa31c1b6bb423afdd961e2aab24c91f764545681599c3f2d90530c7f",
+    "pressure-inputs/resources-worker.py": "e84768ff56690e83c59f1d42d9e51c9ba1e0d3e0cf271b042127c070bc754c84",
+    "pressure-inputs/supervisor-cases.py": "826b42ffe75a6b58d67189b305eed84ee1d64f7d7bd333b66168cedb9afebe21",
+    "pressure-inputs/task-probe.py": "b45dea3ee311f0c4f0a7b64e9d19b4942d3d7e473a09c26a8490128c675c4b79",
+    "pressure-inputs/tasks-worker.py": "6da305112ee2bef74a9f2e96fb72305fb6cb38065c7584a6b7fd7a43f2f32b3c",
+    "pressure-inputs/test-pressure.py": "fa3488c5bc7652614d539affeae05155f03d5eef15b0175ccdd7ed4936a7da4a",
+    "pressure-tests.py": "cf532a983e8010844a524f0fc20e33fd18cd88ed27a6fffe7c9d333274b9020a",
+    "probe-host-policy.py": "a90eb9a9b006ca8baa68cd61a1716d3205a1a1db12472d755641bb9a6c570d9f",
+    "recovery-inputs/guest-suffix.py": "39a1a3907045dcd0219d25e7ee71ad3a684a8c6deaab2a1aaf67359263439449",
+    "recovery-inputs/host-transport.py": "be916d02b5e61121da9c8171c070868f8caea226968197b9bff9ca80515a8847",
+    "recovery-inputs/io-worker.py": "e0b02d033db7dcbfc0c06eb0bcbfe116147cda0c2a0aba89878ed7b68e096369",
+    "recovery-inputs/left-worker.py": "5ecfe14961dce2d369137227d7615829dc4894a7a893dc87e8c46ba35db95462",
+    "recovery-inputs/prepare.py": "94f0f83bd1f29ba7a09924e4c498e855d4bb0967e85a1b7da135a620cabb33ec",
+    "recovery-inputs/probe-controller-slice.py": "32441c089e0a3c437ba450cb40cb99d8759dc3424fb773d00f96664e67ef5422",
+    "recovery-inputs/probe-guest-protocol.py": "400b62176f52514ab610655808f074cc243e25391d43ae96b8e0aed404afc3b3",
+    "recovery-inputs/probe-recovery-services.py": "60d7ec2cd947f98dffe5733628b7d66561aa3adc6363640eef09ae9eae4289a5",
+    "recovery-inputs/right-worker.py": "d48cbc176ae4511b8e76cc785179265d44e3cb32288b78b325c23e804ee4f75e",
+    "recovery-inputs/stale-worker.py": "ea87cf16738ef04c9b9195d14d2e0d52d6f4f17e155ca46e256aa9df79e0ed2e",
+    "recovery-inputs/suite-template.py": "3f57fd0d4f52288932419796af1066d171c8a5079e3aa5bb763cd75d34372e8a",
+    "recovery-inputs/supervisor-worker.py": "cb598891896ce01b53f932ae1a2f97f4f7476bb74e8be241cb1334ed2fb057c6",
+    "recovery-inputs/test-recovery.py": "21a5e98f8182b88f634ad472d1709bebf8f1e325d02798ba800283fe503a4c2e",
+    "recovery-inputs/third-worker.py": "5e3ed82f50e2eeab894c2558883acf500da9288cf392b1e8a19c491988473fdc",
+    "recovery-tests.py": "c6dfba2adfdb6b7281d99d7728665fc7f286257ac797b8cf143fc56108745cf5"
+  },
+  "abridged_receipts": {
+    "receipts/recovery-tests/supervisor/report.json": {
+      "source_sha256": "64f51d9e2a2dc257a262b38a9fa8e78299d2f5df9daecd1630d9ba9e2fdab183",
+      "omitted_fields": [
+        "qemu",
+        "guest_report_untrusted"
+      ]
+    },
+    "receipts/recovery-tests/stale/report.json": {
+      "source_sha256": "fe2838bf26cde329ac4f2f0d32cea7e29dc79279eae47e43e43dd3761fa3aafc",
+      "omitted_fields": [
+        "qemu",
+        "guest_report_untrusted"
+      ]
+    },
+    "receipts/recovery-tests/io/report.json": {
+      "source_sha256": "be54f84a65e71c7cc6724cbe31de06c00b53ffd6c395c92df0dd1cad28f82f3f",
+      "omitted_fields": [
+        "qemu",
+        "guest_report_untrusted"
+      ]
+    },
+    "receipts/recovery-tests/left/report.json": {
+      "source_sha256": "6995d7199697d75af28a842071d0ca49ede11220340b24283390b91846ae38da",
+      "omitted_fields": [
+        "qemu",
+        "guest_report_untrusted"
+      ]
+    },
+    "receipts/recovery-tests/right/report.json": {
+      "source_sha256": "76597eef81e57403cb4b197b56fb8607613464dae7cd2d5266a27e11e582306e",
+      "omitted_fields": [
+        "qemu",
+        "guest_report_untrusted"
+      ]
+    }
+  }
+}

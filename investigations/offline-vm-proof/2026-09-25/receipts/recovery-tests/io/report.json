@@ -1,0 +1,105 @@
+{
+  "schema": 1,
+  "ok": true,
+  "workload_ok": true,
+  "scope": "synthetic recovery and concurrency proof; guest evidence remains untrusted",
+  "uuid": "d23aac25-501a-40ae-ac4f-8b7d5f19bb52",
+  "checks": {
+    "host_pre_resume": true
+  },
+  "inputs": {
+    "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "seed.iso": "2690d4def93e71d3420b030028a704abba83eb5e1b01e579be9e6f408eba11ac",
+    "fixture.iso": "ade9896dc2b26c8c5a2b81838b4bfe5734b59eb8e69ccad0a0618167364ab3bd"
+  },
+  "started_at": 1790362219.6611052,
+  "virtlogd": {
+    "max_size": 2097152,
+    "max_backups": 3
+  },
+  "inputs_verified_at": 1790362220.5247927,
+  "allocated_disk_bytes": 34359754752,
+  "io_device": {
+    "filesystem": "259:2",
+    "backing_disk": "259:0"
+  },
+  "limits": {
+    "memory.max": "6442450944",
+    "memory.swap.max": "0",
+    "pids.max": "256",
+    "cpu.max": "200000 100000",
+    "io.max": "259:0 rbps=104857600 wbps=52428800 riops=max wiops=max"
+  },
+  "resumed_at": 1790362222.1592555,
+  "ready_at": 1790362392.7494993,
+  "pulse_count": 1,
+  "observations": [
+    {
+      "kind": "probe",
+      "nonce": "698e67a9d8bd442d998c7beff10174bf",
+      "identity": "eqemu-recovery-io-v1",
+      "http": "eqemu-recovery-io-v1",
+      "counter": 1,
+      "database": "/opt/eqemu-proof/world.db",
+      "endpoint": "172.29.31.2:8080",
+      "at": 1790362392.8277273
+    }
+  ],
+  "serial_bytes": 105682,
+  "io_phases": [
+    {
+      "op": "io-write",
+      "bytes": 67125248,
+      "seconds": 16.017194854095578,
+      "limit": 4194304,
+      "response_untrusted": {
+        "kind": "io-write",
+        "nonce": "78bcd65ea977439f9bbd0d8f472c47c3",
+        "identity": "eqemu-recovery-io-v1",
+        "bytes": 67108864
+      },
+      "passed": true
+    },
+    {
+      "op": "io-read",
+      "bytes": 67649536,
+      "seconds": 8.07794113457203,
+      "limit": 8388608,
+      "response_untrusted": {
+        "kind": "io-read",
+        "nonce": "9bf22cb01b58484cabdc326d90b00b20",
+        "identity": "eqemu-recovery-io-v1",
+        "bytes": 67108864
+      },
+      "passed": true
+    }
+  ],
+  "io_verified": true,
+  "finish_untrusted": {
+    "kind": "finish",
+    "nonce": "57dc4c888a744e1592d8a560a52666ab",
+    "identity": "eqemu-recovery-io-v1",
+    "counter": 1,
+    "clean": true
+  },
+  "finished_at": 1790362422.5532808,
+  "resource_observations": {
+    "memory.peak": "1495154688",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu.stat": "usage_usec 21118155\nuser_usec 13660099\nsystem_usec 7458056\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 1500\nnr_throttled 7\nthrottled_usec 24427\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "cleanup": {
+    "complete": true,
+    "uuid": "d23aac25-501a-40ae-ac4f-8b7d5f19bb52",
+    "started_at": 1790362422.6231318,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "cgroup_absent": true,
+    "readonly_inputs_unchanged": true,
+    "data_absent": true,
+    "finished_at": 1790362423.0637379
+  },
+  "service_result": "success"
+}

@@ -1,0 +1,164 @@
+{
+  "suite_passed": true,
+  "started_at": 1790271895.407465,
+  "cases": [
+    {
+      "case": "timeout",
+      "case_passed": true,
+      "uuid": "afd8c8bc-f568-4ec8-84d2-326f0f3af5fc",
+      "started_at": 1790271895.4580448,
+      "resources_before_injection": {
+        "memory.peak": "1427091456",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+        "cpu.stat": "usage_usec 16948941\nuser_usec 11327736\nsystem_usec 5621204\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 804\nnr_throttled 11\nthrottled_usec 120819\nnr_bursts 0\nburst_usec 0",
+        "pids.events": "max 0"
+      },
+      "injection": {
+        "uuid": "afd8c8bc-f568-4ec8-84d2-326f0f3af5fc",
+        "at": 1790272036.4370556,
+        "action": "await RuntimeMaxSec=300",
+        "live_qemu": true,
+        "domain_running": true,
+        "qemu_pid": 2782318,
+        "controller_pid": "2782078"
+      },
+      "unit_properties": {
+        "RuntimeMaxUSec": "5min",
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "timeout",
+        "ExecMainCode": "1",
+        "ExecMainStatus": "1",
+        "MemoryMax": "1006632960",
+        "MemorySwapMax": "0",
+        "LoadState": "loaded",
+        "ActiveState": "failed",
+        "SubState": "failed"
+      },
+      "checks": {
+        "ready_before_injection": true,
+        "attempt_identity": true,
+        "host_verified_live_vm": true,
+        "host_pre_resume": true,
+        "expected_service_result": true,
+        "expected_exit_status": true,
+        "attempt_remains_failed": true,
+        "controller_quiescent": true,
+        "cleanup_complete": true,
+        "cleanup_bounded": true,
+        "inputs_unchanged": true,
+        "resources_absent": true,
+        "interruption_recorded": true
+      },
+      "finished_at": 1790272196.5287085
+    },
+    {
+      "case": "cancel",
+      "case_passed": true,
+      "uuid": "3155625e-18be-42c7-b6d7-2a2eb4a84076",
+      "started_at": 1790272196.5760148,
+      "resources_before_injection": {
+        "memory.peak": "1434341376",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+        "cpu.stat": "usage_usec 17447661\nuser_usec 11393540\nsystem_usec 6054121\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 1055\nnr_throttled 7\nthrottled_usec 27072\nnr_bursts 0\nburst_usec 0",
+        "pids.events": "max 0"
+      },
+      "injection": {
+        "uuid": "3155625e-18be-42c7-b6d7-2a2eb4a84076",
+        "at": 1790272368.9861214,
+        "action": "systemctl stop",
+        "live_qemu": true,
+        "domain_running": true,
+        "qemu_pid": 2788194,
+        "controller_pid": "2787982"
+      },
+      "unit_properties": {
+        "RuntimeMaxUSec": "5min",
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "exit-code",
+        "ExecMainCode": "1",
+        "ExecMainStatus": "1",
+        "MemoryMax": "1006632960",
+        "MemorySwapMax": "0",
+        "LoadState": "loaded",
+        "ActiveState": "failed",
+        "SubState": "failed"
+      },
+      "checks": {
+        "ready_before_injection": true,
+        "attempt_identity": true,
+        "host_verified_live_vm": true,
+        "host_pre_resume": true,
+        "expected_service_result": true,
+        "expected_exit_status": true,
+        "attempt_remains_failed": true,
+        "controller_quiescent": true,
+        "cleanup_complete": true,
+        "cleanup_bounded": true,
+        "inputs_unchanged": true,
+        "resources_absent": true,
+        "interruption_recorded": true
+      },
+      "finished_at": 1790272369.6572552
+    },
+    {
+      "case": "death",
+      "case_passed": true,
+      "uuid": "1ee9c7f5-56d4-449d-8ec4-2a2e18124612",
+      "started_at": 1790272369.7039921,
+      "resources_before_injection": {
+        "memory.peak": "1394601984",
+        "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+        "cpu.stat": "usage_usec 16871026\nuser_usec 11512131\nsystem_usec 5358895\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 1115\nnr_throttled 4\nthrottled_usec 13391\nnr_bursts 0\nburst_usec 0",
+        "pids.events": "max 0"
+      },
+      "injection": {
+        "uuid": "1ee9c7f5-56d4-449d-8ec4-2a2e18124612",
+        "at": 1790272541.9165568,
+        "action": "pidfd SIGKILL controller only",
+        "live_qemu": true,
+        "domain_running": true,
+        "qemu_pid": 2791819,
+        "controller_pid": "2791568"
+      },
+      "unit_properties": {
+        "RuntimeMaxUSec": "5min",
+        "MainPID": "0",
+        "ControlPID": "0",
+        "Result": "signal",
+        "ExecMainCode": "2",
+        "ExecMainStatus": "9",
+        "MemoryMax": "1006632960",
+        "MemorySwapMax": "0",
+        "LoadState": "loaded",
+        "ActiveState": "failed",
+        "SubState": "failed"
+      },
+      "checks": {
+        "ready_before_injection": true,
+        "attempt_identity": true,
+        "host_verified_live_vm": true,
+        "host_pre_resume": true,
+        "expected_service_result": true,
+        "expected_exit_status": true,
+        "attempt_remains_failed": true,
+        "controller_quiescent": true,
+        "cleanup_complete": true,
+        "cleanup_bounded": true,
+        "inputs_unchanged": true,
+        "resources_absent": true
+      },
+      "finished_at": 1790272542.973219
+    }
+  ],
+  "cases_passed": true,
+  "finished_at": 1790272542.9736044,
+  "cleanup": {
+    "complete": true,
+    "rescued": [],
+    "started_at": 1790272543.0283647,
+    "finished_at": 1790272543.1443522
+  },
+  "service_result": "success"
+}

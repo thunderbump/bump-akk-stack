@@ -1,0 +1,34 @@
+{
+  "case": "right",
+  "case_passed": true,
+  "checks": {
+    "identity": true,
+    "ready": true,
+    "clean": true,
+    "bounded_cleanup": true,
+    "absent": true,
+    "serial_bounded": true,
+    "outcome": true,
+    "service": true
+  },
+  "uuid": "222f5dbd-96ca-4fca-8410-ef3218b43160",
+  "unit_properties": {
+    "RuntimeMaxUSec": "infinity",
+    "MainPID": "0",
+    "ControlPID": "0",
+    "Result": "success",
+    "ExecMainCode": "0",
+    "ExecMainStatus": "0",
+    "Slice": "",
+    "MemoryMax": "infinity",
+    "MemorySwapMax": "infinity",
+    "LoadState": "not-found",
+    "ActiveState": "inactive",
+    "SubState": "dead",
+    "FragmentPath": "",
+    "DropInPaths": "",
+    "Transient": "no"
+  },
+  "report_sha256": "76597eef81e57403cb4b197b56fb8607613464dae7cd2d5266a27e11e582306e",
+  "cleanup_sha256": "f7aca6436e07924393708d19d538e2f5ae0f9beb9f40dac89c46da41d2dc1021"
+}

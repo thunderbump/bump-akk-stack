@@ -1,0 +1,15 @@
+{
+  "uuid": "9cf70b12-9526-46d1-813e-507bd4a45127",
+  "ok": true,
+  "cleanup_complete": true,
+  "elapsed_seconds": 172.51202082633972,
+  "memory_peak": "1377521664",
+  "independent_absence_checks": [
+    "domain",
+    "qemu process",
+    "scratch",
+    "slice file",
+    "slice cgroup"
+  ],
+  "full_investigation_complete": false
+}

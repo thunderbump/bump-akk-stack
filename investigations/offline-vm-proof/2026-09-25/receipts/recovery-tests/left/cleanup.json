@@ -1,0 +1,13 @@
+{
+  "complete": true,
+  "uuid": "6ef62fdb-9706-41d5-ad31-9904aada2cbe",
+  "started_at": 1790362777.8279655,
+  "virsh_destroy_exit": 0,
+  "domain_absent": true,
+  "profile_absent": true,
+  "slice_file_absent": true,
+  "cgroup_absent": true,
+  "readonly_inputs_unchanged": true,
+  "data_absent": true,
+  "finished_at": 1790362778.4948213
+}

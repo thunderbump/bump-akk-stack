@@ -1,0 +1,81 @@
+{
+  "phase": "pair",
+  "active": {},
+  "released": [
+    {
+      "state": "active",
+      "name": "eqemu-rc-supervisor",
+      "worker_sha256": "cb598891896ce01b53f932ae1a2f97f4f7476bb74e8be241cb1334ed2fb057c6",
+      "admission": {
+        "free_bytes": 262898839552,
+        "mem_available": 25364324352,
+        "free_inodes": 49762602,
+        "required_disk": 193273528320,
+        "required_ram": 16106127360,
+        "reserved_count": 0,
+        "at": 1790361870.0750127
+      },
+      "uuid": "e63d415d-abe0-428b-8e31-f7bc186786ac"
+    },
+    {
+      "state": "active",
+      "name": "eqemu-rc-stale",
+      "worker_sha256": "ea87cf16738ef04c9b9195d14d2e0d52d6f4f17e155ca46e256aa9df79e0ed2e",
+      "admission": {
+        "free_bytes": 262898556928,
+        "mem_available": 25363070976,
+        "free_inodes": 49762587,
+        "required_disk": 193273528320,
+        "required_ram": 16106127360,
+        "reserved_count": 0,
+        "at": 1790362045.4207134
+      },
+      "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677"
+    },
+    {
+      "state": "active",
+      "name": "eqemu-rc-io",
+      "worker_sha256": "e0b02d033db7dcbfc0c06eb0bcbfe116147cda0c2a0aba89878ed7b68e096369",
+      "admission": {
+        "free_bytes": 262898130944,
+        "mem_available": 25356632064,
+        "free_inodes": 49762570,
+        "required_disk": 193273528320,
+        "required_ram": 16106127360,
+        "reserved_count": 0,
+        "at": 1790362219.5943847
+      },
+      "uuid": "d23aac25-501a-40ae-ac4f-8b7d5f19bb52"
+    },
+    {
+      "state": "active",
+      "name": "eqemu-rc-left",
+      "worker_sha256": "5ecfe14961dce2d369137227d7615829dc4894a7a893dc87e8c46ba35db95462",
+      "admission": {
+        "free_bytes": 262897569792,
+        "mem_available": 25350742016,
+        "free_inodes": 49762557,
+        "required_disk": 236223201280,
+        "required_ram": 22548578304,
+        "reserved_count": 0,
+        "at": 1790362423.603572
+      },
+      "uuid": "6ef62fdb-9706-41d5-ad31-9904aada2cbe"
+    },
+    {
+      "state": "active",
+      "name": "eqemu-rc-right",
+      "worker_sha256": "d48cbc176ae4511b8e76cc785179265d44e3cb32288b78b325c23e804ee4f75e",
+      "admission": {
+        "free_bytes": 229425958912,
+        "mem_available": 23993622528,
+        "free_inodes": 49762537,
+        "required_disk": 202751881216,
+        "required_ram": 22548578304,
+        "reserved_count": 1,
+        "at": 1790362597.271865
+      },
+      "uuid": "222f5dbd-96ca-4fca-8410-ef3218b43160"
+    }
+  ]
+}

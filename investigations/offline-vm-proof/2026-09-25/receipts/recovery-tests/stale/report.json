@@ -1,0 +1,70 @@
+{
+  "schema": 1,
+  "ok": false,
+  "workload_ok": false,
+  "scope": "synthetic recovery and concurrency proof; guest evidence remains untrusted",
+  "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677",
+  "checks": {
+    "host_pre_resume": true
+  },
+  "inputs": {
+    "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "seed.iso": "46b3f6a70c8c77baed4d9e0bade89940ba0fa3787aeddbf1a897c49590877834",
+    "fixture.iso": "ade9896dc2b26c8c5a2b81838b4bfe5734b59eb8e69ccad0a0618167364ab3bd"
+  },
+  "started_at": 1790362045.4801571,
+  "virtlogd": {
+    "max_size": 2097152,
+    "max_backups": 3
+  },
+  "inputs_verified_at": 1790362045.924859,
+  "allocated_disk_bytes": 34359754752,
+  "io_device": {
+    "filesystem": "259:2",
+    "backing_disk": "259:0"
+  },
+  "limits": {
+    "memory.max": "6442450944",
+    "memory.swap.max": "0",
+    "pids.max": "256",
+    "cpu.max": "200000 100000",
+    "io.max": "259:0 rbps=104857600 wbps=52428800 riops=max wiops=max"
+  },
+  "resumed_at": 1790362047.6108115,
+  "ready_at": 1790362218.4729064,
+  "pulse_count": 1,
+  "observations": [
+    {
+      "kind": "probe",
+      "nonce": "09f9d1d7381a42c4ad38e559baba0d66",
+      "identity": "eqemu-recovery-stale-v1",
+      "http": "eqemu-recovery-stale-v1",
+      "counter": 1,
+      "database": "/opt/eqemu-proof/world.db",
+      "endpoint": "172.29.31.2:8080",
+      "at": 1790362218.5462995
+    }
+  ],
+  "serial_bytes": 90683,
+  "error": "Controller interrupted",
+  "finished_at": 1790362218.5784528,
+  "resource_observations": {
+    "memory.peak": "1418539008",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu.stat": "usage_usec 19547827\nuser_usec 12567269\nsystem_usec 6980558\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 1175\nnr_throttled 8\nthrottled_usec 34256\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "cleanup": {
+    "complete": true,
+    "uuid": "9769301b-33b4-4e1d-bb7b-9f5f6e21c677",
+    "started_at": 1790362219.155506,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "cgroup_absent": true,
+    "readonly_inputs_unchanged": true,
+    "data_absent": true,
+    "finished_at": 1790362219.5240955
+  },
+  "reconciled": true
+}

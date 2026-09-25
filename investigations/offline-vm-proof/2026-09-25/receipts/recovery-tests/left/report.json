@@ -1,0 +1,91 @@
+{
+  "schema": 1,
+  "ok": false,
+  "workload_ok": false,
+  "scope": "synthetic recovery and concurrency proof; guest evidence remains untrusted",
+  "uuid": "6ef62fdb-9706-41d5-ad31-9904aada2cbe",
+  "checks": {
+    "host_pre_resume": true
+  },
+  "inputs": {
+    "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "seed.iso": "9ec920d109470bf993665f2966173e9695b9bc03ff9b6b86835fac270522c300",
+    "fixture.iso": "ade9896dc2b26c8c5a2b81838b4bfe5734b59eb8e69ccad0a0618167364ab3bd"
+  },
+  "started_at": 1790362423.686893,
+  "virtlogd": {
+    "max_size": 2097152,
+    "max_backups": 3
+  },
+  "inputs_verified_at": 1790362424.6989894,
+  "allocated_disk_bytes": 34359754752,
+  "io_device": {
+    "filesystem": "259:2",
+    "backing_disk": "259:0"
+  },
+  "limits": {
+    "memory.max": "6442450944",
+    "memory.swap.max": "0",
+    "pids.max": "256",
+    "cpu.max": "200000 100000",
+    "io.max": "259:0 rbps=104857600 wbps=52428800 riops=max wiops=max"
+  },
+  "resumed_at": 1790362426.385889,
+  "ready_at": 1790362596.933729,
+  "pulse_count": 36,
+  "observations": [
+    {
+      "kind": "probe",
+      "nonce": "37a1a7dcfe044795a19184a5370d66a6",
+      "identity": "eqemu-recovery-left-v1",
+      "http": "eqemu-recovery-left-v1",
+      "counter": 34,
+      "database": "/opt/eqemu-proof/world.db",
+      "endpoint": "172.29.31.2:8080",
+      "at": 1790362764.8824668
+    },
+    {
+      "kind": "probe",
+      "nonce": "11bf8ee6a64e4f969ba665bb6e64a99c",
+      "identity": "eqemu-recovery-left-v1",
+      "http": "eqemu-recovery-left-v1",
+      "counter": 35,
+      "database": "/opt/eqemu-proof/world.db",
+      "endpoint": "172.29.31.2:8080",
+      "at": 1790362769.953082
+    },
+    {
+      "kind": "probe",
+      "nonce": "9ece20f475e94b0ca38c60f95383ba2f",
+      "identity": "eqemu-recovery-left-v1",
+      "http": "eqemu-recovery-left-v1",
+      "counter": 36,
+      "database": "/opt/eqemu-proof/world.db",
+      "endpoint": "172.29.31.2:8080",
+      "at": 1790362775.042135
+    }
+  ],
+  "serial_bytes": 98761,
+  "error": "Controller interrupted",
+  "finished_at": 1790362777.7634444,
+  "resource_observations": {
+    "memory.peak": "1433182208",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu.stat": "usage_usec 24580316\nuser_usec 15656563\nsystem_usec 8923752\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 2868\nnr_throttled 5\nthrottled_usec 41755\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "cleanup": {
+    "complete": true,
+    "uuid": "6ef62fdb-9706-41d5-ad31-9904aada2cbe",
+    "started_at": 1790362777.8279655,
+    "virsh_destroy_exit": 0,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "cgroup_absent": true,
+    "readonly_inputs_unchanged": true,
+    "data_absent": true,
+    "finished_at": 1790362778.4948213
+  },
+  "service_result": "exit-code"
+}

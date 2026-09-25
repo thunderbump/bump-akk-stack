@@ -1,0 +1,116 @@
+{
+  "case": "pair",
+  "case_passed": true,
+  "same_endpoint": "172.29.31.2:8080",
+  "same_database": "/opt/eqemu-proof/world.db",
+  "left": {
+    "case": "left",
+    "case_passed": true,
+    "checks": {
+      "identity": true,
+      "ready": true,
+      "clean": true,
+      "bounded_cleanup": true,
+      "absent": true,
+      "serial_bounded": true,
+      "outcome": true,
+      "service": true
+    },
+    "uuid": "6ef62fdb-9706-41d5-ad31-9904aada2cbe",
+    "unit_properties": {
+      "RuntimeMaxUSec": "20min",
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "exit-code",
+      "ExecMainCode": "1",
+      "ExecMainStatus": "1",
+      "Slice": "eqemuvmrecoveryctl.slice",
+      "MemoryMax": "1006632960",
+      "MemorySwapMax": "0",
+      "LoadState": "loaded",
+      "ActiveState": "failed",
+      "SubState": "failed",
+      "FragmentPath": "/run/systemd/transient/eqemu-vm-recovery-left.service",
+      "DropInPaths": "",
+      "Transient": "yes"
+    },
+    "report_sha256": "6995d7199697d75af28a842071d0ca49ede11220340b24283390b91846ae38da",
+    "cleanup_sha256": "6139dec3d9f245cb6ed838b5ffbc8d3c6a0ff0c095172aed354bf65cb3266810"
+  },
+  "right": {
+    "case": "right",
+    "case_passed": true,
+    "checks": {
+      "identity": true,
+      "ready": true,
+      "clean": true,
+      "bounded_cleanup": true,
+      "absent": true,
+      "serial_bounded": true,
+      "outcome": true,
+      "service": true
+    },
+    "uuid": "222f5dbd-96ca-4fca-8410-ef3218b43160",
+    "unit_properties": {
+      "RuntimeMaxUSec": "infinity",
+      "MainPID": "0",
+      "ControlPID": "0",
+      "Result": "success",
+      "ExecMainCode": "0",
+      "ExecMainStatus": "0",
+      "Slice": "",
+      "MemoryMax": "infinity",
+      "MemorySwapMax": "infinity",
+      "LoadState": "not-found",
+      "ActiveState": "inactive",
+      "SubState": "dead",
+      "FragmentPath": "",
+      "DropInPaths": "",
+      "Transient": "no"
+    },
+    "report_sha256": "76597eef81e57403cb4b197b56fb8607613464dae7cd2d5266a27e11e582306e",
+    "cleanup_sha256": "f7aca6436e07924393708d19d538e2f5ae0f9beb9f40dac89c46da41d2dc1021"
+  },
+  "third_rejection": "Worker admission cap reached",
+  "third_allocated": false,
+  "survivor_observations": [
+    {
+      "kind": "probe",
+      "nonce": "0c18f59c45574506bae5025082560111",
+      "identity": "eqemu-recovery-right-v1",
+      "http": "eqemu-recovery-right-v1",
+      "counter": 3,
+      "database": "/opt/eqemu-proof/world.db",
+      "endpoint": "172.29.31.2:8080",
+      "at": 1790362782.519851
+    },
+    {
+      "kind": "probe",
+      "nonce": "9a6265bbad82438eba383723367811a2",
+      "identity": "eqemu-recovery-right-v1",
+      "http": "eqemu-recovery-right-v1",
+      "counter": 4,
+      "database": "/opt/eqemu-proof/world.db",
+      "endpoint": "172.29.31.2:8080",
+      "at": 1790362787.603719
+    },
+    {
+      "kind": "probe",
+      "nonce": "b4d266a35bee43fcb82f116df4dfded4",
+      "identity": "eqemu-recovery-right-v1",
+      "http": "eqemu-recovery-right-v1",
+      "counter": 5,
+      "database": "/opt/eqemu-proof/world.db",
+      "endpoint": "172.29.31.2:8080",
+      "at": 1790362792.7293518
+    }
+  ],
+  "left_cleanup_finished_at": 1790362778.556628,
+  "shared_controller_budget": {
+    "memory.max": "1073741824",
+    "memory.swap.max": "0",
+    "memory.current": "19439616",
+    "memory.peak": "815820800",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+  }
+}
