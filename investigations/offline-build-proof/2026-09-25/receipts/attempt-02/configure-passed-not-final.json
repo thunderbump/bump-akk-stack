@@ -1,0 +1,260 @@
+{
+  "observed_at": "2026-09-26T02:29:51.534814+00:00",
+  "observation": "Dependency configuration passed. Server build is running. This is not a final workload or cleanup result.",
+  "report": {
+    "schema": 1,
+    "ok": false,
+    "workload_ok": false,
+    "scope": "offline EQEmu build experiment; guest evidence remains untrusted",
+    "uuid": "0cd8759f-6774-4e63-bccd-088e8256d986",
+    "checks": {
+      "host_pre_resume": true
+    },
+    "inputs": {
+      "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+      "seed.iso": "9cc7c1124ad0804f5105ff369a29819491df2d006cb6482f2b940438cd377e07",
+      "fixture.iso": "7bc933747f2d4a089129c0dde78355f53306939bee31eb206e29a2c7d3609145"
+    },
+    "started_at": 1790389245.4939632,
+    "virtlogd": {
+      "max_size": 2097152,
+      "max_backups": 3
+    },
+    "inputs_verified_at": 1790389246.2951546,
+    "allocated_disk_bytes": 34359762944,
+    "io_device": {
+      "filesystem": "259:2",
+      "backing_disk": "259:0"
+    },
+    "limits": {
+      "memory.max": "6442450944",
+      "memory.swap.max": "0",
+      "pids.max": "256",
+      "cpu.max": "200000 100000",
+      "io.max": "259:0 rbps=104857600 wbps=52428800 riops=max wiops=max"
+    },
+    "qemu": {
+      "pid": 527879,
+      "uid": "64055\t64055\t64055\t64055",
+      "gid": "993\t993\t993\t993",
+      "groups": "993 64055",
+      "cap_eff": "0000000000000000",
+      "seccomp": "2",
+      "apparmor": "libvirt-0cd8759f-6774-4e63-bccd-088e8256d986 (enforce)",
+      "cgroup": "0::/eqemuvmbuild02worker.slice/machine-qemu\\x2d1\\x2deqemu\\x2dbuild\\x2d02.scope/libvirt/emulator",
+      "cmdline": [
+        "/usr/bin/qemu-system-x86_64",
+        "-name",
+        "guest=eqemu-build-02,debug-threads=on",
+        "-S",
+        "-object",
+        "{\"qom-type\":\"secret\",\"id\":\"masterKey0\",\"format\":\"raw\",\"file\":\"/var/lib/libvirt/qemu/domain-1-eqemu-build-02/master-key.aes\"}",
+        "-machine",
+        "pc-q35-8.2,usb=off,dump-guest-core=off,memory-backend=pc.ram,acpi=on",
+        "-accel",
+        "kvm",
+        "-cpu",
+        "host,migratable=on,svm=off,vmx=off",
+        "-m",
+        "size=4194304k",
+        "-object",
+        "{\"qom-type\":\"memory-backend-ram\",\"id\":\"pc.ram\",\"size\":4294967296}",
+        "-overcommit",
+        "mem-lock=off",
+        "-smp",
+        "2,sockets=2,cores=1,threads=1",
+        "-uuid",
+        "0cd8759f-6774-4e63-bccd-088e8256d986",
+        "-display",
+        "none",
+        "-no-user-config",
+        "-nodefaults",
+        "-chardev",
+        "socket,id=charmonitor,fd=31,server=on,wait=off",
+        "-mon",
+        "chardev=charmonitor,id=monitor,mode=control",
+        "-rtc",
+        "base=utc",
+        "-no-shutdown",
+        "-boot",
+        "strict=on",
+        "-device",
+        "{\"driver\":\"pcie-root-port\",\"port\":8,\"chassis\":1,\"id\":\"pci.1\",\"bus\":\"pcie.0\",\"multifunction\":true,\"addr\":\"0x1\"}",
+        "-device",
+        "{\"driver\":\"pcie-root-port\",\"port\":9,\"chassis\":2,\"id\":\"pci.2\",\"bus\":\"pcie.0\",\"addr\":\"0x1.0x1\"}",
+        "-blockdev",
+        "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-proof-02/build/data/root.raw\",\"node-name\":\"libvirt-3-storage\",\"auto-read-only\":true,\"discard\":\"unmap\",\"cache\":{\"direct\":true,\"no-flush\":false}}",
+        "-blockdev",
+        "{\"node-name\":\"libvirt-3-format\",\"read-only\":false,\"cache\":{\"direct\":true,\"no-flush\":false},\"driver\":\"raw\",\"file\":\"libvirt-3-storage\"}",
+        "-device",
+        "{\"driver\":\"virtio-blk-pci\",\"bus\":\"pci.1\",\"addr\":\"0x0\",\"drive\":\"libvirt-3-format\",\"id\":\"virtio-disk0\",\"bootindex\":1,\"write-cache\":\"on\"}",
+        "-blockdev",
+        "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-proof-02/build/data/seed.iso\",\"node-name\":\"libvirt-2-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+        "-blockdev",
+        "{\"node-name\":\"libvirt-2-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-2-storage\"}",
+        "-device",
+        "{\"driver\":\"ide-cd\",\"bus\":\"ide.0\",\"drive\":\"libvirt-2-format\",\"id\":\"sata0-0-0\"}",
+        "-blockdev",
+        "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-proof-02/build/data/fixture.iso\",\"node-name\":\"libvirt-1-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+        "-blockdev",
+        "{\"node-name\":\"libvirt-1-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-1-storage\"}",
+        "-device",
+        "{\"driver\":\"ide-cd\",\"bus\":\"ide.1\",\"drive\":\"libvirt-1-format\",\"id\":\"sata0-0-1\"}",
+        "-chardev",
+        "socket,id=charserial0,fd=30,server=on,wait=off",
+        "-device",
+        "{\"driver\":\"isa-serial\",\"chardev\":\"charserial0\",\"id\":\"serial0\",\"index\":0}",
+        "-audiodev",
+        "{\"id\":\"audio1\",\"driver\":\"none\"}",
+        "-global",
+        "ICH9-LPC.noreboot=off",
+        "-watchdog-action",
+        "reset",
+        "-sandbox",
+        "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny",
+        "-msg",
+        "timestamp=on"
+      ],
+      "fds": [
+        "/dev/null",
+        "pipe:[708063303]",
+        "pipe:[708063303]",
+        "anon_inode:[eventfd]",
+        "/run/libvirt/qemu/eqemu-build-02.pid",
+        "anon_inode:[signalfd]",
+        "anon_inode:[eventfd]",
+        "anon_inode:[eventfd]",
+        "/var/lib/eqemu-vm-proof/build-proof-02/build/data/seed.iso",
+        "/var/lib/eqemu-vm-proof/build-proof-02/build/data/fixture.iso",
+        "/dev/kvm",
+        "anon_inode:kvm-vm",
+        "socket:[708038950]",
+        "anon_inode:[eventfd]",
+        "anon_inode:[eventfd]",
+        "anon_inode:kvm-vcpu:0",
+        "anon_inode:kvm-vcpu-stats:0",
+        "anon_inode:kvm-vcpu:1",
+        "anon_inode:kvm-vcpu-stats:1",
+        "/var/lib/eqemu-vm-proof/build-proof-02/build/data/root.raw",
+        "socket:[708024084]",
+        "socket:[708024085]"
+      ]
+    },
+    "resumed_at": 1790389247.92125,
+    "stages": {
+      "mount-input": {
+        "state": "passed",
+        "at": 1790389408.6120653
+      },
+      "signature-0": {
+        "state": "passed",
+        "at": 1790389411.4817276
+      },
+      "signature-1": {
+        "state": "passed",
+        "at": 1790389411.4861999
+      },
+      "signature-2": {
+        "state": "passed",
+        "at": 1790389411.4909887
+      },
+      "apt-plan": {
+        "state": "passed",
+        "at": 1790389413.5415146
+      },
+      "apt-install": {
+        "state": "passed",
+        "at": 1790389430.6712756
+      },
+      "dpkg-audit": {
+        "state": "passed",
+        "at": 1790389430.6884887
+      },
+      "package-identities": {
+        "state": "passed",
+        "at": 1790389430.6950135
+      },
+      "registry-clone": {
+        "state": "passed",
+        "at": 1790389439.168337
+      },
+      "registry-checkout": {
+        "state": "passed",
+        "at": 1790389439.4931347
+      },
+      "registry-integrity": {
+        "state": "passed",
+        "at": 1790389449.0156572
+      },
+      "tool-compiler": {
+        "state": "passed",
+        "at": 1790389449.2308838
+      },
+      "tool-cmake": {
+        "state": "passed",
+        "at": 1790389449.2410107
+      },
+      "tool-ninja": {
+        "state": "passed",
+        "at": 1790389449.2450643
+      },
+      "tool-perl": {
+        "state": "passed",
+        "at": 1790389449.3908093
+      },
+      "tool-make": {
+        "state": "passed",
+        "at": 1790389449.395054
+      },
+      "tool-autoreconf": {
+        "state": "passed",
+        "at": 1790389449.4228706
+      },
+      "tool-pkgconfig": {
+        "state": "passed",
+        "at": 1790389449.4269829
+      },
+      "tool-vcpkg": {
+        "state": "passed",
+        "at": 1790389449.4415483
+      },
+      "vcpkg-plan": {
+        "state": "passed",
+        "at": 1790389452.3157842
+      },
+      "intentional-exit-seven": {
+        "state": "running",
+        "at": 1790389452.31904
+      },
+      "configure": {
+        "state": "passed",
+        "at": 1790389729.613454
+      },
+      "server-build": {
+        "state": "running",
+        "at": 1790389789.8671384
+      }
+    },
+    "ready_at": 1790389408.5788786,
+    "serial_bytes": 99708,
+    "preflight_untrusted": {
+      "kind": "preflight",
+      "before_status": "eb4fcbb8f264b0e601ef4f79c92195d6dfb7b3a4cd07f25425fed92affae48d5",
+      "after_status": "c0c24a5e2f80794a6aec10f1f84ec4686ecfa586e57170c4ac140ffc3306146b",
+      "solver_sha256": "ff12921bfdef6da6dce1924c78a48ffbfb4049b912254dd4cb2af26fd619e006",
+      "ports": 51,
+      "negative_control": true,
+      "tools": {
+        "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+        "cmake": "cmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+        "ninja": "1.11.1\n",
+        "perl": "v5.38.2\n",
+        "make": "GNU Make 4.3\nBuilt for x86_64-pc-linux-gnu\nCopyright (C) 1988-2020 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n",
+        "autoreconf": "autoreconf (GNU Autoconf) 2.71\nCopyright (C) 2021 Free Software Foundation, Inc.\nLicense GPLv3+/Autoconf: GNU GPL version 3 or later\n<https://gnu.org/licenses/gpl.html>, <https://gnu.org/licenses/exceptions.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David J. MacKenzie and Akim Demaille.\n",
+        "pkgconfig": "1.8.1\n",
+        "vcpkg": "vcpkg package management program version 2025-10-16-71538f2694db93da4668782d094768ba74c45991\n\nSee LICENSE.txt for license information.\n"
+      },
+      "nonce": "257385a5db524ce780b398f80e91c100"
+    }
+  }
+}
