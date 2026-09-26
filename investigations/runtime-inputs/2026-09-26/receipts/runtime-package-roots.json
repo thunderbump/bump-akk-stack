@@ -1,0 +1,11 @@
+{
+  "roots": [
+    "mariadb-server",
+    "mariadb-client",
+    "libdbi-perl",
+    "libdbd-mysql-perl",
+    "libjson-perl"
+  ],
+  "build_bundle": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4",
+  "scope": "static solver on base placeholders plus exact build package control records; real guest preflight required"
+}

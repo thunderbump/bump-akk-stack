@@ -1,0 +1,11 @@
+{
+  "status": "prepared-unexecuted",
+  "iso_bytes": 171806720,
+  "iso_sha256": "5fa2a4822e03ee7693c566e8670ddab5ee35c7a5d25d4671ac57c53ddf82c767",
+  "manifest_sha256": "b51d4751fe2a31689dd906b392da1e24d9510e26418067b09788f43b78403b28",
+  "files_verified_from_media": 48,
+  "payload_bytes": 171338254,
+  "host_free_bytes": 259408003072,
+  "production_access": false,
+  "host_execution_of_acquired_content": false
+}

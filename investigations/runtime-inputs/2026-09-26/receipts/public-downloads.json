@@ -1,0 +1,37 @@
+[
+  {
+    "url": "https://db.eqemu.dev/api/v1/dump/archive/peq-1787356814.zip",
+    "path": "downloads/peq-1787356814.zip",
+    "bytes": 32153606,
+    "sha256": "71c9969a65c190ab7f388f5887136d0e5f705ad3ed54788276827ccd275f1266",
+    "git_blob": null
+  },
+  {
+    "url": "https://codeload.github.com/ProjectEQ/projecteqquests/tar.gz/b3e34b84457d570401ea954ddd66de19179d0e41",
+    "path": "downloads/quests-b3e34b8.tar.gz",
+    "bytes": 3789428,
+    "sha256": "863afda49a1e666fac53faddd52557dbe907525711378ce49d31be3fca240523",
+    "git_blob": null
+  },
+  {
+    "url": "https://raw.githubusercontent.com/EQEmu/maps/e8efa8ed4f4ea4c434c03c40d2a758388a54f4d6/base/poknowledge.map",
+    "path": "downloads/poknowledge.map",
+    "bytes": 940304,
+    "sha256": "794b618d86852b47bd593424129aaf34eee326e5e3fec7290aeeb0e32bc41d20",
+    "git_blob": "6f152f4e4e472caee6dc9b2bb952648857dceec3"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/EQEmu/maps/e8efa8ed4f4ea4c434c03c40d2a758388a54f4d6/nav/poknowledge.nav",
+    "path": "downloads/poknowledge.nav",
+    "bytes": 1210906,
+    "sha256": "edf48789922d0de8a7b30ee47b8fe023c89c07cebd014f399dd6202ee7752b24",
+    "git_blob": "a6843cae0c12f57c392c30be01ecf4b96b49034e"
+  },
+  {
+    "url": "https://raw.githubusercontent.com/EQEmu/maps/e8efa8ed4f4ea4c434c03c40d2a758388a54f4d6/water/poknowledge.wtr",
+    "path": "downloads/poknowledge.wtr",
+    "bytes": 129726,
+    "sha256": "78596081d06ca3027ddf68c0b6bbaec291833d9ad2c238b4165a5a2313362045",
+    "git_blob": "ee1703cd9f24061a03a212ab716d4bcb57faff06"
+  }
+]

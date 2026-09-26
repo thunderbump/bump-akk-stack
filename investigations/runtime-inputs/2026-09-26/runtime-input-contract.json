@@ -1,0 +1,135 @@
+{
+  "status": "prepared inputs only; guest installation/import/startup pending",
+  "server_commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d",
+  "base_image_sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+  "required_build_iso_sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4",
+  "database": {
+    "archive": "database/peq-1787356814.zip",
+    "import_members": [
+      "peq-dump/create_tables_content.sql",
+      "peq-dump/create_tables_login.sql",
+      "peq-dump/create_tables_player.sql",
+      "peq-dump/create_tables_state.sql",
+      "peq-dump/create_tables_system.sql"
+    ],
+    "expected_distinct_tables_before_startup": 221,
+    "expected_version": [
+      9328,
+      0,
+      0
+    ],
+    "expected_bot_tables": [],
+    "expected_empty_groups": [
+      "player",
+      "login"
+    ],
+    "state_inserts_only": [
+      "instance_list"
+    ],
+    "expected_ruleset": {
+      "id": 1,
+      "name": "default",
+      "Bots:Enabled": "false"
+    },
+    "normalization": "none selected; mismatch must fail without migrations, source changes or version relabeling",
+    "client": "pinned /usr/bin/mariadb; retain sandbox directive; no --force; import each fixed member via stdin; no create_all_tables wrapper"
+  },
+  "quests": {
+    "archive": "quests/quests-b3e34b8.tar.gz",
+    "strip_prefix": "projecteqquests-b3e34b84457d570401ea954ddd66de19179d0e41",
+    "commit": "b3e34b84457d570401ea954ddd66de19179d0e41",
+    "layout": "full unmodified tree at runtime/quests",
+    "external_perl_modules": [
+      "DBI",
+      "DBD::mysql",
+      "JSON",
+      "Scalar::Util"
+    ],
+    "module_probe": "guest only, before zone launch; source files preserve original bytes"
+  },
+  "maps": {
+    "commit": "e8efa8ed4f4ea4c434c03c40d2a758388a54f4d6",
+    "paths": [
+      "maps/base/poknowledge.map",
+      "maps/water/poknowledge.wtr",
+      "maps/nav/poknowledge.nav"
+    ]
+  },
+  "runtime_configuration": {
+    "generation": "create inside guest, never copy deployment config; random guest-local database password and world shared key; do not emit either",
+    "directories": {
+      "quests": "quests",
+      "plugins": "quests/plugins",
+      "lua_modules": "quests/lua_modules",
+      "maps": "maps",
+      "patches": "opcodes",
+      "opcodes": "opcodes",
+      "shared_memory": "shared",
+      "logs": "logs"
+    },
+    "auto_database_updates": "false",
+    "world": {
+      "shortname": "offlineproof",
+      "longname": "Offline runtime proof",
+      "address": "127.0.0.1",
+      "localaddress": "127.0.0.1",
+      "tcp": {
+        "ip": "127.0.0.1",
+        "port": "9000"
+      },
+      "loginserver_entries": [],
+      "telnet_enabled": "false",
+      "http_enabled": "false"
+    },
+    "database_host": "127.0.0.1",
+    "database_port": 3306,
+    "database_name": "eqemu_proof",
+    "ucs_host": "127.0.0.1",
+    "queryserver_host": "127.0.0.1",
+    "rule_overrides_before_baseline": {
+      "Bots:Enabled": "false",
+      "Analytics:CrashReporting": "false"
+    },
+    "no_external_webhooks": "assert none configured in imported settings; disable external sinks in guest-only derived state if discovered"
+  },
+  "package_execution_gate": {
+    "host_execution": false,
+    "install_order": "existing build packages then exact runtime package pins inside offline guest",
+    "prevent_automatic_service_start": "guest policy-rc.d and service masking before package configuration; verify no DB process before compile",
+    "preflight": "real guest APT dry-run --no-download --no-remove; compare complete transaction to fixed pins; dpkg audit and module probe",
+    "mariadb": "1:10.11.14-0ubuntu0.24.04.1",
+    "db_mode": "owned data directory, socket, loopback listener; disable binary log; root import only to disposable DB then scoped runtime account"
+  },
+  "space_budget": {
+    "guest_disk_bytes": 34359738368,
+    "observed_build_used_bytes": 8245886976,
+    "additional_runtime_cap_bytes": 8589934592,
+    "additional_runtime_includes": [
+      "package cache and unpack",
+      "SQL extraction",
+      "initialized MariaDB plus imported table/index/temp files",
+      "quest/map copies",
+      "shared memory",
+      "bounded logs"
+    ],
+    "subcaps_bytes": {
+      "package_cache_unpack": 536870912,
+      "sql_and_quests": 536870912,
+      "database_and_temp": 6442450944,
+      "runtime_shared_memory_and_logs": 1073741824
+    },
+    "stop_on_excess": true,
+    "host_owned_preparation_cap_bytes": 4294967296,
+    "shared_input_pool_cap_bytes": 21474836480,
+    "worker_cap_bytes": 42949672960,
+    "note": "DB physical expansion is a bounded estimate, not a measured result; actual resource monitoring required"
+  },
+  "remaining_guest_checks": [
+    "complete package transaction and interpreter loads",
+    "SQL syntax, schema shape and content invariants",
+    "no private rows and bot tables absent",
+    "actual MariaDB, shared-memory and zone memory/disk peaks",
+    "world/zone map/quest/time readiness",
+    "failure, cancellation, shutdown, cleanup and repeat"
+  ]
+}

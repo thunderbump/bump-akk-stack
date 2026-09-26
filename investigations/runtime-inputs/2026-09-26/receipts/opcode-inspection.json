@@ -1,0 +1,58 @@
+[
+  {
+    "source_path": "utils/patches/mail_opcodes.conf",
+    "media_path": "opcodes/mail_opcodes.conf",
+    "bytes": 300,
+    "sha256": "128e0bd0b8f18a11d3451280748d4390bc222029966ef2d732b80f26c3b743d7",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+  },
+  {
+    "source_path": "utils/patches/opcodes.conf",
+    "media_path": "opcodes/opcodes.conf",
+    "bytes": 16675,
+    "sha256": "6a38877b337c983bb8fee2fa1e72eb2265cc5f34ac91b68d8c86e2eec860d52c",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+  },
+  {
+    "source_path": "utils/patches/patch_RoF.conf",
+    "media_path": "opcodes/patch_RoF.conf",
+    "bytes": 16973,
+    "sha256": "ea29b22c609fc1e9085aeef694ac53307adc67f730f46a237b9173862f0a2ef9",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+  },
+  {
+    "source_path": "utils/patches/patch_RoF2.conf",
+    "media_path": "opcodes/patch_RoF2.conf",
+    "bytes": 18415,
+    "sha256": "b2059cda5169cb820cd031f46f608af23c376bcf7a247fa67a971b3c8ac7c6b1",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+  },
+  {
+    "source_path": "utils/patches/patch_SoD.conf",
+    "media_path": "opcodes/patch_SoD.conf",
+    "bytes": 19954,
+    "sha256": "4d165616777fb7219cc077e939414d187db99da6283b0710f0faa96c0e966bb4",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+  },
+  {
+    "source_path": "utils/patches/patch_SoF.conf",
+    "media_path": "opcodes/patch_SoF.conf",
+    "bytes": 23317,
+    "sha256": "deb17b9bdb94edc066272b47ca07a2db57e00c1868e5b3462cc50868260c97b1",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+  },
+  {
+    "source_path": "utils/patches/patch_Titanium.conf",
+    "media_path": "opcodes/patch_Titanium.conf",
+    "bytes": 20304,
+    "sha256": "c65eccc75a5cbd2319db826bed225e2b6c2da22c996a7993cf5173636ea0a579",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+  },
+  {
+    "source_path": "utils/patches/patch_UF.conf",
+    "media_path": "opcodes/patch_UF.conf",
+    "bytes": 21278,
+    "sha256": "c1fa95bd76959dace3ba7a09b933341859285cc281af3bcfc024d2a603dda540",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+  }
+]

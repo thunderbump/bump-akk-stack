@@ -1,0 +1,18 @@
+{
+  "scope": "inert public input preparation only",
+  "owned_root": "/home/bump/.local/state/eqemu-vm-proof/runtime-inputs-20260926",
+  "existing_pool_bytes_upper_bound": 4294967296,
+  "new_preparation_cap_bytes": 4294967296,
+  "shared_pool_cap_bytes": 21474836480,
+  "host_free_bytes": 259845312512,
+  "host_reserve_bytes": 107374182400,
+  "archive_compressed_cap_bytes": 67108864,
+  "archive_expanded_cap_bytes": 1073741824,
+  "quest_archive_cap_bytes": 33554432,
+  "quest_expanded_cap_bytes": 33554432,
+  "map_bytes": 2280936,
+  "runtime_package_compressed_cap_bytes": 536870912,
+  "runtime_package_installed_cap_bytes": 2147483648,
+  "future_worker_runtime_increment_cap_bytes": 8589934592,
+  "cleanup": "only artifacts within this owned root; keep sealed inputs and provenance until runtime task concludes"
+}
