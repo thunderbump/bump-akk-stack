@@ -1,0 +1,18 @@
+Running as unit: eqemu-build-input-apt-update.service; invocation ID: 19e9952b2d6146f4be2f30abdf6968ac
+Get:1 https://archive.ubuntu.com/ubuntu noble InRelease [256 kB]
+Get:2 https://archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+Get:3 https://archive.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+Get:4 https://archive.ubuntu.com/ubuntu noble/universe amd64 Packages [15.0 MB]
+Get:5 https://archive.ubuntu.com/ubuntu noble/main amd64 Packages [1,401 kB]
+Get:6 https://archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1,698 kB]
+Get:7 https://archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1,319 kB]
+Get:8 https://archive.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1,220 kB]
+Get:9 https://archive.ubuntu.com/ubuntu noble-security/main amd64 Packages [1,053 kB]
+Fetched 22.2 MB in 5s (4,135 kB/s)
+Reading package lists...
+Finished with result: success
+Main processes terminated with: code=exited/status=0
+Service runtime: 5.680s
+CPU time consumed: 1.682s
+Memory peak: 1.5M
+Memory swap peak: 0B

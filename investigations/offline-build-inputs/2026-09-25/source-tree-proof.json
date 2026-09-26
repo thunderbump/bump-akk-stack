@@ -1,0 +1,229 @@
+[
+  {
+    "path": "sources/eqemu.tar.gz",
+    "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d",
+    "bytes": 19974225,
+    "sha256": "537208716ea1dd1af562f7b5dbd2c5d96080f007e8d6d3b042d698a446dcc6dc",
+    "recursive_submodules": "packaged separately"
+  },
+  {
+    "path": "sources/websocketpp.tar.gz",
+    "commit": "b9aeec6eaf3d5610503439b4fae3581d9aff08e8",
+    "bytes": 717497,
+    "sha256": "0df78da0f74843ad0bf951d1f27259407af6f7c66df0aaf4ff3308d82db0326e",
+    "recursive_submodules": "packaged separately"
+  },
+  {
+    "path": "sources/vcpkg.bundle",
+    "commit": "d1ff36c6520ee43f1a656c03cd6425c2974a449e",
+    "bytes": 95762006,
+    "sha256": "5c33882ba3f588ed39bc9261c1b49f67281eed99e4dab954ea33145163575bfe",
+    "independent_clone_fsck": "passed",
+    "versioned_port_trees": [
+      {
+        "port": "boost-array",
+        "git_tree": "53a38d9df50a94549967fa8b7e47714c4d5761db"
+      },
+      {
+        "port": "boost-assert",
+        "git_tree": "4b40db7ad8e6420b04da87e8266e5eca7c3c059f"
+      },
+      {
+        "port": "boost-bind",
+        "git_tree": "b2fdb396a7064165de3c60c4da30dffd751f82e2"
+      },
+      {
+        "port": "boost-cmake",
+        "git_tree": "8c7d8286875eac4b6e5995d63337cfd3e16d66ef"
+      },
+      {
+        "port": "boost-concept-check",
+        "git_tree": "4f43e61a82b1e215fbea09fe321fb63b89d70ccf"
+      },
+      {
+        "port": "boost-config",
+        "git_tree": "73499959016446ec7272976b0abaab1ed123c3c8"
+      },
+      {
+        "port": "boost-container-hash",
+        "git_tree": "f808bcb3fafb29847b0e7f07f78525e036eee56b"
+      },
+      {
+        "port": "boost-conversion",
+        "git_tree": "72f5608e82127ab4b384bcc268fb92c59d36bbc7"
+      },
+      {
+        "port": "boost-core",
+        "git_tree": "9823973b46eb48abfc4d773b8461e98165b6eb6b"
+      },
+      {
+        "port": "boost-describe",
+        "git_tree": "b6c39726cb8a5ed76d564c222cfd5a59f24d3e02"
+      },
+      {
+        "port": "boost-detail",
+        "git_tree": "42321194aba4197b21532f5e146ddd36f4ec1a4f"
+      },
+      {
+        "port": "boost-dynamic-bitset",
+        "git_tree": "4e9bb084edae227089add595ccb7c596e76d0575"
+      },
+      {
+        "port": "boost-foreach",
+        "git_tree": "970a40545dc165073fab67037e1a22616740c9ed"
+      },
+      {
+        "port": "boost-function",
+        "git_tree": "5d75dc069bb0685bfa48febfc0d4bffc0f46f8c9"
+      },
+      {
+        "port": "boost-function-types",
+        "git_tree": "21f4acfebeb149a3de71f341be55a5ce59cb32aa"
+      },
+      {
+        "port": "boost-functional",
+        "git_tree": "ade45ba6b3c1ceec40f8eb3ac8d3a523f80b2038"
+      },
+      {
+        "port": "boost-fusion",
+        "git_tree": "c63f6e3ba7e2890a640553e6caaf2a5418c60913"
+      },
+      {
+        "port": "boost-headers",
+        "git_tree": "95dbcdac30de15e8f72cdba71aedb4fb06638718"
+      },
+      {
+        "port": "boost-integer",
+        "git_tree": "a37945e3e5b2c880c256c6266cc76c40e425b008"
+      },
+      {
+        "port": "boost-io",
+        "git_tree": "52997d9b6a05b007e2897de28beaeea18968cc0e"
+      },
+      {
+        "port": "boost-iterator",
+        "git_tree": "afb261ecce2d7eb9a01aa41c835608482c129e03"
+      },
+      {
+        "port": "boost-move",
+        "git_tree": "9e2f411e14732036732cece814356699a76cc91e"
+      },
+      {
+        "port": "boost-mp11",
+        "git_tree": "b8f038d03ba53847d4b120f55730c0737aab5587"
+      },
+      {
+        "port": "boost-mpl",
+        "git_tree": "419ecb733b84695280f408232c73470ab30be15d"
+      },
+      {
+        "port": "boost-optional",
+        "git_tree": "a00224cf1d434cc257cae3146aed00651f9700c4"
+      },
+      {
+        "port": "boost-predef",
+        "git_tree": "44b5803d820eb060f0727227d0ae9171912df6ce"
+      },
+      {
+        "port": "boost-preprocessor",
+        "git_tree": "b24666cb6f30bbace4fa4f602072ff22a1926e6d"
+      },
+      {
+        "port": "boost-range",
+        "git_tree": "ab4c025322e42dec411e33f17d3952fac5d7f00a"
+      },
+      {
+        "port": "boost-regex",
+        "git_tree": "411f23facef811713ece1498443d376f4fc375da"
+      },
+      {
+        "port": "boost-smart-ptr",
+        "git_tree": "3520f2bdf1ddfd6b9b9e83fa0db82bb9a28fe6a5"
+      },
+      {
+        "port": "boost-static-assert",
+        "git_tree": "c297fdc10a4751a0813d174da5b3d6ee8ac4fcd2"
+      },
+      {
+        "port": "boost-throw-exception",
+        "git_tree": "2595f3f64c49285c68fde05cca87afa79eb4d664"
+      },
+      {
+        "port": "boost-tuple",
+        "git_tree": "4975ef963fa02d53b2fca5eb8936b32e4de2e9da"
+      },
+      {
+        "port": "boost-type-traits",
+        "git_tree": "8c46d2bab6817bbbb8382efaed7aeb1ae8b15119"
+      },
+      {
+        "port": "boost-typeof",
+        "git_tree": "bc97dedd1bd7d66c437b13b38786e182c54fc924"
+      },
+      {
+        "port": "boost-uninstall",
+        "git_tree": "83ce7d42de32cacf540be39b74cfcb462ab034b8"
+      },
+      {
+        "port": "boost-utility",
+        "git_tree": "13afb12031051f9b937985deade5bbeb7c5cc256"
+      },
+      {
+        "port": "cereal",
+        "git_tree": "075869fcf5302c6dd11d564286d0dfa1d2d4d7a1"
+      },
+      {
+        "port": "fmt",
+        "git_tree": "936231a2c765082457d348a8781ea9d3610eb331"
+      },
+      {
+        "port": "glm",
+        "git_tree": "560b2b9970a1d71a8e5cc569f1291a853915469e"
+      },
+      {
+        "port": "libmariadb",
+        "git_tree": "f17c21d25e6448236a978a35d9a430144de13c9e"
+      },
+      {
+        "port": "libsodium",
+        "git_tree": "6dcb750702485c4dafac0b605b910b81e2c48831"
+      },
+      {
+        "port": "libuv",
+        "git_tree": "eaf94ede185f34dff0625254f6e64261d1c819fc"
+      },
+      {
+        "port": "luajit",
+        "git_tree": "8d6aa0d4fd0ef4005685e468090f35e3a9a00802"
+      },
+      {
+        "port": "openssl",
+        "git_tree": "21c1dabbf149eaa75b6c8b6ba9c3c6edb4f47ea7"
+      },
+      {
+        "port": "recastnavigation",
+        "git_tree": "806d9850ce88d7190649eb90863455084516d519"
+      },
+      {
+        "port": "vcpkg-boost",
+        "git_tree": "858b0333b773b5650c3f19ef271e3205542d7ceb"
+      },
+      {
+        "port": "vcpkg-cmake",
+        "git_tree": "e74aa1e8f93278a8e71372f1fa08c3df420eb840"
+      },
+      {
+        "port": "vcpkg-cmake-config",
+        "git_tree": "97a63e4bc1a17422ffe4eff71da53b4b561a7841"
+      },
+      {
+        "port": "vcpkg-cmake-get-vars",
+        "git_tree": "d6510f888dd526c7828f6b973349e7f30be51254"
+      },
+      {
+        "port": "zlib",
+        "git_tree": "3f05e04b9aededb96786a911a16193cdb711f0c9"
+      }
+    ]
+  }
+]

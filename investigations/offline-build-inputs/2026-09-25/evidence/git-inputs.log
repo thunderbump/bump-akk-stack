@@ -1,0 +1,9 @@
+Running as unit: eqemu-build-input-git.service; invocation ID: 88a5778ed5914d329cb17b4b8670de5e
+Cloning into bare repository '/home/bump/.local/state/eqemu-vm-proof/build-inputs-20260925/registry-check.git'...
+{"source_bytes": 116453728, "versioned_trees_checked": 51}
+Finished with result: success
+Main processes terminated with: code=exited/status=0
+Service runtime: 18.904s
+CPU time consumed: 23.759s
+Memory peak: 1.5M
+Memory swap peak: 0B

@@ -1,0 +1,8 @@
+Running as unit: eqemu-build-input-verify.service; invocation ID: 111f2b17bd924c2b8ac12c54093fa598
+{"packages": 83, "download_bytes": 98431384, "signed_indexes": 6}
+Finished with result: success
+Main processes terminated with: code=exited/status=0
+Service runtime: 852ms
+CPU time consumed: 893ms
+Memory peak: 1.5M
+Memory swap peak: 0B

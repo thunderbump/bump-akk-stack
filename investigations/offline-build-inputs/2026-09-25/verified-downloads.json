@@ -1,0 +1,878 @@
+{
+  "status": "static-enumeration-not-solver-proof",
+  "eqemu_commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d",
+  "vcpkg_commit": "d1ff36c6520ee43f1a656c03cd6425c2974a449e",
+  "websocketpp_commit": "b9aeec6eaf3d5610503439b4fae3581d9aff08e8",
+  "ports": [
+    {
+      "port": "boost-array",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-assert",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-bind",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-cmake",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-concept-check",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-config",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-container-hash",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-conversion",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-core",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-describe",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-detail",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-dynamic-bitset",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-foreach",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-function",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-function-types",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-functional",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-fusion",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-headers",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-integer",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-io",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-iterator",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-move",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-mp11",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-mpl",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-optional",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-predef",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-preprocessor",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-range",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-regex",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-smart-ptr",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-static-assert",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-throw-exception",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-tuple",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-type-traits",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-typeof",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-uninstall",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "boost-utility",
+      "version": "1.89.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "cereal",
+      "version": "1.3.2",
+      "port_version": 1,
+      "features": []
+    },
+    {
+      "port": "fmt",
+      "version": "12.1.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "glm",
+      "version": "1.0.2",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "libmariadb",
+      "version": "3.4.7",
+      "port_version": 0,
+      "features": [
+        "openssl"
+      ]
+    },
+    {
+      "port": "libsodium",
+      "version": "1.0.20",
+      "port_version": 3,
+      "features": []
+    },
+    {
+      "port": "libuv",
+      "version": "1.51.0",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "luajit",
+      "version": "2023-01-04",
+      "port_version": 7,
+      "features": []
+    },
+    {
+      "port": "openssl",
+      "version": "3.6.0",
+      "port_version": 3,
+      "features": []
+    },
+    {
+      "port": "recastnavigation",
+      "version": "1.6.0",
+      "port_version": 1,
+      "features": []
+    },
+    {
+      "port": "vcpkg-boost",
+      "version": "2025-03-29",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "vcpkg-cmake",
+      "version": "2024-04-23",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "vcpkg-cmake-config",
+      "version": "2024-05-23",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "vcpkg-cmake-get-vars",
+      "version": "2025-05-29",
+      "port_version": 0,
+      "features": []
+    },
+    {
+      "port": "zlib",
+      "version": "1.3.1",
+      "port_version": 0,
+      "features": []
+    }
+  ],
+  "files": [
+    {
+      "role": "port-source",
+      "port": "boost-array",
+      "path": "downloads/boostorg-array-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/array/archive/boost-1.89.0.tar.gz",
+      "sha512": "5b417979dfca7acb34064282d46786054d8e7b4300e88c0ea902a049322f971735fbef35843c00f51fa1eaf8e24de7c870559d54be43d714ee5a02e75de16b20",
+      "authority": "ports/boost-array/portfile.cmake",
+      "bytes": 24973,
+      "sha256": "60cf52df4a5e065bb98c8381262307704fe8656980b133c78c7d0fe810357a00",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-assert",
+      "path": "downloads/boostorg-assert-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/assert/archive/boost-1.89.0.tar.gz",
+      "sha512": "943b201002a3dbe44137565a7448229194f7dfcd406855fc037c71faea0e295d25b54b6b000d0d893944572de5f9872adab35e442171d08f3abc83ea869f6d92",
+      "authority": "ports/boost-assert/portfile.cmake",
+      "bytes": 20885,
+      "sha256": "e25e42fbc5f77dcb203a3479eaf2e9303511f2a5bb8cbdf54e9c562fcbf29da1",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-bind",
+      "path": "downloads/boostorg-bind-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/bind/archive/boost-1.89.0.tar.gz",
+      "sha512": "dbba71a6a1e13a2ed36fc512d559dd2fe2ab63d9bc801b3cb1b79de7433ce21caa940505a3f83d1ca845933ccf547b34768dedae506de9237f5bfc4db699adcf",
+      "authority": "ports/boost-bind/portfile.cmake",
+      "bytes": 85939,
+      "sha256": "4169c6f99c9a22c096da319b93b930152073cd505c50b44a8da73f1a47b604cd",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-cmake",
+      "path": "downloads/boostorg-cmake-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/cmake/archive/boost-1.89.0.tar.gz",
+      "sha512": "dd17731fb03d634aa4751e5f36acd124d04eb71341c000df2a0f0b49d5bea0db50e54d1bf820e066a07a22fcaecc97dbe8caaf2883b6a2c1eb2b941938c67d25",
+      "authority": "ports/boost-cmake/portfile.cmake",
+      "bytes": 36263,
+      "sha256": "77111abebe9327ccd6ea33c729d5fae3c3aa42a2489f8c9f1adc94cd6fb6dff1",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-extra",
+      "port": "boost-cmake",
+      "path": "downloads/boost-1.89.0-LICENSE_1_0.txt",
+      "url": "https://raw.githubusercontent.com/boostorg/boost/refs/tags/boost-1.89.0/LICENSE_1_0.txt",
+      "sha512": "d6078467835dba8932314c1c1e945569a64b065474d7aced27c9a7acc391d52e9f234138ed9f1aa9cd576f25f12f557e0b733c14891d42c16ecdc4a7bd4d60b8",
+      "authority": "ports/boost-cmake/portfile.cmake",
+      "bytes": 1338,
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-concept-check",
+      "path": "downloads/boostorg-concept_check-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/concept_check/archive/boost-1.89.0.tar.gz",
+      "sha512": "2897f939fc23249c5d3466ad570b60c0d33b750eacf9ad8ddcf0cadd923f3830426a0632a3f18951dbc9006bd2a1d77ca2f3b83458038afd78bb7f345bac54c8",
+      "authority": "ports/boost-concept-check/portfile.cmake",
+      "bytes": 57958,
+      "sha256": "1670e50d93089ba8c461f934e56742cdb7eaf9a9afb31c0e9c088914daec79aa",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-config",
+      "path": "downloads/boostorg-config-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/config/archive/boost-1.89.0.tar.gz",
+      "sha512": "456b3d648e4ca2b25a70159d282ee25ee3451b05450d2bb0e16b03e0f96860e4e678e4c8f75200b65cff0d073138083df8f1876cf6c5c227feb62de180ff7f3d",
+      "authority": "ports/boost-config/portfile.cmake",
+      "bytes": 386610,
+      "sha256": "a16a53f8f0dde2a9ff485fb134a069e54aca738009d825837dac9a35cd4afe0a",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-container-hash",
+      "path": "downloads/boostorg-container_hash-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/container_hash/archive/boost-1.89.0.tar.gz",
+      "sha512": "bf2e3280a421665ad6081340024abc2473a3e5cc38eb308a4afb5815cb47d9fb4b622760be4b3f61bf8ff4344f81168b65b21946629370c2883082a4db05e0ef",
+      "authority": "ports/boost-container-hash/portfile.cmake",
+      "bytes": 67167,
+      "sha256": "b59a02885ce969be8eaadc1aee434b1027fc5d5e79c7a3ada50d028a2b5ff78c",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-conversion",
+      "path": "downloads/boostorg-conversion-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/conversion/archive/boost-1.89.0.tar.gz",
+      "sha512": "1da566c2aa7ea3bfe0654374d4c0de3cfd4858154f8eaf01c281495a825f3990ca2af388c83f9de30b2068baceed6d8da8679d8e9207b4711d60e3b6b95c5b56",
+      "authority": "ports/boost-conversion/portfile.cmake",
+      "bytes": 13519,
+      "sha256": "530810717119cfc6ea1c9e8e3eeb2a5332372359e17d273f770e04e9b4b5a33e",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-core",
+      "path": "downloads/boostorg-core-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/core/archive/boost-1.89.0.tar.gz",
+      "sha512": "f45500c9a33978fe6aeb45027e08159d276c9cb472c072e96b64c426ce3583870d24ce0a9d719442521383a4944a3a67b5b0d46e0025743556798e72a603059e",
+      "authority": "ports/boost-core/portfile.cmake",
+      "bytes": 173335,
+      "sha256": "032e8f535e901a2d1c24b06e7276ed8effa945a963505d09071c65a046272eef",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-describe",
+      "path": "downloads/boostorg-describe-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/describe/archive/boost-1.89.0.tar.gz",
+      "sha512": "e4aee186d8ed75ccd255f8d43356a040c4199483f4cce23b6332e12b531ecc546de6b1109e0658c146ac7f46687e5f07fed23f23986115aa42901ab8aaa0757b",
+      "authority": "ports/boost-describe/portfile.cmake",
+      "bytes": 42613,
+      "sha256": "7147ef717284a0b7a5b505821fbfb83caa6f279aa74b1db82f39ce817fb73d50",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-detail",
+      "path": "downloads/boostorg-detail-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/detail/archive/boost-1.89.0.tar.gz",
+      "sha512": "5d8fa6a8f83ad64427715f6f74114696abf4de377360aed34e8e36219eac895f0ee703fdc7fdabd1e018f0e87a786e215965d2f04e8ff133c7a1ff30d77bd0d3",
+      "authority": "ports/boost-detail/portfile.cmake",
+      "bytes": 75999,
+      "sha256": "7285a3c97d656d6a38d83d40915f28e517b1d99c50db18aaec97fffa5ed1e1a4",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-dynamic-bitset",
+      "path": "downloads/boostorg-dynamic_bitset-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/dynamic_bitset/archive/boost-1.89.0.tar.gz",
+      "sha512": "f018fe1de813bd731ed570601191e6c99180024abb7b7befcd759e09cb2da6ce63d60b1a74062b5902751750a5cb94e64357037623273bd72139bef9181dd536",
+      "authority": "ports/boost-dynamic-bitset/portfile.cmake",
+      "bytes": 63283,
+      "sha256": "2aa4008346ebb7b4052b4b469d6f5e2c16edda5f961982204d6d5fd23f1428b9",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-foreach",
+      "path": "downloads/boostorg-foreach-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/foreach/archive/boost-1.89.0.tar.gz",
+      "sha512": "1e12b58dc366dacd71f4153d6e069ca9284f9504addd8689f517a28b3207e6d8defbb8aab6aeabe7e5c8610e68afb5e718318ba0b09e6bddb1002ed3afa9ea1d",
+      "authority": "ports/boost-foreach/portfile.cmake",
+      "bytes": 21010,
+      "sha256": "c04f4b9f0099cbadbfd8c2b081fa08d9555c45de882f767584d107926b3b6e33",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-function",
+      "path": "downloads/boostorg-function-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/function/archive/boost-1.89.0.tar.gz",
+      "sha512": "8ba920093734f2111fafd84a7a6fb68819263830979f48026b47a22d5c3d9afc64f95ca4b98fd0beabe581d8304e79eca3983fcec191e059fdd9dbffe86fa074",
+      "authority": "ports/boost-function/portfile.cmake",
+      "bytes": 46576,
+      "sha256": "9ce2adf800f991fd4a335639c70bbfb3021f934f8c43de882d4bbc1c5b2b809a",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-function-types",
+      "path": "downloads/boostorg-function_types-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/function_types/archive/boost-1.89.0.tar.gz",
+      "sha512": "c54c976cc4be8a0e7712f634317b014f3fe949cec7ed50f7629a78175651d936a4137e79d015100fe3d48c8c4fd2663cf902b7b3d0241ec20cd619631609fc24",
+      "authority": "ports/boost-function-types/portfile.cmake",
+      "bytes": 79890,
+      "sha256": "4491ee740f1661f6d2a826a73e05d0da842cee8783c961e37c20efc238b588f9",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-functional",
+      "path": "downloads/boostorg-functional-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/functional/archive/boost-1.89.0.tar.gz",
+      "sha512": "6d780f96aa7056daf4c56e7ebbd677a9c81ea6cb00f6032df44ee5030e425dfd50e6d243e6da8773803c0a9277d78e83ead99dc96fa90e095ca7741b543bcc7e",
+      "authority": "ports/boost-functional/portfile.cmake",
+      "bytes": 57180,
+      "sha256": "aa69cc8c4d5d932ef33c6cf86c6c6494eea3dba930db60883f61c90db21de82a",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-fusion",
+      "path": "downloads/boostorg-fusion-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/fusion/archive/boost-1.89.0.tar.gz",
+      "sha512": "b019e2aa6d413c14cbadfca62130b8c115cdd2dc456a6b3943690da19366c8a991d37eafb624152819ad0b479db4e96327429e02e1a1b5bea0071f80370796c3",
+      "authority": "ports/boost-fusion/portfile.cmake",
+      "bytes": 718220,
+      "sha256": "8dde0b60dd707bff5a334c1050eaab9895d66e02c7292ed21cc272a4f52d64b2",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-headers",
+      "path": "downloads/boostorg-headers-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/headers/archive/boost-1.89.0.tar.gz",
+      "sha512": "de3c08b24daaa84d20b1aaed817e0ebc8f6666dcd3db3fe31b6a78bc6be9372fa59bf07bea6930fa9a60e798f7437303795fd3f7cb84df77cfac72e02a081ba7",
+      "authority": "ports/boost-headers/portfile.cmake",
+      "bytes": 2026,
+      "sha256": "6a528891d44f48812ee7e93bf518c403d4ab52064b0c89f55a069d4641294fb8",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-integer",
+      "path": "downloads/boostorg-integer-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/integer/archive/boost-1.89.0.tar.gz",
+      "sha512": "585ea52bf1311c35989a73459ba477afa3e9f57dd1ffb4e52798764cfff592fe9e1b6f1bef16676e116745d6be859ed22e435be9a448160f7124bd7c43972e04",
+      "authority": "ports/boost-integer/portfile.cmake",
+      "bytes": 48074,
+      "sha256": "8285a1ee5037a0ce797ed1c31e22f710086f89695598638ecda8b2ac7df739f4",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-io",
+      "path": "downloads/boostorg-io-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/io/archive/boost-1.89.0.tar.gz",
+      "sha512": "74e8c95092d432493125fb7970286f1e7602dcebcf7f568ab6f65b99006ade24801cf6e87446e5f6d12e2cacb9c5b828d58dccbc8a9deda01e6bcf1e5dd4fb27",
+      "authority": "ports/boost-io/portfile.cmake",
+      "bytes": 17478,
+      "sha256": "ad5f9cb49862bc6d7ea2da098d01358958a5c499a955ea88468088b8adf9aca5",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-iterator",
+      "path": "downloads/boostorg-iterator-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/iterator/archive/boost-1.89.0.tar.gz",
+      "sha512": "a7eba754136ef2c69b9914bf7a955301ec8c03bb5e90d7915474e55478528c398ff9d57dc698f8d10d2a473ddaa60aaa1aa920399955cadadd90a11729fb76e6",
+      "authority": "ports/boost-iterator/portfile.cmake",
+      "bytes": 1521505,
+      "sha256": "9cb36d339fa848a0af82cbbecff20ebdf77ef9211cef9d498a30ba0963ae568c",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-move",
+      "path": "downloads/boostorg-move-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/move/archive/boost-1.89.0.tar.gz",
+      "sha512": "02fe889c164447f4933230145394110dc8f62ac683b72f4f0726454a13e6bd9df2c82fc7ccabc84062a121bfad6cc8f50280c6cb63356c6b6a9683ec54307b80",
+      "authority": "ports/boost-move/portfile.cmake",
+      "bytes": 133471,
+      "sha256": "090d1f07815a1840d40b2aa45ce428fafa8d13983e27d3178b68a5b1bd4d84a3",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-mp11",
+      "path": "downloads/boostorg-mp11-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/mp11/archive/boost-1.89.0.tar.gz",
+      "sha512": "59b6b883317cc7473fcb22b8d590678a962ab01f7ed78fd35c513b8ada65e185dbbd4b4d92e8521076d617d6bec1df74b720f4e8a69e272b3d5ead18ef2f3400",
+      "authority": "ports/boost-mp11/portfile.cmake",
+      "bytes": 130785,
+      "sha256": "6dbfae01358be88ebefcdfb7707a2a68ba914c39dc83fdd85f556761fe0fafb4",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-mpl",
+      "path": "downloads/boostorg-mpl-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/mpl/archive/boost-1.89.0.tar.gz",
+      "sha512": "1e358a16a972784400c1705b9712d8451644b0560ae840999d92dfb3b0f92da394111ed2d98266e207911c13ab129f6837aa8a5356bcde0961ec006057d46e04",
+      "authority": "ports/boost-mpl/portfile.cmake",
+      "bytes": 1514792,
+      "sha256": "e2a852cffe1a8dd87f37c527995c94a2deac9c152f6534ae416d9d55b67806a8",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-optional",
+      "path": "downloads/boostorg-optional-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/optional/archive/boost-1.89.0.tar.gz",
+      "sha512": "6fdd4be76db2d03711767345da7c0c47d9620fc683e1bf85a67279ef0c198dce7fc240f28d389eee059db36f8c4bf82761b85307faa2435dc6034196b5cf73a4",
+      "authority": "ports/boost-optional/portfile.cmake",
+      "bytes": 86714,
+      "sha256": "65bf01bc1c5b597ce9f86859d8bba439a599e8c7c96d3c66f16e783a9f7acc51",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-predef",
+      "path": "downloads/boostorg-predef-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/predef/archive/boost-1.89.0.tar.gz",
+      "sha512": "868e2234953ec24e63e68c8d12a55abc7759e553538b258f369a30960e1eaf99ec60cc231428b4ff3c20c4b6b01e00dcf4ba0a6d6f245b108af11f7c9de95d04",
+      "authority": "ports/boost-predef/portfile.cmake",
+      "bytes": 109567,
+      "sha256": "5e673c206ca834655087de62e04a67452824196fc7aab28e8f26f546a0cc5a79",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-preprocessor",
+      "path": "downloads/boostorg-preprocessor-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/preprocessor/archive/boost-1.89.0.tar.gz",
+      "sha512": "08cd63af1dd23afb17de7ce565c64d6eee1929ed32d06d54c9525fd50b50d6618034fa52507ffa2dd85ad5f91df101d8eae1b417a7dcbf0168466483089f49ce",
+      "authority": "ports/boost-preprocessor/portfile.cmake",
+      "bytes": 866739,
+      "sha256": "53de1b2e64706b73903d9f3957525fa8fa620445ec0d596aa6fb8335af6f45c0",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-range",
+      "path": "downloads/boostorg-range-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/range/archive/boost-1.89.0.tar.gz",
+      "sha512": "ec56996272195bf37642faa34864e3c8cc99bf671588cc6f7e0a08e9cba89612528fc0bc43fa8efd0cb4547c9999b7b1c16d2aa11596c200b8bc45e75be12e34",
+      "authority": "ports/boost-range/portfile.cmake",
+      "bytes": 207537,
+      "sha256": "7fc884401a75ac006affedf233c968d852c917bf120c343063f4f6e288ce770c",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-regex",
+      "path": "downloads/boostorg-regex-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/regex/archive/boost-1.89.0.tar.gz",
+      "sha512": "5319e20f93f6618f911366e05132d376b16f11a5c55f7f712d550d7c7eb5151f2c2fc9dde25fd1c8ac39aafc4852ed73292b287a1de847df00ff1a358fcd1983",
+      "authority": "ports/boost-regex/portfile.cmake",
+      "bytes": 512170,
+      "sha256": "97d6caa4c273883f6432a0914d4b77967adf665dfeb209c239b6315c5f7e06db",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-smart-ptr",
+      "path": "downloads/boostorg-smart_ptr-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/smart_ptr/archive/boost-1.89.0.tar.gz",
+      "sha512": "ca1399f580291224dc3a3631b5446cbdbba69e8ccfc38ce4007247beccb9a90ca366fcc84b1a8c3f502e74cfa2c98987d5f1e6a8372a394051a47f21d952c363",
+      "authority": "ports/boost-smart-ptr/portfile.cmake",
+      "bytes": 174966,
+      "sha256": "5e924e6ca214b399f365d7ee5edc4563ce8d920ea1de4759813e26fc45267ef9",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-static-assert",
+      "path": "downloads/boostorg-static_assert-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/static_assert/archive/boost-1.89.0.tar.gz",
+      "sha512": "a57158d4d67168f7afe8cc2e221d2707ef7710528993929de185f1676ad7905ad0b3b0b40b8f55e90255c4302bc8e8e912e64eae097c80f61d3336f6df26733e",
+      "authority": "ports/boost-static-assert/portfile.cmake",
+      "bytes": 14615,
+      "sha256": "48ef5ced01a5a4a0b940eb23eb5a0d5a54c8f27ca7326f86a2b90be405f5d53f",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-throw-exception",
+      "path": "downloads/boostorg-throw_exception-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/throw_exception/archive/boost-1.89.0.tar.gz",
+      "sha512": "99af9a7a29113bf93c54e64c6f2bc748273f3d9d109bd8841bdb1f3e2ea28b01880213d6dbc49c3afe0884da251f60a33f12a40f1ab694b1ceef54c25e3912a9",
+      "authority": "ports/boost-throw-exception/portfile.cmake",
+      "bytes": 20201,
+      "sha256": "7deb2dc859f608355e583747183d323d256bc4dd3230fc5958272e7dce5d1551",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-tuple",
+      "path": "downloads/boostorg-tuple-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/tuple/archive/boost-1.89.0.tar.gz",
+      "sha512": "4a25148fbaa13e1ff926eddb09e201515f0b4bbea502543c0e402aabc7875123e7e543f7935232b84a02884337f87f67d0992ba690db95ba977685238c250cba",
+      "authority": "ports/boost-tuple/portfile.cmake",
+      "bytes": 31520,
+      "sha256": "e7e35ab4dcee831f93f6b17f91c266649a8fa8a6a24d3288f8c2169c20c1c236",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-type-traits",
+      "path": "downloads/boostorg-type_traits-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/type_traits/archive/boost-1.89.0.tar.gz",
+      "sha512": "f1c653f741fc28af8e50ef2993e2997c18c13e2314583c91df5f484c0b08e05f676e180516ccb296cd1d14b8305df9fc2adfff57a9a548a7c727a566074dcf58",
+      "authority": "ports/boost-type-traits/portfile.cmake",
+      "bytes": 399922,
+      "sha256": "228a0dfdf69f60c4eb9ba47c98a358d3163a65b45e9c338793b87df8dba269c0",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-typeof",
+      "path": "downloads/boostorg-typeof-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/typeof/archive/boost-1.89.0.tar.gz",
+      "sha512": "520f367227391f0acf6bb42b2c70f4a04d367dda2ecbf36518bb7412d6cb72e38315f207517eba1da6b2d5e582b1dc5f911ce48b93a96a3fb147c051e985f5e2",
+      "authority": "ports/boost-typeof/portfile.cmake",
+      "bytes": 22714,
+      "sha256": "c92eb1e2d50d8dac61834e82b26cf8763d27617c30e88642d7b503471603f39d",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "boost-utility",
+      "path": "downloads/boostorg-utility-boost-1.89.0.tar.gz",
+      "url": "https://github.com/boostorg/utility/archive/boost-1.89.0.tar.gz",
+      "sha512": "a29ee7bb661bb04ed7a933ac6a68babee0fe8f11a37127b2ed4248d7446ed3f46732aa2f9a4925a6422640fe3c7ff3761cf33ed03833fb65ae87ce38d54a8823",
+      "authority": "ports/boost-utility/portfile.cmake",
+      "bytes": 161355,
+      "sha256": "9f8c8712e7acadd5cf98fb718952d4b966a4354fd6e26a9e3f74b1f7b75ad98f",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "cereal",
+      "path": "downloads/USCiLab-cereal-v1.3.2.tar.gz",
+      "url": "https://github.com/USCiLab/cereal/archive/v1.3.2.tar.gz",
+      "sha512": "98d306d6292789129675f1c5c5aedcb90cfcc1029c4482893a8f9b23f3c9755e5ed4762d7a528f215345cae6392e87cd8d89467115b6f031b41c8673d6b4b109",
+      "authority": "ports/cereal/portfile.cmake",
+      "bytes": 385903,
+      "sha256": "16a7ad9b31ba5880dac55d62b5d6f243c3ebc8d46a3514149e56b5e7ea81f85f",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "fmt",
+      "path": "downloads/fmtlib-fmt-12.1.0.tar.gz",
+      "url": "https://github.com/fmtlib/fmt/archive/12.1.0.tar.gz",
+      "sha512": "f0da82c545b01692e9fd30fdfb613dbb8dd9716983dcd0ff19ac2a8d36f74beb5540ef38072fdecc1e34191b3682a8542ecbf3a61ef287dbba0a2679d4e023f2",
+      "authority": "ports/fmt/portfile.cmake",
+      "bytes": 711419,
+      "sha256": "ea7de4299689e12b6dddd392f9896f08fb0777ac7168897a244a6d6085043fea",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "glm",
+      "path": "downloads/g-truc-glm-1.0.2.tar.gz",
+      "url": "https://github.com/g-truc/glm/archive/1.0.2.tar.gz",
+      "sha512": "e66e4f192f6579128198c47ed20442dda13c741f371b447722b7449200f05785e1b69386a465febf97f33b437f6eb69b3fb282e1e9eabf6261eb7b57998cd68c",
+      "authority": "ports/glm/portfile.cmake",
+      "bytes": 4597309,
+      "sha256": "19edf2e860297efab1c74950e6076bf4dad9de483826bc95e2e0f2c758a43f65",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "libmariadb",
+      "path": "downloads/mariadb-corporation-mariadb-connector-c-v3.4.7.tar.gz",
+      "url": "https://github.com/mariadb-corporation/mariadb-connector-c/archive/v3.4.7.tar.gz",
+      "sha512": "0e06452539fcea4e21c3922b58b7079aa5d467e2ac704fe586fcd83563f69c4e0536d40e0020170f7670320cc71cd9de2a110f3f4c6ed52233aa329c3e495fd5",
+      "authority": "ports/libmariadb/portfile.cmake",
+      "bytes": 1390647,
+      "sha256": "cf81cd1c71c3199da9d2125aee840cb6083d43e1ea4c60c4be5045bfc7824eba",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-extra",
+      "port": "libmariadb",
+      "path": "downloads/mariadb-corporation-mariadb-connector-c-fp_is_not_const-0ca807a.diff",
+      "url": "https://github.com/mariadb-corporation/mariadb-connector-c/commit/0ca807a210befe9c159d6b9a2c1d5de8f26869ad.diff?full_index=1",
+      "sha512": "1695ae5408fd54b148315aaa47806371e7db5f0001fc98bc480914aeaa41d48c0841ff64e99266b6c0ea1262ac65983507faf46306d98292c87926f74900fee2",
+      "authority": "ports/libmariadb/portfile.cmake",
+      "bytes": 910,
+      "sha256": "3af1544e0a3ea8e16d942e2801d3183359249fedf52c50fee74e79ebcb4f939e",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "libsodium",
+      "path": "downloads/jedisct1-libsodium-1.0.20-RELEASE.tar.gz",
+      "url": "https://github.com/jedisct1/libsodium/archive/1.0.20-RELEASE.tar.gz",
+      "sha512": "477b9dc10d87ae3c83db3fc207b50b9fe39593684a59f164986cce32bdaba95db0df7dee32149bf9a23c5794354fce8241d88a9a4bd4bbf2630483cbbc378c2f",
+      "authority": "ports/libsodium/portfile.cmake",
+      "bytes": 2151843,
+      "sha256": "8e5aeca07a723a27bbecc3beef14b0068d37e7fc0e97f51b3f1c82d2a58005c1",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "libuv",
+      "path": "downloads/libuv-libuv-v1.51.0.tar.gz",
+      "url": "https://github.com/libuv/libuv/archive/v1.51.0.tar.gz",
+      "sha512": "cf3ca916fc3a762a194dac86718a5a7fe24f230e34172a48f9b3401ad72fbc1cf21b46ceaba956cdf6783d323e518d40f8632fff965943869819a1c26992a3c1",
+      "authority": "ports/libuv/portfile.cmake",
+      "bytes": 1352232,
+      "sha256": "27e55cf7083913bfb6826ca78cde9de7647cded648d35f24163f2d31bb9f51cd",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "luajit",
+      "path": "downloads/LuaJIT-LuaJIT-d0e88930ddde28ff662503f9f20facf34f7265aa.tar.gz",
+      "url": "https://github.com/LuaJIT/LuaJIT/archive/d0e88930ddde28ff662503f9f20facf34f7265aa.tar.gz",
+      "sha512": "e4111b2d7eeb05676c62d69da13a380a51d98f082c0be575a414c09ee27ff17d101b5b4a95e1b8a1bad14d55a4d2b305718a11878fbf36e0d3d48e62ba03407f",
+      "authority": "ports/luajit/portfile.cmake",
+      "bytes": 1075279,
+      "sha256": "aa354d1265814db5a1ee9dfff6049e19b148e1fd818f1ecfa4fcf2b19f6e4dd9",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "openssl",
+      "path": "downloads/openssl-openssl-openssl-3.6.0.tar.gz",
+      "url": "https://github.com/openssl/openssl/archive/openssl-3.6.0.tar.gz",
+      "sha512": "3e1796708155454c118550ba0964b42c0c1055b651fec00cfb55038e8a8abbf5f85df02449e62b50b99d2a4a2f7b47862067f8a965e9c8a72f71dee0153672d9",
+      "authority": "ports/openssl/portfile.cmake",
+      "bytes": 55165518,
+      "sha256": "1535d184cbd04ea6b20485b98719fa8d609e45c3657f7c65b8299ae606f78159",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "recastnavigation",
+      "path": "downloads/recastnavigation-recastnavigation-v1.6.0.tar.gz",
+      "url": "https://github.com/recastnavigation/recastnavigation/archive/v1.6.0.tar.gz",
+      "sha512": "7567aaa78219cc490a6f76210fba1f130f0c17aeaa06432ab1207e0fd03404abe31042e8b03971aa0d04ad65d39469f13575fe0072fb920c38581d39568b70fb",
+      "authority": "ports/recastnavigation/portfile.cmake",
+      "bytes": 1280501,
+      "sha256": "d48ca0121962fa0639502c0f56c4e3ae72f98e55d88727225444f500775c0074",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "port-source",
+      "port": "zlib",
+      "path": "downloads/madler-zlib-v1.3.1.tar.gz",
+      "url": "https://github.com/madler/zlib/archive/v1.3.1.tar.gz",
+      "sha512": "8c9642495bafd6fad4ab9fb67f09b268c69ff9af0f4f20cf15dfc18852ff1f312bd8ca41de761b3f8d8e90e77d79f2ccacd3d4c5b19e475ecf09d021fdfe9088",
+      "authority": "ports/zlib/portfile.cmake",
+      "bytes": 1572744,
+      "sha256": "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "portable-tool",
+      "name": "cmake",
+      "path": "downloads/cmake-3.30.1-linux-x86_64.tar.gz",
+      "url": "https://github.com/Kitware/CMake/releases/download/v3.30.1/cmake-3.30.1-linux-x86_64.tar.gz",
+      "sha512": "84ce1333ed696a1736986fba2853c5d8db0e4c9addaf4a4723911248c6d49ecf545adf8bd46091d198fc7bd1e6c896798661463aa1ce3a726a093883aaa19adf",
+      "authority": "scripts/vcpkg-tools.json",
+      "bytes": 53635525,
+      "sha256": "ac31f077ef3378641fa25a3cb980d21b2f083982d3149a8f2eb9154f2b53696b",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "portable-tool",
+      "name": "ninja",
+      "path": "downloads/ninja-linux-1.13.1.zip",
+      "url": "https://github.com/ninja-build/ninja/releases/download/v1.13.1/ninja-linux.zip",
+      "sha512": "ca4e424c46c12f4e120ab2030edcff8e34cf5db9d05b4364f2d4be10f46e1a29eef64f7b4bf65fb33cd629b3bc3bcb9292341f92953968ef226f44b52959d916",
+      "authority": "scripts/vcpkg-tools.json",
+      "bytes": 134048,
+      "sha256": "0830252db77884957a1a4b87b05a1e2d9b5f658b8367f82999a941884cbe0238",
+      "acquisition": "verified-local-cache-copy"
+    },
+    {
+      "role": "vcpkg-executable",
+      "path": "tools/vcpkg",
+      "url": "https://github.com/microsoft/vcpkg-tool/releases/download/2025-10-16/vcpkg-glibc",
+      "sha512": "191698aeff93fee0bdbfb3066afb50e40b3ac1b41d57ecb286e4fd74f99eaa9af55396eec67606c42362a67d5ac3f2114f52d7fe39a7955c99aeaea71e18a996",
+      "authority": "scripts/vcpkg-tool-metadata.txt",
+      "bytes": 8410064,
+      "sha256": "35b9a7a3ea7f8f88a42a1a5673669152e360ea39b5f301567ca8081e131abb65",
+      "acquisition": "downloaded-and-hash-verified"
+    }
+  ]
+}
