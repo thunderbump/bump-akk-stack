@@ -1,0 +1,40 @@
+{
+  "scope": "Operational repeatability of fixed offline build and upstream utility tests; not bit-for-bit binary reproducibility or game-server runtime proof",
+  "checks": {
+    "input_hashes_match": true,
+    "tool_facts_match": true,
+    "solver_output_hash_matches": true,
+    "effective_cmake_matches": true,
+    "cmake_cache_hash_matches": true,
+    "both_builds_tests_cleanup_passed": true,
+    "receipt_hashes_verified": true,
+    "both_leases_released_and_scratch_absent": true
+  },
+  "runs": {
+    "03": {
+      "suite_sha256": "3dc79bb99749f6d202e37aa217e94b3e3eb27fe12d4418c70aa93b0e3da834d7",
+      "duration_seconds": 1985.5637621879578,
+      "qemu_memory_peak_bytes": 4425228288,
+      "qemu_memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "guest_disk_used_bytes": 8245874688
+    },
+    "04": {
+      "suite_sha256": "b6f4d0f6dc83b1f4dc1aedcdd0e19a3e6629ea96da8a6262d977d83ee3980bc9",
+      "duration_seconds": 1955.4933466911316,
+      "qemu_memory_peak_bytes": 4357869568,
+      "qemu_memory_events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+      "guest_disk_used_bytes": 8245886976
+    }
+  },
+  "binary_hash_matches": {
+    "world": false,
+    "zone": false,
+    "shared_memory": false,
+    "loginserver": false,
+    "ucs": false,
+    "queryserv": false,
+    "eqlaunch": false,
+    "tests": false
+  },
+  "binary_difference_cause": "Not determined by these receipts; guest disks were deliberately removed during cleanup."
+}
