@@ -1,0 +1,20 @@
+test_cleanup_after_successful_release (__main__.Acceptance.test_cleanup_after_successful_release) ... ok
+test_controller_deadlines_and_network_boundary (__main__.Acceptance.test_controller_deadlines_and_network_boundary) ... ok
+test_green_requires_both_workload_and_cleanup (__main__.Acceptance.test_green_requires_both_workload_and_cleanup) ... ok
+test_clean_success (__main__.GuestRunner.test_clean_success) ... ok
+test_log_overflow (__main__.GuestRunner.test_log_overflow) ... ok
+test_missing_and_tampered_media (__main__.GuestRunner.test_missing_and_tampered_media) ... ok
+test_nonzero (__main__.GuestRunner.test_nonzero) ... ok
+test_timeout (__main__.GuestRunner.test_timeout) ... ok
+test_bad_json (__main__.Protocol.test_bad_json) ... ok
+test_failure_stays_failure (__main__.Protocol.test_failure_stays_failure) ... ok
+test_good_and_duplicate_end (__main__.Protocol.test_good_and_duplicate_end) ... ok
+test_incomplete_success (__main__.Protocol.test_incomplete_success) ... ok
+test_limits (__main__.Protocol.test_limits) ... ok
+test_order_and_nonce (__main__.Protocol.test_order_and_nonce) ... ok
+test_split_frame (__main__.Protocol.test_split_frame) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.218s
+
+OK

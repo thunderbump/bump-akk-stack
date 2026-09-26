@@ -1,0 +1,15 @@
+{
+  "previous_iso_sha256": "8c296a41d6a23d33985a4d820cab1727738155d1d2ad10e2583775597455cb9b",
+  "change": "Add missing pinned patchelf post-build tool; ports, OS packages and source commits unchanged",
+  "added": {
+    "role": "portable-tool",
+    "name": "patchelf",
+    "path": "downloads/patchelf-0.15.5-x86_64.tar.gz",
+    "url": "https://github.com/NixOS/patchelf/releases/download/0.15.5/patchelf-0.15.5-x86_64.tar.gz",
+    "sha512": "1a638467dc71119d88657e83825bf9c4e65dbb2d3bbbd0267963a507e29429569dc7777490724928c86efc50af82d91b0163b29a09f8f99e62ebf6d9bb1567d2",
+    "authority": "scripts/cmake/vcpkg_find_acquire_program(PATCHELF).cmake",
+    "bytes": 497060,
+    "sha256": "ed3b12af4b61733ee65e18d58c52855469ff7d879d91e1ba4239d3b73af8c295",
+    "acquisition": "verified-local-cache-copy"
+  }
+}

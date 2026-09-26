@@ -1,0 +1,16 @@
+{
+  "active": {},
+  "released": [
+    {
+      "state": "active",
+      "name": "eqemu-build-01",
+      "worker_sha256": "5143d61c19f034df5a9d9db65e13bf1ab155e75aab24e813c1381197d4015ccd",
+      "admission": {
+        "free_bytes": 261825871872,
+        "free_inodes": 49758701,
+        "mem_available": 25304907776
+      },
+      "uuid": "a4913a81-27d5-4fb0-b6b4-d529b009d465"
+    }
+  ]
+}
