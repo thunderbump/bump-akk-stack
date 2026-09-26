@@ -1,0 +1,25 @@
+{
+  "status": "prepared-unexecuted",
+  "local_control_tests": 33,
+  "runtime_tests": 17,
+  "retained_build_tests": 16,
+  "static_check": {
+    "inputs_and_worker_verified": true,
+    "vm_started": false
+  },
+  "admission": {
+    "free_bytes": 259393011712,
+    "free_inodes": 49749634,
+    "mem_available": 25140207616
+  },
+  "input_copy_bytes": 1266475520,
+  "worker_peak_reserved_bytes": 35626213888,
+  "worker_cap_bytes": 42949672960,
+  "preparation_allocated_bytes": 745472,
+  "known_remaining_cases": [
+    "first missing-water-map plus positive guest execution",
+    "runtime cancellation",
+    "fresh successful repeat"
+  ],
+  "operator_required": "sudo password; sudo -n unavailable"
+}
