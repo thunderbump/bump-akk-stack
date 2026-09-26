@@ -1,0 +1,16 @@
+{
+  "worker_sha256": "a9e49677ab1a83a67dafaf97f288b67307611e02679a6a9840c2d4a6f543a2d2",
+  "launcher_sha256": "e0d1a7d799caa09a22b9003f79c97e46a704ef107d153403dfbe56f1296ab148",
+  "seed_sha256": "4e08ad92914498a5ae5bacd261598e2b0296f82d8f877763822ee6d4d12dca8d",
+  "seed_bytes": 387072,
+  "input_iso_sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4",
+  "previous_suite_sha256": "3dc79bb99749f6d202e37aa217e94b3e3eb27fe12d4418c70aa93b0e3da834d7",
+  "unchanged_files": {
+    "guest.py": "576975ef8a2da548362cd1d7fa9e80129cb6756bcb9bb14df2e4bea4e55562e8",
+    "host-transport.py": "d353e76e1f0cfa7c2b416cd5809ca10f50505d4e4d78cc7d613432cb7ef63daa",
+    "seed.iso": "4e08ad92914498a5ae5bacd261598e2b0296f82d8f877763822ee6d4d12dca8d",
+    "user-data": "2a08f69ae1e5149992b581e2f881d2d3415f8c5a8c5a78acb11f313144a7142b",
+    "meta-data": "9a158b484b36cd1b0d25c029fa320ef46d01d9b25afe11736dd64dbcc36cbae8"
+  },
+  "worker_changes_only_run_identity": true
+}
