@@ -25,7 +25,7 @@ CASE='build'
 GIB=1024**3
 FILES={
  'base.qcow2':('inputs/ubuntu-noble-20260911/ubuntu-24.04-server-cloudimg-amd64.img',625256960,'612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354'),
- 'seed.iso':('runtime-proof-inputs-01/seed.iso',411648,'8a7cac0e11297e0447b989691722092608739b54d4e97a25f1fee234a4f072d1'),
+ 'seed.iso':('runtime-proof-inputs-01/seed.iso',411648,'a000b414e5ade51096ff11d6f2c3b9021f8737ec5010bf0977b54aeea6f2eeee'),
  'runtime.iso':('runtime-inputs-20260926/runtime-inputs.iso',171806720,'5fa2a4822e03ee7693c566e8670ddab5ee35c7a5d25d4671ac57c53ddf82c767'),
  'fixture.iso':('build-inputs-20260925-v3/build-inputs.iso',469000192,'02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4'),
 }
@@ -496,7 +496,7 @@ def validate_runtime_result(v,events):
     if not isinstance(v,dict) or set(v)!={'input_manifest_sha256','package_plan_sha256','negative','positive','disk_growth_bytes'}:raise RuntimeError('Runtime result shape')
     if v['input_manifest_sha256']!=RUNTIME_MANIFEST_SHA or not hash_value(v['package_plan_sha256']):raise RuntimeError('Runtime result identity')
     if type(v['disk_growth_bytes']) is not int or not 0<=v['disk_growth_bytes']<=8*GIB:raise RuntimeError('Runtime disk growth')
-    keys={'accepted','missing_readiness','flags','samples','duration','exits','schema_sha256','state_before_sha256','state_after_sha256','changed_tables','shared','logs'}
+    keys={'accepted','missing_readiness','flags','samples','duration','exits','config_sha256','schema_sha256','state_before_sha256','state_after_sha256','changed_tables','shared','logs'}
     for name in ['negative','positive']:
         x=v[name];e=events[name];needed=READY_FLAGS-({'water_map'} if name=='negative' else set())
         if not isinstance(x,dict) or set(x)!=keys or e['state']!='completed':raise RuntimeError('Incomplete runtime result')
@@ -504,7 +504,7 @@ def validate_runtime_result(v,events):
         if x['flags']!=sorted(needed) or type(x['samples']) is not int or x['samples']!=e['samples'] or x['samples']<(7 if name=='positive' else 4):raise RuntimeError('Incomplete runtime readiness/samples')
         if type(x['duration']) not in [int,float] or x['duration']!=e['elapsed'] or x['duration']<(60 if name=='positive' else 15):raise RuntimeError('Incomplete health window')
         if x['exits']!={'zone':0,'world':0,'database':0} or any(type(n) is not int for n in x['exits'].values()):raise RuntimeError('Missing graceful shutdown')
-        if any(not hash_value(x[k]) for k in ['schema_sha256','state_before_sha256','state_after_sha256']):raise RuntimeError('Missing state hashes')
+        if any(not hash_value(x[k]) for k in ['config_sha256','schema_sha256','state_before_sha256','state_after_sha256']):raise RuntimeError('Missing state hashes')
         if not isinstance(x['changed_tables'],list) or any(not isinstance(t,str) for t in x['changed_tables']) or set(x['changed_tables'])-MUTABLE_TABLES:raise RuntimeError('Unexpected changed tables')
         for key in ['shared','logs']:
             records=x[key]

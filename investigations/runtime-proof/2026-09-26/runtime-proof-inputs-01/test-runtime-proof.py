@@ -23,7 +23,7 @@ def case_frames(p,case):
 
 def record(case):
  f={'bytes':123,'sha256':'4'*64}
- return {'accepted':case=='positive','missing_readiness':['water_map'] if case=='negative' else [],'flags':sorted(W.READY_FLAGS-({'water_map'} if case=='negative' else set())),'samples':4 if case=='negative' else 7,'duration':15 if case=='negative' else 60,'exits':{'zone':0,'world':0,'database':0},'schema_sha256':'5'*64,'state_before_sha256':'6'*64,'state_after_sha256':'7'*64,'changed_tables':['eqtime'],'shared':{'items':f,'spells':f},'logs':dict.fromkeys(['world-console.log','zone-console.log','database-console.log'],f)}
+ return {'accepted':case=='positive','missing_readiness':['water_map'] if case=='negative' else [],'flags':sorted(W.READY_FLAGS-({'water_map'} if case=='negative' else set())),'samples':4 if case=='negative' else 7,'duration':15 if case=='negative' else 60,'exits':{'zone':0,'world':0,'database':0},'config_sha256':'a'*64,'schema_sha256':'5'*64,'state_before_sha256':'6'*64,'state_after_sha256':'7'*64,'changed_tables':['eqtime'],'shared':{'items':f,'spells':f},'logs':dict.fromkeys(['world-console.log','zone-console.log','database-console.log'],f)}
 def success():
  return {'kind':'result','nonce':N,'ok':True,'checks':dict.fromkeys(['inputs','packages','solver','negative_control','perl','system_zlib','build','tests','runtime'],True),'binaries':dict.fromkeys(['world','zone','shared_memory','loginserver','ucs','queryserv','eqlaunch','tests'],'8'*64),'cache_sha256':'9'*64,'guest_disk_used_bytes':1024,'effective_cmake':{},'runtime':{'input_manifest_sha256':W.RUNTIME_MANIFEST_SHA,'package_plan_sha256':'0'*64,'negative':record('negative'),'positive':record('positive'),'disk_growth_bytes':1024}}
 def completed():

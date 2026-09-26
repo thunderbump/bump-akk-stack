@@ -185,6 +185,8 @@ class Database:
   if set(actual)!=set(tables):raise RuntimeError('Unexpected table set: '+str(set(actual)^set(tables)))
   version=self.query(label+'-version','SELECT version,bots_version,custom_version FROM db_version;').strip()
   if version!='9328\t0\t0':raise RuntimeError('Unexpected database version')
+  policy=self.query(label+'-policy',"SELECT rule_value FROM rule_values WHERE ruleset_id=1 AND rule_name='Bots:Enabled';").strip()
+  if policy!='false':raise RuntimeError('Bots rule changed')
   empty=sorted(set(inventory['groups']['player']['tables']+inventory['groups']['login']['tables']))
   sql=' UNION ALL '.join("SELECT '"+t+"',COUNT(*) FROM `"+t+'`' for t in empty)+';'
   counts=self.query(label+'-empty',sql)
@@ -220,7 +222,7 @@ def check_state(before,after):
 def scenario(case):
  event(case,'started');root=ROOT/case;root.mkdir();db=Database(case,root);world=zone=None
  try:
-  db.initialize();inventory=db.import_fixture();server=configure(case,root,db)
+  db.initialize();inventory=db.import_fixture();server=configure(case,root,db);config_sha=B.sha(server/'eqemu_config.json')
   expected_zone=db.query('zone-content',"SELECT zoneidnumber,version,short_name FROM zone WHERE zoneidnumber=202 AND version=0; SELECT COUNT(*)>0 FROM items; SELECT COUNT(*)>0 FROM spells_new;").strip()
   if expected_zone!='202\t0\tpoknowledge\n1\n1':raise RuntimeError('Required public content missing')
   shared_log=B.command(case+'-shared-memory',[str(B.WORK/'build/bin/shared_memory')],cwd=server,timeout=180)
@@ -258,8 +260,9 @@ def scenario(case):
    time.sleep(10 if case=='positive' else 5)
   exits={'zone':zone.stop(),'world':world.stop()};zone=world=None
   after=db.snapshot('after',inventory);changed=check_state(before,after)
+  if B.sha(server/'eqemu_config.json')!=config_sha:raise RuntimeError('Runtime configuration changed')
   exits['database']=db.service.stop()
-  result={'accepted':case=='positive','missing_readiness':['water_map'] if case=='negative' else [],'flags':sorted(flags),'samples':samples,'duration':round(elapsed,3),'exits':exits,'schema_sha256':before['schema_sha256'],'state_before_sha256':hashlib.sha256(json.dumps(before,sort_keys=True).encode()).hexdigest(),'state_after_sha256':hashlib.sha256(json.dumps(after,sort_keys=True).encode()).hexdigest(),'changed_tables':changed,'shared':shared,'logs':{p.name:{'bytes':p.stat().st_size,'sha256':B.sha(p)} for p in root.glob('*-console.log')}}
+  result={'accepted':case=='positive','missing_readiness':['water_map'] if case=='negative' else [],'flags':sorted(flags),'samples':samples,'duration':round(elapsed,3),'exits':exits,'config_sha256':config_sha,'schema_sha256':before['schema_sha256'],'state_before_sha256':hashlib.sha256(json.dumps(before,sort_keys=True).encode()).hexdigest(),'state_after_sha256':hashlib.sha256(json.dumps(after,sort_keys=True).encode()).hexdigest(),'changed_tables':changed,'shared':shared,'logs':{p.name:{'bytes':p.stat().st_size,'sha256':B.sha(p)} for p in root.glob('*-console.log')}}
   event(case,'completed',accepted=result['accepted'],missing_readiness=result['missing_readiness'])
   return result
  finally:

@@ -8,7 +8,7 @@ UNIT='eqemu-vm-runtime-01-suite.service';CHILD='eqemu-vm-recovery-parent.service
 CTL='eqemuvmruntime01ctl.slice';CTLFILE=P('/run/systemd/system')/CTL
 CTLTEXT='[Unit]\nDescription=Owned offline build proof controllers\nStopWhenUnneeded=yes\n[Slice]\nMemoryMax=1G\nMemorySwapMax=0\n'
 CASES=('build',)
-HASHES={'build-worker.py': '444d5a76a434cf35743dd0431870bd3492bc7ce0d3f30140bb2e7504dd879309'}
+HASHES={'build-worker.py': '6d09bbbdfc0818576cd18f7b71831c21c21b62aa0c84dfbb266e6d76a1bf36f7'}
 ENV={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8'}
 GIB=1024**3
 
