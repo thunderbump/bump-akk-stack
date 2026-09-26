@@ -1,0 +1,6 @@
+test_pool_names_fail_staging_succeeds_missing_archive_fails (__main__.OfflineCache.test_pool_names_fail_staging_succeeds_missing_archive_fails) ... ok
+
+----------------------------------------------------------------------
+Ran 1 test in 1.254s
+
+OK

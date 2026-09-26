@@ -1,0 +1,122 @@
+{
+  "scope": "selected failure facts; full bounded raw evidence retained under runtime-proof-01",
+  "suite_sha256": "fdbfd9aca8cec421c69087ec39a81980ba7a5ad54bca56f217169bf76a0b0c4c",
+  "report_sha256": "08950d5200fcdd57300f62515f8e8dd3d5d3dcd3c3f8089a1fb7abd49f62667a",
+  "error": "Guest build failed: runtime-package-plan: exit 100\nReading package lists...\nBuilding dependency tree...\nReading state information...\nSuggested packages:\n  libclone-perl libmldbm-perl libnet-daemon-perl libsql-statement-perl mailx\n  mariadb-test\nRecommended packages:\n  libjson-xs-perl libhtml-template-perl mariadb-plugin-provider-bzip2\n  mariadb-plugin-provider-lz4 mariadb-plugin-provider-lzma\n  mariadb-plugin-provider-lzo mariadb-plugin-provider-snappy pv\nE: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?\n",
+  "stages": {
+    "mount-input": {
+      "state": "passed",
+      "at": 1790454954.0514026
+    },
+    "mount-runtime": {
+      "state": "passed",
+      "at": 1790454954.0841618
+    },
+    "signature-0": {
+      "state": "passed",
+      "at": 1790454959.3058734
+    },
+    "signature-1": {
+      "state": "passed",
+      "at": 1790454959.3117921
+    },
+    "signature-2": {
+      "state": "passed",
+      "at": 1790454959.318426
+    },
+    "apt-plan": {
+      "state": "passed",
+      "at": 1790454961.5804863
+    },
+    "apt-install": {
+      "state": "passed",
+      "at": 1790454975.0909555
+    },
+    "dpkg-audit": {
+      "state": "passed",
+      "at": 1790454975.1032293
+    },
+    "package-identities": {
+      "state": "passed",
+      "at": 1790454975.109667
+    },
+    "system-zlib-link": {
+      "state": "passed",
+      "at": 1790454975.171969
+    },
+    "system-zlib-run": {
+      "state": "passed",
+      "at": 1790454975.176021
+    },
+    "registry-clone": {
+      "state": "passed",
+      "at": 1790454984.27066
+    },
+    "registry-checkout": {
+      "state": "passed",
+      "at": 1790454984.417234
+    },
+    "registry-integrity": {
+      "state": "passed",
+      "at": 1790454994.178699
+    },
+    "tool-compiler": {
+      "state": "passed",
+      "at": 1790454994.4831133
+    },
+    "tool-cmake": {
+      "state": "passed",
+      "at": 1790454994.4977508
+    },
+    "tool-ninja": {
+      "state": "passed",
+      "at": 1790454994.5043106
+    },
+    "tool-perl": {
+      "state": "passed",
+      "at": 1790454994.5392573
+    },
+    "tool-make": {
+      "state": "passed",
+      "at": 1790454994.5435996
+    },
+    "tool-autoreconf": {
+      "state": "passed",
+      "at": 1790454994.57333
+    },
+    "tool-pkgconfig": {
+      "state": "passed",
+      "at": 1790454994.5775113
+    },
+    "tool-vcpkg": {
+      "state": "passed",
+      "at": 1790454994.5927312
+    },
+    "vcpkg-plan": {
+      "state": "passed",
+      "at": 1790454997.0774958
+    },
+    "intentional-exit-seven": {
+      "state": "running",
+      "at": 1790454997.0812364
+    },
+    "configure": {
+      "state": "passed",
+      "at": 1790455267.4399827
+    },
+    "server-build": {
+      "state": "passed",
+      "at": 1790456763.753757
+    },
+    "upstream-tests": {
+      "state": "passed",
+      "at": 1790456763.9883726
+    },
+    "runtime-package-plan": {
+      "state": "running",
+      "at": 1790456768.6634653
+    }
+  },
+  "duration_minutes": 33.12,
+  "diagnosis": "APT simulation reproduced exit 100 twice; renaming only six epoch-bearing package archives changes result to exit 0 and the exact 15-package closure. No package contents, indexes or guest-status records changed."
+}

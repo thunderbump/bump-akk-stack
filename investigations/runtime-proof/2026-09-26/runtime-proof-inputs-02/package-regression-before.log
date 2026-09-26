@@ -1,0 +1,29 @@
+test_pool_names_fail_staging_succeeds_missing_archive_fails (__main__.OfflineCache.test_pool_names_fail_staging_succeeds_missing_archive_fails) ... FAIL
+
+======================================================================
+FAIL: test_pool_names_fail_staging_succeeds_missing_archive_fails (__main__.OfflineCache.test_pool_names_fail_staging_succeeds_missing_archive_fails)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/bump/.local/state/eqemu-vm-proof/runtime-proof-inputs-02/test-runtime-packages.py", line 27, in test_pool_names_fail_staging_succeeds_missing_archive_fails
+    good=simulate();self.assertEqual(good.returncode,0,good.stdout+good.stderr)
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: 100 != 0 : NOTE: This is only a simulation!
+      apt-get needs root privileges for real execution.
+      Keep also in mind that locking is deactivated,
+      so don't depend on the relevance to the real current situation!
+Reading package lists...
+Building dependency tree...
+Suggested packages:
+  libclone-perl libmldbm-perl libnet-daemon-perl libsql-statement-perl mailx
+  mariadb-test
+Recommended packages:
+  libjson-xs-perl libhtml-template-perl mariadb-plugin-provider-bzip2
+  mariadb-plugin-provider-lz4 mariadb-plugin-provider-lzma
+  mariadb-plugin-provider-lzo mariadb-plugin-provider-snappy pv
+E: Unable to fetch some archives, maybe run apt-get update or try with --fix-missing?
+
+
+----------------------------------------------------------------------
+Ran 1 test in 0.778s
+
+FAILED (failures=1)

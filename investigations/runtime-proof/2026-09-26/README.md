@@ -19,3 +19,39 @@ Retains 4 GiB guest/6 GiB QEMU/2 vCPU/one compiler job/32 GiB disk, controller 1
 Operator sudo is required to launch. This first attempt does not itself prove real guest installation/import/startup. Runtime cancellation and a fresh successful repeat are separate follow-up attempts after first-run evidence. No actor, player, bot, production migration or general AFK execution is enabled. The investigation remains open.
 
 Authoritative operating instructions and findings live in operations-webui. These scripts are a fixed investigation kit, not a production installer or a general validation interface.
+
+## Attempt 02: offline APT cache correction
+
+Attempt 01 finished in 33.12 minutes. Build and upstream tests passed, but runtime
+package simulation exited 100 before installation, SQL import or server startup.
+Its suite outcome remains failed and all owned cleanup completed without rescue.
+Selected immutable receipts are in `runtime-proof-inputs-02/attempt01-evidence/`.
+
+A real APT simulation using an isolated copy of the pinned indexes, status and
+packages reproduced the exact failure. Renaming only six MariaDB package cache
+files to include their escaped `1:` version epoch made the same simulation pass
+with exactly 15 new packages, no upgrades and no removals. Ubuntu pool filenames
+and APT archive cache filenames are different. The sealed media stays unchanged.
+
+`guest-runtime.py` now stages verified packages under the full package/version/arch
+cache name, including `%3a` for colons. `test-runtime-packages.py` exercises that
+same function against real `apt-get -s --no-download`; original pool names and a
+missing archive fail, while corrected staging passes. No acquired code, package
+installation, SQL or game binary executes on the host. Its failing-before and
+passing-after logs are retained. The 33 existing controls also pass.
+
+The new generator and launcher use separate attempt 02 identities and require
+the exact failed attempt 01 result plus completed cleanup. `--check` passes input
+hashes, XML and AppArmor syntax without starting a VM. Preparation receipts record
+34 local tests. Guest runtime installation and startup remain unproven. Runtime
+cancellation and a fresh successful repeat remain required after initial success.
+
+Operator command, after reviewing the local prepared files:
+
+```sh
+sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-proof-02.py
+```
+
+This needs the operator's sudo password. Progress/final evidence goes under
+`/var/lib/eqemu-vm-proof/runtime-proof-02/`. Cancel the owned run with
+`sudo systemctl stop eqemu-vm-runtime-02-suite.service`. Never reuse retained state.
