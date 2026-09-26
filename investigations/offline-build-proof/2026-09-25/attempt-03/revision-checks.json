@@ -1,0 +1,15 @@
+{
+  "apt_simulation": "passed with manifest-derived status plus signed zlib stanza; real guest resolution still required",
+  "pinned_archives": 84,
+  "unchanged_worker_function_asts": [
+    "cleanup",
+    "prepare_disk",
+    "inspect_limits",
+    "owned_pids",
+    "wait_domain_absent",
+    "admission",
+    "policy"
+  ],
+  "host_install": false,
+  "vm_started": false
+}

@@ -1,0 +1,1435 @@
+{
+  "guest_resolution": "manifest-derived placeholders; real guest solver and installation pending",
+  "host_install": false,
+  "keyring_sha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31",
+  "releases": [
+    {
+      "suite": "noble",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble_InRelease",
+      "sha256": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+      "signature": "verified",
+      "date": "Thu, 25 Apr 2024 15:10:33 UTC",
+      "valid_until": null
+    },
+    {
+      "suite": "noble-updates",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble-updates_InRelease",
+      "sha256": "269dd8e4030f0963cbbdbdc7e12a53d06494263f4cf9878e4a26fb13d42a6d63",
+      "signature": "verified",
+      "date": "Fri, 25 Sep 2026 18:50:28 UTC",
+      "valid_until": null
+    },
+    {
+      "suite": "noble-security",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble-security_InRelease",
+      "sha256": "6be2718be70acbf245b9fe37ca753c043b970db6cd27594ec081d6809cb9908d",
+      "signature": "verified",
+      "date": "Fri, 25 Sep 2026 16:49:58 UTC",
+      "valid_until": null
+    }
+  ],
+  "indexes": [
+    {
+      "id": "noble/main/binary-amd64/Packages",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages",
+      "sha256": "8f6f71ae839c8cba390a7643fcbbdacddb0bc7d12c1583a2dd80a1f8443a30e5",
+      "bytes": 7165069
+    },
+    {
+      "id": "noble/universe/binary-amd64/Packages",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble_universe_binary-amd64_Packages",
+      "sha256": "687ffc969e7700137677b9cfe2f614ee2d638052a91a7c9bf31f3f6a3040a99a",
+      "bytes": 73379142
+    },
+    {
+      "id": "noble-updates/main/binary-amd64/Packages",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble-updates_main_binary-amd64_Packages",
+      "sha256": "e1330d4b0d1604808295d4af71bc14fdb83f4180ac982bbcf33a1b9bd54f94ee",
+      "bytes": 7120827
+    },
+    {
+      "id": "noble-updates/universe/binary-amd64/Packages",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble-updates_universe_binary-amd64_Packages",
+      "sha256": "f518bf312aeb75c2e8c6c9a4fccc1ebc05876141087fb77f8f3b40f12ce07958",
+      "bytes": 10591098
+    },
+    {
+      "id": "noble-security/main/binary-amd64/Packages",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble-security_main_binary-amd64_Packages",
+      "sha256": "207e1d251ecfc9215516c8db3a71c23cc6039298803c56bc5c2bca8c35bb4c55",
+      "bytes": 5721326
+    },
+    {
+      "id": "noble-security/universe/binary-amd64/Packages",
+      "path": "apt/state/lists/archive.ubuntu.com_ubuntu_dists_noble-security_universe_binary-amd64_Packages",
+      "sha256": "69ef69e72ed3bd48f7e5feddbf114d32f45046a6fb4cefa43e2b394a550d9bf2",
+      "bytes": 7666073
+    }
+  ],
+  "packages": [
+    {
+      "package": "autoconf",
+      "version": "2.71-3",
+      "architecture": "all",
+      "path": "apt/cache/archives/autoconf_2.71-3_all.deb",
+      "bytes": 338946,
+      "sha256": "cc3f9f7a1e576173fb59c36652c0a67c6426feae752b352404ba92dfcb1b26c9",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/a/autoconf/autoconf_2.71-3_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "automake",
+      "version": "1:1.16.5-1.3ubuntu1",
+      "architecture": "all",
+      "path": "apt/cache/archives/automake_1%3a1.16.5-1.3ubuntu1_all.deb",
+      "bytes": 558172,
+      "sha256": "5ae9a98e73545002cd891f028859941af2a3c760cb6190e635c7ef36953912de",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/a/automake-1.16/automake_1.16.5-1.3ubuntu1_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "autotools-dev",
+      "version": "20220109.1",
+      "architecture": "all",
+      "path": "apt/cache/archives/autotools-dev_20220109.1_all.deb",
+      "bytes": 44886,
+      "sha256": "d909f0327b09d9a9136239caca975df89782fa28efd721c4eb4caea422d3fc5a",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/a/autotools-dev/autotools-dev_20220109.1_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "binutils-common",
+      "version": "2.42-4ubuntu2.10",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/binutils-common_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 240286,
+      "sha256": "d136073f5e2153f3df11c1d08d66727b9466b28ff483f50085f14bbe3464b5ee",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/binutils/binutils-common_2.42-4ubuntu2.10_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "binutils-x86-64-linux-gnu",
+      "version": "2.42-4ubuntu2.10",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/binutils-x86-64-linux-gnu_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 2462744,
+      "sha256": "1e510a15f30208d39edcd840e48f26a77bbca7c417805eeccb1e3f7de198ef29",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/binutils/binutils-x86-64-linux-gnu_2.42-4ubuntu2.10_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "binutils",
+      "version": "2.42-4ubuntu2.10",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/binutils_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 18154,
+      "sha256": "b3b5a84181a38fd191820b2cdcc1a3eeb1cd6333ad472f2092f96e81047e9c74",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/binutils/binutils_2.42-4ubuntu2.10_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "bsdextrautils",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/bsdextrautils_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 73682,
+      "sha256": "aa1d336f8e54351528195a7e1bedb8176b04a81c60f3d9c97ecd044a044ac6fb",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/bsdextrautils_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/bsdextrautils_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "bsdutils",
+      "version": "1:2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/bsdutils_1%3a2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 96370,
+      "sha256": "761e5ad2ff5c30d1bfa9f41dcfe042b3475495c78c11949a9792585bd1f6765b",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/bsdutils_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/bsdutils_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "build-essential",
+      "version": "12.10ubuntu1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/build-essential_12.10ubuntu1_amd64.deb",
+      "bytes": 4928,
+      "sha256": "9b2159b95a4c01937309783c7c8a6ec8dfbcb7ffd604951c9713ac52ee9c7268",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/build-essential/build-essential_12.10ubuntu1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "bzip2",
+      "version": "1.0.8-5.1ubuntu0.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/bzip2_1.0.8-5.1ubuntu0.1_amd64.deb",
+      "bytes": 34560,
+      "sha256": "60fb79214dd8366fa39d7e69911294e72b9f1a4425a3d22f211359c8626e4b9e",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/bzip2/bzip2_1.0.8-5.1ubuntu0.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/bzip2/bzip2_1.0.8-5.1ubuntu0.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "ccache",
+      "version": "4.9.1-1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/ccache_4.9.1-1_amd64.deb",
+      "bytes": 591638,
+      "sha256": "d76d042ad067648c03597a3a809544439861e2ed02224c9760f90c60f1735a65",
+      "signed_index_matches": [
+        {
+          "index": "noble/universe/binary-amd64/Packages",
+          "archive_path": "pool/universe/c/ccache/ccache_4.9.1-1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "cmake-data",
+      "version": "3.28.3-1build7",
+      "architecture": "all",
+      "path": "apt/cache/archives/cmake-data_3.28.3-1build7_all.deb",
+      "bytes": 2154936,
+      "sha256": "20a3b644211ce82f35c24f1f5052199adeb0ac159978a8740fd6c0959611557f",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/c/cmake/cmake-data_3.28.3-1build7_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "cmake",
+      "version": "3.28.3-1build7",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/cmake_3.28.3-1build7_amd64.deb",
+      "bytes": 11190006,
+      "sha256": "4b0a7f8c0daf27b26b46997d994ae5d1ee7a3d11dfcda9f7627bb1462c162295",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/c/cmake/cmake_3.28.3-1build7_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "cpp-13-x86-64-linux-gnu",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/cpp-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 10714542,
+      "sha256": "2ca48bf0c2d6465bc39322899715a85d934b4d7442dd5586a7bebbe3ce0f806b",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/cpp-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/cpp-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "cpp-13",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/cpp-13_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 1042,
+      "sha256": "c7535331fbb183c802c3bf4b6b210872dcc12d0421b3212b3c4b940f2c59ed3a",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/cpp-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/cpp-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "cpp-x86-64-linux-gnu",
+      "version": "4:13.2.0-7ubuntu1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/cpp-x86-64-linux-gnu_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 5326,
+      "sha256": "85059b30960de3582e8612740614da3dfe47241d0368a28dea686188cf7648dd",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-defaults/cpp-x86-64-linux-gnu_13.2.0-7ubuntu1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "cpp",
+      "version": "4:13.2.0-7ubuntu1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/cpp_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 22442,
+      "sha256": "b51f8094760f7b41afdcb1fe1b5a57fc64b75a090859918af17450a10f8c7d31",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-defaults/cpp_13.2.0-7ubuntu1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "dpkg-dev",
+      "version": "1.22.6ubuntu6.6",
+      "architecture": "all",
+      "path": "apt/cache/archives/dpkg-dev_1.22.6ubuntu6.6_all.deb",
+      "bytes": 1074218,
+      "sha256": "70da073557dbed76dc14eb1e682e7ec30fcb736f3d98812490a4c785b4c481cb",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/d/dpkg/dpkg-dev_1.22.6ubuntu6.6_all.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/d/dpkg/dpkg-dev_1.22.6ubuntu6.6_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "dpkg",
+      "version": "1.22.6ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/dpkg_1.22.6ubuntu6.6_amd64.deb",
+      "bytes": 1282284,
+      "sha256": "ceb6aa4da59fbcb8a3b0549b4280c60b7d849b519859797c8668bdfbe378fb3b",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/d/dpkg/dpkg_1.22.6ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/d/dpkg/dpkg_1.22.6ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "eject",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/eject_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 26278,
+      "sha256": "e49024f6e5c1becc7bdff11589ea7973b8f522ad77f515a94cfb8176dbb699e3",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/eject_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/eject_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "fdisk",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/fdisk_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 121538,
+      "sha256": "4a27cce5a9ad937298ce82722912e8ceefd123773de5c39fa8cf2a2f61cf4657",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/fdisk_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/fdisk_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "g++-13-x86-64-linux-gnu",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/g++-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 12161938,
+      "sha256": "0bd6af6164252d4ea9170d201ee4c10a3120fe0fc04985a00be3bc9076353844",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/g++-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/g++-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "g++-13",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/g++-13_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 16048,
+      "sha256": "0f3ef964b8a91a9cd7bebfd126839a21941c55547cadcf4aa00204bc8cc43985",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/g++-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/g++-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "g++-x86-64-linux-gnu",
+      "version": "4:13.2.0-7ubuntu1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/g++-x86-64-linux-gnu_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 964,
+      "sha256": "145b027a542db5b21f85d4f9e242f51c62c69914fc484adb3a4881ca8e2f3913",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-defaults/g++-x86-64-linux-gnu_13.2.0-7ubuntu1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "g++",
+      "version": "4:13.2.0-7ubuntu1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/g++_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 1100,
+      "sha256": "800a84b369c64b18d65f0fb5c1533de0446c880ee4f1cadad64e3363327f63f0",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-defaults/g++_13.2.0-7ubuntu1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "gcc-13-base",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/gcc-13-base_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 51616,
+      "sha256": "e859aca26585bb91113a451f1e66bc0e5283cb08797d679aacc1d936ae6dff8e",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/gcc-13-base_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/gcc-13-base_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "gcc-13-x86-64-linux-gnu",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/gcc-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 21084546,
+      "sha256": "a134b0319a82d14581b3a14820d2832af4ec9778ed8b9b4ddaeecfb0555ec325",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/gcc-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/gcc-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "gcc-13",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/gcc-13_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 494262,
+      "sha256": "7438ff160b020a74970672189ecae25d0ca650de6d7f543f12a3134192cffbd9",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/gcc-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/gcc-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "gcc-14-base",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/gcc-14-base_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 51014,
+      "sha256": "b95c172411a7fdae70307cf33a9f5320ba5e056b556454543dd5b679d5ce1c4f",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/gcc-14-base_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/gcc-14-base_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "gcc-x86-64-linux-gnu",
+      "version": "4:13.2.0-7ubuntu1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/gcc-x86-64-linux-gnu_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 1212,
+      "sha256": "72e79089a10e381360bfc6f03c5e5d8c2ff177d6dbac2cd7ffb3cc1383f57591",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-defaults/gcc-x86-64-linux-gnu_13.2.0-7ubuntu1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "gcc",
+      "version": "4:13.2.0-7ubuntu1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/gcc_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 5018,
+      "sha256": "0e0bb8b25153ed1c44ab92bc219eed469fcb5820c5c0bc6454b2fd366a33d3ee",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-defaults/gcc_13.2.0-7ubuntu1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libasan8",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libasan8_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 3026656,
+      "sha256": "8321aac6230fa1da320e76eb6288b7436164624aec449ed3933ea6c4cc86daac",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libasan8_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libasan8_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libatomic1",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libatomic1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 10466,
+      "sha256": "fe49cbbc7be753528380c724a8eef5f1e31dffa9221f692c5069048d81c7449d",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libatomic1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libatomic1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libbinutils",
+      "version": "2.42-4ubuntu2.10",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libbinutils_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 576834,
+      "sha256": "064dce00ce94e1fc2d33779cb0071088f4c8aac79e85345f2e78a020f7d14699",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/binutils/libbinutils_2.42-4ubuntu2.10_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libblkid1",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libblkid1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 124124,
+      "sha256": "3bcf169cd65e2539059b2287924090fc629f9bf90f595fc25465a7efe950ee82",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libblkid1_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libblkid1_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libbz2-1.0",
+      "version": "1.0.8-5.1ubuntu0.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libbz2-1.0_1.0.8-5.1ubuntu0.1_amd64.deb",
+      "bytes": 34562,
+      "sha256": "36ee08b00b1ee5018b2fce02881b7d2d73c9b4e32990bde3388400d86c48126a",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/bzip2/libbz2-1.0_1.0.8-5.1ubuntu0.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/bzip2/libbz2-1.0_1.0.8-5.1ubuntu0.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libcc1-0",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libcc1-0_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 48002,
+      "sha256": "454456436ca767817a860557263d7cc2489f0a410f03efff4c0bb236d579ec09",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libcc1-0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libcc1-0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libctf-nobfd0",
+      "version": "2.42-4ubuntu2.10",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libctf-nobfd0_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 98012,
+      "sha256": "da352eb7fa6c4369d2a6c1e5e680f574eda2e38576563326b18d9e47e61c4078",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/binutils/libctf-nobfd0_2.42-4ubuntu2.10_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libctf0",
+      "version": "2.42-4ubuntu2.10",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libctf0_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 94474,
+      "sha256": "7ec86d697c3668503c85f308a6832f092075b5880ad002f22185264da0bd4645",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/binutils/libctf0_2.42-4ubuntu2.10_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libdpkg-perl",
+      "version": "1.22.6ubuntu6.6",
+      "architecture": "all",
+      "path": "apt/cache/archives/libdpkg-perl_1.22.6ubuntu6.6_all.deb",
+      "bytes": 268420,
+      "sha256": "db57f9f0608f78001b5f468e03541fdb88b7e30a07b46d0bcdb57a916a6e8c11",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/d/dpkg/libdpkg-perl_1.22.6ubuntu6.6_all.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/d/dpkg/libdpkg-perl_1.22.6ubuntu6.6_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "libfdisk1",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libfdisk1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 146344,
+      "sha256": "7f67b127d239f51218c1eb63c3b0c219bbf26f450349bed9ad5d9f10a6b80c1b",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libfdisk1_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libfdisk1_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libgcc-13-dev",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libgcc-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 2680642,
+      "sha256": "cd689db2691edaa10f37329307292796bb599e722e0505c79e14caaa1fe9a93a",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/libgcc-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/libgcc-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libgcc-s1",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libgcc-s1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 78392,
+      "sha256": "aa7fadbe33b78bcf99885318040601c550c208929565b179891d9a3cc2aa68cd",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libgcc-s1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libgcc-s1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libgomp1",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libgomp1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 148062,
+      "sha256": "e8a95ec58125b4933597f30ff56c2ae10edf90f287262e366d4b6edea3019144",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libgomp1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libgomp1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libgprofng0",
+      "version": "2.42-4ubuntu2.10",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libgprofng0_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 848684,
+      "sha256": "1b7e3c2fc162e8358ca6e5a3fffdb4d0d632f790630323215841bb36a63c0ab8",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/binutils/libgprofng0_2.42-4ubuntu2.10_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libhiredis1.1.0",
+      "version": "1.2.0-6ubuntu3",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libhiredis1.1.0_1.2.0-6ubuntu3_amd64.deb",
+      "bytes": 41380,
+      "sha256": "912a25553f29a47d1524c0b58a3c5bff2d067109da2adae9fa9c4fb15efaa568",
+      "signed_index_matches": [
+        {
+          "index": "noble/universe/binary-amd64/Packages",
+          "archive_path": "pool/universe/h/hiredis/libhiredis1.1.0_1.2.0-6ubuntu3_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libhwasan0",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libhwasan0_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 1640706,
+      "sha256": "2195318cfe68fe16b601913ef7b33c9a900372f57861643fdc9ae6fef84534cd",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libhwasan0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libhwasan0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libisl23",
+      "version": "0.26-3build1.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libisl23_0.26-3build1.1_amd64.deb",
+      "bytes": 679812,
+      "sha256": "4e040926e50fb961fae9bf95660189d468336a4a17bc321872c434fc8f777e7f",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/i/isl/libisl23_0.26-3build1.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libitm1",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libitm1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 29702,
+      "sha256": "1fca498129dd3510294809d77ee754f72a9de281111200e9b7b9a5adf37faa9f",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libitm1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libitm1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libjsoncpp25",
+      "version": "1.9.5-6build1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libjsoncpp25_1.9.5-6build1_amd64.deb",
+      "bytes": 82754,
+      "sha256": "8efea5b75952f3ad1c40e6b5b31de687c297ea29f87f8b63efebb55e13467211",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/libj/libjsoncpp/libjsoncpp25_1.9.5-6build1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "liblsan0",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/liblsan0_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 1321652,
+      "sha256": "dc0c2a1a053e833ba4d71e1ec2ba4244fe301761ad4a91d6725f927a52d86a14",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/liblsan0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/liblsan0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libmount1",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libmount1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 134082,
+      "sha256": "8f2c25589f187dacfdc5bb6be2af0aee6c2ba7b4d2edd1ca4b26753469f07aae",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libmount1_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libmount1_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libmpc3",
+      "version": "1.3.1-1build1.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libmpc3_1.3.1-1build1.1_amd64.deb",
+      "bytes": 54636,
+      "sha256": "cebe6098bb3d66fdacac9dc6fe406a651216d9c00f27c3f9c159d15d96cdf864",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/m/mpclib3/libmpc3_1.3.1-1build1.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libperl-dev",
+      "version": "5.38.2-3.2ubuntu0.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libperl-dev_5.38.2-3.2ubuntu0.6_amd64.deb",
+      "bytes": 1185340,
+      "sha256": "c44d080cebac4bf2c99263cf9de3d0e6d8f4618249c8feaddfb99a34450784b6",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/libperl-dev_5.38.2-3.2ubuntu0.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/libperl-dev_5.38.2-3.2ubuntu0.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libperl5.38t64",
+      "version": "5.38.2-3.2ubuntu0.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libperl5.38t64_5.38.2-3.2ubuntu0.6_amd64.deb",
+      "bytes": 4863614,
+      "sha256": "e9e5ac9a657e0cacf5f0de977c1573c696ee74515d5136c4e9a0ce9467d32ae7",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/libperl5.38t64_5.38.2-3.2ubuntu0.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/libperl5.38t64_5.38.2-3.2ubuntu0.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libpkgconf3",
+      "version": "1.8.1-2build1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libpkgconf3_1.8.1-2build1_amd64.deb",
+      "bytes": 30652,
+      "sha256": "fc3a57e8f931ec06cb7c51acc56878f1fec247ff02a7adcab26905c2faeb2792",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/pkgconf/libpkgconf3_1.8.1-2build1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libquadmath0",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libquadmath0_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 153316,
+      "sha256": "dc8f0ca542e09d662f29370c8393c016440dd4bc5c996c5fcc19f632b63ce3b0",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libquadmath0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libquadmath0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "librhash0",
+      "version": "1.4.3-3build1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/librhash0_1.4.3-3build1_amd64.deb",
+      "bytes": 128748,
+      "sha256": "e9ee69963ff1a56378b9c5ffdd21ea0feaec9647c522349b7612b25103490528",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/r/rhash/librhash0_1.4.3-3build1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libsframe1",
+      "version": "2.42-4ubuntu2.10",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libsframe1_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 15724,
+      "sha256": "72093fb456864db55f1352bfa5e952a94f7abaff64e71dff1fbf001db1984564",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/b/binutils/libsframe1_2.42-4ubuntu2.10_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libsmartcols1",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libsmartcols1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 66282,
+      "sha256": "84f33a780d27cce20a2cd925e7ce8498daba2dbc614d433548a19fbb2c5dac18",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libsmartcols1_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libsmartcols1_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libstdc++-13-dev",
+      "version": "13.3.0-6ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 2419834,
+      "sha256": "ee5633e863e19c3381ed97842ce35ed32ede96a3d1ae4e94c051d3036fe21347",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-13/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libstdc++6",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libstdc++6_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 792064,
+      "sha256": "a51f8de7829211db961a31f02158058ad1a95f92ac6d0a5dff6350e2821c54c0",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libstdc++6_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libstdc++6_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libtool-bin",
+      "version": "2.4.7-7build1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libtool-bin_2.4.7-7build1_amd64.deb",
+      "bytes": 84062,
+      "sha256": "23959c8be74b4433d635c76e61a6c4bb62f10d3899362598c53173e8e57c0f8a",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/libt/libtool/libtool-bin_2.4.7-7build1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libtool",
+      "version": "2.4.7-7build1",
+      "architecture": "all",
+      "path": "apt/cache/archives/libtool_2.4.7-7build1_all.deb",
+      "bytes": 166404,
+      "sha256": "9d1d707179675d38e024bb13613b1d99e0d33fa6c45e5f3bcba19340781781d3",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/libt/libtool/libtool_2.4.7-7build1_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "libtsan2",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libtsan2_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 2771910,
+      "sha256": "8cbcc9b3ae5ef23b449383d47a9035b27596e307d7dce7df9b83d47a7acd1d91",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libtsan2_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libtsan2_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libubsan1",
+      "version": "14.2.0-4ubuntu2~24.04.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libubsan1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 1183812,
+      "sha256": "a16dea3abe2dcac99bcfae27e7e5672fde64573c3c170dcb0cd55631238f9814",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libubsan1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/g/gcc-14/libubsan1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "libuuid1",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/libuuid1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 36596,
+      "sha256": "7e2992d3a79fc05514dc5966558ee9c66a7214a47edf2a36017b9e2777528665",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libuuid1_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/libuuid1_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "lto-disabled-list",
+      "version": "47",
+      "architecture": "all",
+      "path": "apt/cache/archives/lto-disabled-list_47_all.deb",
+      "bytes": 12400,
+      "sha256": "cac0f63c88188f376bb4df10a2af2b49a607bbef97a57db50ed58f678c21eee9",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/l/lto-disabled-list/lto-disabled-list_47_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "m4",
+      "version": "1.4.19-4build1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/m4_1.4.19-4build1_amd64.deb",
+      "bytes": 243640,
+      "sha256": "30ea715845a1863abd55d11e47ab91513130bf347852d4cdeae69e9d98fa795c",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/m/m4/m4_1.4.19-4build1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "make",
+      "version": "4.3-4.1build2",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/make_4.3-4.1build2_amd64.deb",
+      "bytes": 179752,
+      "sha256": "1fe6a815b56c7b6e9ce4086a363f09444bbd0a0d30e230c453d0b78e44b57a99",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/m/make-dfsg/make_4.3-4.1build2_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "mount",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/mount_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 118192,
+      "sha256": "09e929ceb9fc5d11757f28429b3151601c44db4c96e0bc5ad46c501c8d56f4f9",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/mount_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/mount_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "ninja-build",
+      "version": "1.11.1-2",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/ninja-build_1.11.1-2_amd64.deb",
+      "bytes": 128926,
+      "sha256": "6a17f76a0f75586f1292f6c61a9b07fd0dec963baf6a102b17673f601c6b323a",
+      "signed_index_matches": [
+        {
+          "index": "noble/universe/binary-amd64/Packages",
+          "archive_path": "pool/universe/n/ninja-build/ninja-build_1.11.1-2_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "perl-base",
+      "version": "5.38.2-3.2ubuntu0.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/perl-base_5.38.2-3.2ubuntu0.6_amd64.deb",
+      "bytes": 1825574,
+      "sha256": "50e1b2c2646387a94664fbea144af1d1b16cf6e0778426baa198166ca3246697",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/perl-base_5.38.2-3.2ubuntu0.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/perl-base_5.38.2-3.2ubuntu0.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "perl-modules-5.38",
+      "version": "5.38.2-3.2ubuntu0.6",
+      "architecture": "all",
+      "path": "apt/cache/archives/perl-modules-5.38_5.38.2-3.2ubuntu0.6_all.deb",
+      "bytes": 3110182,
+      "sha256": "9c4c90145209d4f85be9255417008e8decb9cd5d189f446fd39ad096e31199cf",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/perl-modules-5.38_5.38.2-3.2ubuntu0.6_all.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/perl-modules-5.38_5.38.2-3.2ubuntu0.6_all.deb"
+        }
+      ]
+    },
+    {
+      "package": "perl",
+      "version": "5.38.2-3.2ubuntu0.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/perl_5.38.2-3.2ubuntu0.6_amd64.deb",
+      "bytes": 231438,
+      "sha256": "1a2341674a1c69e3247537ab243dc3d5878b74a39a696964232e1a4f5a27502d",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/perl_5.38.2-3.2ubuntu0.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/perl/perl_5.38.2-3.2ubuntu0.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "pkg-config",
+      "version": "1.8.1-2build1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/pkg-config_1.8.1-2build1_amd64.deb",
+      "bytes": 7264,
+      "sha256": "16bda455d9216da31ad55d72df5a7380cb9d5ac32a2393941cab262a4e5b526f",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/pkgconf/pkg-config_1.8.1-2build1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "pkgconf-bin",
+      "version": "1.8.1-2build1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/pkgconf-bin_1.8.1-2build1_amd64.deb",
+      "bytes": 20730,
+      "sha256": "7a812f05ee1610154b433e2ad54f6e4163fcbb306b9fb31afe959afb2e5e1545",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/pkgconf/pkgconf-bin_1.8.1-2build1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "pkgconf",
+      "version": "1.8.1-2build1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/pkgconf_1.8.1-2build1_amd64.deb",
+      "bytes": 16790,
+      "sha256": "834a58031069d97d7cfb8b2f5bfd5effc69cecf7f30cc362071875f1f8dc1828",
+      "signed_index_matches": [
+        {
+          "index": "noble/main/binary-amd64/Packages",
+          "archive_path": "pool/main/p/pkgconf/pkgconf_1.8.1-2build1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "unzip",
+      "version": "6.0-28ubuntu4.1",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/unzip_6.0-28ubuntu4.1_amd64.deb",
+      "bytes": 174454,
+      "sha256": "a505b9d491386167bd8e14e3383315a4a7d6539e4406745901ccf009a7988271",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/unzip/unzip_6.0-28ubuntu4.1_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/unzip/unzip_6.0-28ubuntu4.1_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "util-linux",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/util-linux_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 1128326,
+      "sha256": "08eb17ba3b83378ed1e73d8335d0ce03b429c0bbeb07e374f536234edab02465",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/util-linux_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/util-linux_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "uuid-dev",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/uuid-dev_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 33546,
+      "sha256": "266115cc3bcecef70b9f75c0cf8ca4daccd40958bf7872f8ccebec50502d2a13",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/uuid-dev_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/uuid-dev_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "uuid-runtime",
+      "version": "2.39.3-9ubuntu6.6",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/uuid-runtime_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 33066,
+      "sha256": "3517a3ae6cb6c6ad8ef9daa7fd95639d83abaa4f67859ba95fe444a4f25e6f6b",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/uuid-runtime_2.39.3-9ubuntu6.6_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/u/util-linux/uuid-runtime_2.39.3-9ubuntu6.6_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "zip",
+      "version": "3.0-13ubuntu0.2",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/zip_3.0-13ubuntu0.2_amd64.deb",
+      "bytes": 175652,
+      "sha256": "30b325b542ef8e9a22a5e1e1cfce8c4f4b75db73e339e76bf405b635861f1f76",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/z/zip/zip_3.0-13ubuntu0.2_amd64.deb"
+        }
+      ]
+    },
+    {
+      "package": "zlib1g-dev",
+      "version": "1:1.3.dfsg-3.1ubuntu2.2",
+      "architecture": "amd64",
+      "path": "apt/cache/archives/zlib1g-dev_1%3a1.3.dfsg-3.1ubuntu2.2_amd64.deb",
+      "bytes": 894116,
+      "sha256": "e9152a08af21ab22bc99e8bfa98f1eb83955b2cc3653bcefecab394ecf9d1b63",
+      "signed_index_matches": [
+        {
+          "index": "noble-updates/main/binary-amd64/Packages",
+          "archive_path": "pool/main/z/zlib/zlib1g-dev_1.3.dfsg-3.1ubuntu2.2_amd64.deb"
+        },
+        {
+          "index": "noble-security/main/binary-amd64/Packages",
+          "archive_path": "pool/main/z/zlib/zlib1g-dev_1.3.dfsg-3.1ubuntu2.2_amd64.deb"
+        }
+      ]
+    }
+  ]
+}

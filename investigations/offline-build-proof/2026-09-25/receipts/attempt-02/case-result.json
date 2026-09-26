@@ -1,0 +1,15 @@
+{
+  "case_passed": false,
+  "checks": {
+    "identity": true,
+    "host_pre_resume": true,
+    "workload": false,
+    "service": false,
+    "cleanup": true,
+    "cleanup_time": true,
+    "absence": true,
+    "quiescent": true
+  },
+  "report_sha256": "be81b0bbe752e01df93125bde12c4ed5cdca0655f9103d962201e62b9c93e4ef",
+  "cleanup_sha256": "d986f5aa18a5d3be135d5cdc711bb1cc0f5635d5dfafd89d80351383ca3ad15e"
+}

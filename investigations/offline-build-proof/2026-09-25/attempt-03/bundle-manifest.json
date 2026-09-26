@@ -1,0 +1,2316 @@
+{
+  "schema": 1,
+  "status": "prepared-unexecuted",
+  "target_triplet": "x64-linux",
+  "host_triplet": "x64-linux",
+  "base_image_sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+  "scope": "Static port enumeration and authenticated package acquisition; real guest solver, installation and offline build pending",
+  "files": [
+    {
+      "path": "downloads/boostorg-array-boost-1.89.0.tar.gz",
+      "bytes": 24973,
+      "sha256": "60cf52df4a5e065bb98c8381262307704fe8656980b133c78c7d0fe810357a00",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/array/archive/boost-1.89.0.tar.gz",
+        "sha512": "5b417979dfca7acb34064282d46786054d8e7b4300e88c0ea902a049322f971735fbef35843c00f51fa1eaf8e24de7c870559d54be43d714ee5a02e75de16b20",
+        "authority": "ports/boost-array/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-assert-boost-1.89.0.tar.gz",
+      "bytes": 20885,
+      "sha256": "e25e42fbc5f77dcb203a3479eaf2e9303511f2a5bb8cbdf54e9c562fcbf29da1",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/assert/archive/boost-1.89.0.tar.gz",
+        "sha512": "943b201002a3dbe44137565a7448229194f7dfcd406855fc037c71faea0e295d25b54b6b000d0d893944572de5f9872adab35e442171d08f3abc83ea869f6d92",
+        "authority": "ports/boost-assert/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-bind-boost-1.89.0.tar.gz",
+      "bytes": 85939,
+      "sha256": "4169c6f99c9a22c096da319b93b930152073cd505c50b44a8da73f1a47b604cd",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/bind/archive/boost-1.89.0.tar.gz",
+        "sha512": "dbba71a6a1e13a2ed36fc512d559dd2fe2ab63d9bc801b3cb1b79de7433ce21caa940505a3f83d1ca845933ccf547b34768dedae506de9237f5bfc4db699adcf",
+        "authority": "ports/boost-bind/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-cmake-boost-1.89.0.tar.gz",
+      "bytes": 36263,
+      "sha256": "77111abebe9327ccd6ea33c729d5fae3c3aa42a2489f8c9f1adc94cd6fb6dff1",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/cmake/archive/boost-1.89.0.tar.gz",
+        "sha512": "dd17731fb03d634aa4751e5f36acd124d04eb71341c000df2a0f0b49d5bea0db50e54d1bf820e066a07a22fcaecc97dbe8caaf2883b6a2c1eb2b941938c67d25",
+        "authority": "ports/boost-cmake/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boost-1.89.0-LICENSE_1_0.txt",
+      "bytes": 1338,
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "role": "port-extra",
+      "origin": {
+        "url": "https://raw.githubusercontent.com/boostorg/boost/refs/tags/boost-1.89.0/LICENSE_1_0.txt",
+        "sha512": "d6078467835dba8932314c1c1e945569a64b065474d7aced27c9a7acc391d52e9f234138ed9f1aa9cd576f25f12f557e0b733c14891d42c16ecdc4a7bd4d60b8",
+        "authority": "ports/boost-cmake/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-concept_check-boost-1.89.0.tar.gz",
+      "bytes": 57958,
+      "sha256": "1670e50d93089ba8c461f934e56742cdb7eaf9a9afb31c0e9c088914daec79aa",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/concept_check/archive/boost-1.89.0.tar.gz",
+        "sha512": "2897f939fc23249c5d3466ad570b60c0d33b750eacf9ad8ddcf0cadd923f3830426a0632a3f18951dbc9006bd2a1d77ca2f3b83458038afd78bb7f345bac54c8",
+        "authority": "ports/boost-concept-check/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-config-boost-1.89.0.tar.gz",
+      "bytes": 386610,
+      "sha256": "a16a53f8f0dde2a9ff485fb134a069e54aca738009d825837dac9a35cd4afe0a",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/config/archive/boost-1.89.0.tar.gz",
+        "sha512": "456b3d648e4ca2b25a70159d282ee25ee3451b05450d2bb0e16b03e0f96860e4e678e4c8f75200b65cff0d073138083df8f1876cf6c5c227feb62de180ff7f3d",
+        "authority": "ports/boost-config/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-container_hash-boost-1.89.0.tar.gz",
+      "bytes": 67167,
+      "sha256": "b59a02885ce969be8eaadc1aee434b1027fc5d5e79c7a3ada50d028a2b5ff78c",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/container_hash/archive/boost-1.89.0.tar.gz",
+        "sha512": "bf2e3280a421665ad6081340024abc2473a3e5cc38eb308a4afb5815cb47d9fb4b622760be4b3f61bf8ff4344f81168b65b21946629370c2883082a4db05e0ef",
+        "authority": "ports/boost-container-hash/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-conversion-boost-1.89.0.tar.gz",
+      "bytes": 13519,
+      "sha256": "530810717119cfc6ea1c9e8e3eeb2a5332372359e17d273f770e04e9b4b5a33e",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/conversion/archive/boost-1.89.0.tar.gz",
+        "sha512": "1da566c2aa7ea3bfe0654374d4c0de3cfd4858154f8eaf01c281495a825f3990ca2af388c83f9de30b2068baceed6d8da8679d8e9207b4711d60e3b6b95c5b56",
+        "authority": "ports/boost-conversion/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-core-boost-1.89.0.tar.gz",
+      "bytes": 173335,
+      "sha256": "032e8f535e901a2d1c24b06e7276ed8effa945a963505d09071c65a046272eef",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/core/archive/boost-1.89.0.tar.gz",
+        "sha512": "f45500c9a33978fe6aeb45027e08159d276c9cb472c072e96b64c426ce3583870d24ce0a9d719442521383a4944a3a67b5b0d46e0025743556798e72a603059e",
+        "authority": "ports/boost-core/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-describe-boost-1.89.0.tar.gz",
+      "bytes": 42613,
+      "sha256": "7147ef717284a0b7a5b505821fbfb83caa6f279aa74b1db82f39ce817fb73d50",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/describe/archive/boost-1.89.0.tar.gz",
+        "sha512": "e4aee186d8ed75ccd255f8d43356a040c4199483f4cce23b6332e12b531ecc546de6b1109e0658c146ac7f46687e5f07fed23f23986115aa42901ab8aaa0757b",
+        "authority": "ports/boost-describe/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-detail-boost-1.89.0.tar.gz",
+      "bytes": 75999,
+      "sha256": "7285a3c97d656d6a38d83d40915f28e517b1d99c50db18aaec97fffa5ed1e1a4",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/detail/archive/boost-1.89.0.tar.gz",
+        "sha512": "5d8fa6a8f83ad64427715f6f74114696abf4de377360aed34e8e36219eac895f0ee703fdc7fdabd1e018f0e87a786e215965d2f04e8ff133c7a1ff30d77bd0d3",
+        "authority": "ports/boost-detail/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-dynamic_bitset-boost-1.89.0.tar.gz",
+      "bytes": 63283,
+      "sha256": "2aa4008346ebb7b4052b4b469d6f5e2c16edda5f961982204d6d5fd23f1428b9",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/dynamic_bitset/archive/boost-1.89.0.tar.gz",
+        "sha512": "f018fe1de813bd731ed570601191e6c99180024abb7b7befcd759e09cb2da6ce63d60b1a74062b5902751750a5cb94e64357037623273bd72139bef9181dd536",
+        "authority": "ports/boost-dynamic-bitset/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-foreach-boost-1.89.0.tar.gz",
+      "bytes": 21010,
+      "sha256": "c04f4b9f0099cbadbfd8c2b081fa08d9555c45de882f767584d107926b3b6e33",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/foreach/archive/boost-1.89.0.tar.gz",
+        "sha512": "1e12b58dc366dacd71f4153d6e069ca9284f9504addd8689f517a28b3207e6d8defbb8aab6aeabe7e5c8610e68afb5e718318ba0b09e6bddb1002ed3afa9ea1d",
+        "authority": "ports/boost-foreach/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-function-boost-1.89.0.tar.gz",
+      "bytes": 46576,
+      "sha256": "9ce2adf800f991fd4a335639c70bbfb3021f934f8c43de882d4bbc1c5b2b809a",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/function/archive/boost-1.89.0.tar.gz",
+        "sha512": "8ba920093734f2111fafd84a7a6fb68819263830979f48026b47a22d5c3d9afc64f95ca4b98fd0beabe581d8304e79eca3983fcec191e059fdd9dbffe86fa074",
+        "authority": "ports/boost-function/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-function_types-boost-1.89.0.tar.gz",
+      "bytes": 79890,
+      "sha256": "4491ee740f1661f6d2a826a73e05d0da842cee8783c961e37c20efc238b588f9",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/function_types/archive/boost-1.89.0.tar.gz",
+        "sha512": "c54c976cc4be8a0e7712f634317b014f3fe949cec7ed50f7629a78175651d936a4137e79d015100fe3d48c8c4fd2663cf902b7b3d0241ec20cd619631609fc24",
+        "authority": "ports/boost-function-types/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-functional-boost-1.89.0.tar.gz",
+      "bytes": 57180,
+      "sha256": "aa69cc8c4d5d932ef33c6cf86c6c6494eea3dba930db60883f61c90db21de82a",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/functional/archive/boost-1.89.0.tar.gz",
+        "sha512": "6d780f96aa7056daf4c56e7ebbd677a9c81ea6cb00f6032df44ee5030e425dfd50e6d243e6da8773803c0a9277d78e83ead99dc96fa90e095ca7741b543bcc7e",
+        "authority": "ports/boost-functional/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-fusion-boost-1.89.0.tar.gz",
+      "bytes": 718220,
+      "sha256": "8dde0b60dd707bff5a334c1050eaab9895d66e02c7292ed21cc272a4f52d64b2",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/fusion/archive/boost-1.89.0.tar.gz",
+        "sha512": "b019e2aa6d413c14cbadfca62130b8c115cdd2dc456a6b3943690da19366c8a991d37eafb624152819ad0b479db4e96327429e02e1a1b5bea0071f80370796c3",
+        "authority": "ports/boost-fusion/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-headers-boost-1.89.0.tar.gz",
+      "bytes": 2026,
+      "sha256": "6a528891d44f48812ee7e93bf518c403d4ab52064b0c89f55a069d4641294fb8",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/headers/archive/boost-1.89.0.tar.gz",
+        "sha512": "de3c08b24daaa84d20b1aaed817e0ebc8f6666dcd3db3fe31b6a78bc6be9372fa59bf07bea6930fa9a60e798f7437303795fd3f7cb84df77cfac72e02a081ba7",
+        "authority": "ports/boost-headers/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-integer-boost-1.89.0.tar.gz",
+      "bytes": 48074,
+      "sha256": "8285a1ee5037a0ce797ed1c31e22f710086f89695598638ecda8b2ac7df739f4",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/integer/archive/boost-1.89.0.tar.gz",
+        "sha512": "585ea52bf1311c35989a73459ba477afa3e9f57dd1ffb4e52798764cfff592fe9e1b6f1bef16676e116745d6be859ed22e435be9a448160f7124bd7c43972e04",
+        "authority": "ports/boost-integer/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-io-boost-1.89.0.tar.gz",
+      "bytes": 17478,
+      "sha256": "ad5f9cb49862bc6d7ea2da098d01358958a5c499a955ea88468088b8adf9aca5",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/io/archive/boost-1.89.0.tar.gz",
+        "sha512": "74e8c95092d432493125fb7970286f1e7602dcebcf7f568ab6f65b99006ade24801cf6e87446e5f6d12e2cacb9c5b828d58dccbc8a9deda01e6bcf1e5dd4fb27",
+        "authority": "ports/boost-io/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-iterator-boost-1.89.0.tar.gz",
+      "bytes": 1521505,
+      "sha256": "9cb36d339fa848a0af82cbbecff20ebdf77ef9211cef9d498a30ba0963ae568c",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/iterator/archive/boost-1.89.0.tar.gz",
+        "sha512": "a7eba754136ef2c69b9914bf7a955301ec8c03bb5e90d7915474e55478528c398ff9d57dc698f8d10d2a473ddaa60aaa1aa920399955cadadd90a11729fb76e6",
+        "authority": "ports/boost-iterator/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-move-boost-1.89.0.tar.gz",
+      "bytes": 133471,
+      "sha256": "090d1f07815a1840d40b2aa45ce428fafa8d13983e27d3178b68a5b1bd4d84a3",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/move/archive/boost-1.89.0.tar.gz",
+        "sha512": "02fe889c164447f4933230145394110dc8f62ac683b72f4f0726454a13e6bd9df2c82fc7ccabc84062a121bfad6cc8f50280c6cb63356c6b6a9683ec54307b80",
+        "authority": "ports/boost-move/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-mp11-boost-1.89.0.tar.gz",
+      "bytes": 130785,
+      "sha256": "6dbfae01358be88ebefcdfb7707a2a68ba914c39dc83fdd85f556761fe0fafb4",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/mp11/archive/boost-1.89.0.tar.gz",
+        "sha512": "59b6b883317cc7473fcb22b8d590678a962ab01f7ed78fd35c513b8ada65e185dbbd4b4d92e8521076d617d6bec1df74b720f4e8a69e272b3d5ead18ef2f3400",
+        "authority": "ports/boost-mp11/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-mpl-boost-1.89.0.tar.gz",
+      "bytes": 1514792,
+      "sha256": "e2a852cffe1a8dd87f37c527995c94a2deac9c152f6534ae416d9d55b67806a8",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/mpl/archive/boost-1.89.0.tar.gz",
+        "sha512": "1e358a16a972784400c1705b9712d8451644b0560ae840999d92dfb3b0f92da394111ed2d98266e207911c13ab129f6837aa8a5356bcde0961ec006057d46e04",
+        "authority": "ports/boost-mpl/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-optional-boost-1.89.0.tar.gz",
+      "bytes": 86714,
+      "sha256": "65bf01bc1c5b597ce9f86859d8bba439a599e8c7c96d3c66f16e783a9f7acc51",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/optional/archive/boost-1.89.0.tar.gz",
+        "sha512": "6fdd4be76db2d03711767345da7c0c47d9620fc683e1bf85a67279ef0c198dce7fc240f28d389eee059db36f8c4bf82761b85307faa2435dc6034196b5cf73a4",
+        "authority": "ports/boost-optional/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-predef-boost-1.89.0.tar.gz",
+      "bytes": 109567,
+      "sha256": "5e673c206ca834655087de62e04a67452824196fc7aab28e8f26f546a0cc5a79",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/predef/archive/boost-1.89.0.tar.gz",
+        "sha512": "868e2234953ec24e63e68c8d12a55abc7759e553538b258f369a30960e1eaf99ec60cc231428b4ff3c20c4b6b01e00dcf4ba0a6d6f245b108af11f7c9de95d04",
+        "authority": "ports/boost-predef/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-preprocessor-boost-1.89.0.tar.gz",
+      "bytes": 866739,
+      "sha256": "53de1b2e64706b73903d9f3957525fa8fa620445ec0d596aa6fb8335af6f45c0",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/preprocessor/archive/boost-1.89.0.tar.gz",
+        "sha512": "08cd63af1dd23afb17de7ce565c64d6eee1929ed32d06d54c9525fd50b50d6618034fa52507ffa2dd85ad5f91df101d8eae1b417a7dcbf0168466483089f49ce",
+        "authority": "ports/boost-preprocessor/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-range-boost-1.89.0.tar.gz",
+      "bytes": 207537,
+      "sha256": "7fc884401a75ac006affedf233c968d852c917bf120c343063f4f6e288ce770c",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/range/archive/boost-1.89.0.tar.gz",
+        "sha512": "ec56996272195bf37642faa34864e3c8cc99bf671588cc6f7e0a08e9cba89612528fc0bc43fa8efd0cb4547c9999b7b1c16d2aa11596c200b8bc45e75be12e34",
+        "authority": "ports/boost-range/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-regex-boost-1.89.0.tar.gz",
+      "bytes": 512170,
+      "sha256": "97d6caa4c273883f6432a0914d4b77967adf665dfeb209c239b6315c5f7e06db",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/regex/archive/boost-1.89.0.tar.gz",
+        "sha512": "5319e20f93f6618f911366e05132d376b16f11a5c55f7f712d550d7c7eb5151f2c2fc9dde25fd1c8ac39aafc4852ed73292b287a1de847df00ff1a358fcd1983",
+        "authority": "ports/boost-regex/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-smart_ptr-boost-1.89.0.tar.gz",
+      "bytes": 174966,
+      "sha256": "5e924e6ca214b399f365d7ee5edc4563ce8d920ea1de4759813e26fc45267ef9",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/smart_ptr/archive/boost-1.89.0.tar.gz",
+        "sha512": "ca1399f580291224dc3a3631b5446cbdbba69e8ccfc38ce4007247beccb9a90ca366fcc84b1a8c3f502e74cfa2c98987d5f1e6a8372a394051a47f21d952c363",
+        "authority": "ports/boost-smart-ptr/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-static_assert-boost-1.89.0.tar.gz",
+      "bytes": 14615,
+      "sha256": "48ef5ced01a5a4a0b940eb23eb5a0d5a54c8f27ca7326f86a2b90be405f5d53f",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/static_assert/archive/boost-1.89.0.tar.gz",
+        "sha512": "a57158d4d67168f7afe8cc2e221d2707ef7710528993929de185f1676ad7905ad0b3b0b40b8f55e90255c4302bc8e8e912e64eae097c80f61d3336f6df26733e",
+        "authority": "ports/boost-static-assert/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-throw_exception-boost-1.89.0.tar.gz",
+      "bytes": 20201,
+      "sha256": "7deb2dc859f608355e583747183d323d256bc4dd3230fc5958272e7dce5d1551",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/throw_exception/archive/boost-1.89.0.tar.gz",
+        "sha512": "99af9a7a29113bf93c54e64c6f2bc748273f3d9d109bd8841bdb1f3e2ea28b01880213d6dbc49c3afe0884da251f60a33f12a40f1ab694b1ceef54c25e3912a9",
+        "authority": "ports/boost-throw-exception/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-tuple-boost-1.89.0.tar.gz",
+      "bytes": 31520,
+      "sha256": "e7e35ab4dcee831f93f6b17f91c266649a8fa8a6a24d3288f8c2169c20c1c236",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/tuple/archive/boost-1.89.0.tar.gz",
+        "sha512": "4a25148fbaa13e1ff926eddb09e201515f0b4bbea502543c0e402aabc7875123e7e543f7935232b84a02884337f87f67d0992ba690db95ba977685238c250cba",
+        "authority": "ports/boost-tuple/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-type_traits-boost-1.89.0.tar.gz",
+      "bytes": 399922,
+      "sha256": "228a0dfdf69f60c4eb9ba47c98a358d3163a65b45e9c338793b87df8dba269c0",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/type_traits/archive/boost-1.89.0.tar.gz",
+        "sha512": "f1c653f741fc28af8e50ef2993e2997c18c13e2314583c91df5f484c0b08e05f676e180516ccb296cd1d14b8305df9fc2adfff57a9a548a7c727a566074dcf58",
+        "authority": "ports/boost-type-traits/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-typeof-boost-1.89.0.tar.gz",
+      "bytes": 22714,
+      "sha256": "c92eb1e2d50d8dac61834e82b26cf8763d27617c30e88642d7b503471603f39d",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/typeof/archive/boost-1.89.0.tar.gz",
+        "sha512": "520f367227391f0acf6bb42b2c70f4a04d367dda2ecbf36518bb7412d6cb72e38315f207517eba1da6b2d5e582b1dc5f911ce48b93a96a3fb147c051e985f5e2",
+        "authority": "ports/boost-typeof/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/boostorg-utility-boost-1.89.0.tar.gz",
+      "bytes": 161355,
+      "sha256": "9f8c8712e7acadd5cf98fb718952d4b966a4354fd6e26a9e3f74b1f7b75ad98f",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/boostorg/utility/archive/boost-1.89.0.tar.gz",
+        "sha512": "a29ee7bb661bb04ed7a933ac6a68babee0fe8f11a37127b2ed4248d7446ed3f46732aa2f9a4925a6422640fe3c7ff3761cf33ed03833fb65ae87ce38d54a8823",
+        "authority": "ports/boost-utility/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/USCiLab-cereal-v1.3.2.tar.gz",
+      "bytes": 385903,
+      "sha256": "16a7ad9b31ba5880dac55d62b5d6f243c3ebc8d46a3514149e56b5e7ea81f85f",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/USCiLab/cereal/archive/v1.3.2.tar.gz",
+        "sha512": "98d306d6292789129675f1c5c5aedcb90cfcc1029c4482893a8f9b23f3c9755e5ed4762d7a528f215345cae6392e87cd8d89467115b6f031b41c8673d6b4b109",
+        "authority": "ports/cereal/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/fmtlib-fmt-12.1.0.tar.gz",
+      "bytes": 711419,
+      "sha256": "ea7de4299689e12b6dddd392f9896f08fb0777ac7168897a244a6d6085043fea",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/fmtlib/fmt/archive/12.1.0.tar.gz",
+        "sha512": "f0da82c545b01692e9fd30fdfb613dbb8dd9716983dcd0ff19ac2a8d36f74beb5540ef38072fdecc1e34191b3682a8542ecbf3a61ef287dbba0a2679d4e023f2",
+        "authority": "ports/fmt/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/g-truc-glm-1.0.2.tar.gz",
+      "bytes": 4597309,
+      "sha256": "19edf2e860297efab1c74950e6076bf4dad9de483826bc95e2e0f2c758a43f65",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/g-truc/glm/archive/1.0.2.tar.gz",
+        "sha512": "e66e4f192f6579128198c47ed20442dda13c741f371b447722b7449200f05785e1b69386a465febf97f33b437f6eb69b3fb282e1e9eabf6261eb7b57998cd68c",
+        "authority": "ports/glm/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/mariadb-corporation-mariadb-connector-c-v3.4.7.tar.gz",
+      "bytes": 1390647,
+      "sha256": "cf81cd1c71c3199da9d2125aee840cb6083d43e1ea4c60c4be5045bfc7824eba",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/mariadb-corporation/mariadb-connector-c/archive/v3.4.7.tar.gz",
+        "sha512": "0e06452539fcea4e21c3922b58b7079aa5d467e2ac704fe586fcd83563f69c4e0536d40e0020170f7670320cc71cd9de2a110f3f4c6ed52233aa329c3e495fd5",
+        "authority": "ports/libmariadb/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/mariadb-corporation-mariadb-connector-c-fp_is_not_const-0ca807a.diff",
+      "bytes": 910,
+      "sha256": "3af1544e0a3ea8e16d942e2801d3183359249fedf52c50fee74e79ebcb4f939e",
+      "role": "port-extra",
+      "origin": {
+        "url": "https://github.com/mariadb-corporation/mariadb-connector-c/commit/0ca807a210befe9c159d6b9a2c1d5de8f26869ad.diff?full_index=1",
+        "sha512": "1695ae5408fd54b148315aaa47806371e7db5f0001fc98bc480914aeaa41d48c0841ff64e99266b6c0ea1262ac65983507faf46306d98292c87926f74900fee2",
+        "authority": "ports/libmariadb/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/jedisct1-libsodium-1.0.20-RELEASE.tar.gz",
+      "bytes": 2151843,
+      "sha256": "8e5aeca07a723a27bbecc3beef14b0068d37e7fc0e97f51b3f1c82d2a58005c1",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/jedisct1/libsodium/archive/1.0.20-RELEASE.tar.gz",
+        "sha512": "477b9dc10d87ae3c83db3fc207b50b9fe39593684a59f164986cce32bdaba95db0df7dee32149bf9a23c5794354fce8241d88a9a4bd4bbf2630483cbbc378c2f",
+        "authority": "ports/libsodium/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/libuv-libuv-v1.51.0.tar.gz",
+      "bytes": 1352232,
+      "sha256": "27e55cf7083913bfb6826ca78cde9de7647cded648d35f24163f2d31bb9f51cd",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/libuv/libuv/archive/v1.51.0.tar.gz",
+        "sha512": "cf3ca916fc3a762a194dac86718a5a7fe24f230e34172a48f9b3401ad72fbc1cf21b46ceaba956cdf6783d323e518d40f8632fff965943869819a1c26992a3c1",
+        "authority": "ports/libuv/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/LuaJIT-LuaJIT-d0e88930ddde28ff662503f9f20facf34f7265aa.tar.gz",
+      "bytes": 1075279,
+      "sha256": "aa354d1265814db5a1ee9dfff6049e19b148e1fd818f1ecfa4fcf2b19f6e4dd9",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/LuaJIT/LuaJIT/archive/d0e88930ddde28ff662503f9f20facf34f7265aa.tar.gz",
+        "sha512": "e4111b2d7eeb05676c62d69da13a380a51d98f082c0be575a414c09ee27ff17d101b5b4a95e1b8a1bad14d55a4d2b305718a11878fbf36e0d3d48e62ba03407f",
+        "authority": "ports/luajit/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/openssl-openssl-openssl-3.6.0.tar.gz",
+      "bytes": 55165518,
+      "sha256": "1535d184cbd04ea6b20485b98719fa8d609e45c3657f7c65b8299ae606f78159",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/openssl/openssl/archive/openssl-3.6.0.tar.gz",
+        "sha512": "3e1796708155454c118550ba0964b42c0c1055b651fec00cfb55038e8a8abbf5f85df02449e62b50b99d2a4a2f7b47862067f8a965e9c8a72f71dee0153672d9",
+        "authority": "ports/openssl/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/recastnavigation-recastnavigation-v1.6.0.tar.gz",
+      "bytes": 1280501,
+      "sha256": "d48ca0121962fa0639502c0f56c4e3ae72f98e55d88727225444f500775c0074",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/recastnavigation/recastnavigation/archive/v1.6.0.tar.gz",
+        "sha512": "7567aaa78219cc490a6f76210fba1f130f0c17aeaa06432ab1207e0fd03404abe31042e8b03971aa0d04ad65d39469f13575fe0072fb920c38581d39568b70fb",
+        "authority": "ports/recastnavigation/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/madler-zlib-v1.3.1.tar.gz",
+      "bytes": 1572744,
+      "sha256": "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c",
+      "role": "port-source",
+      "origin": {
+        "url": "https://github.com/madler/zlib/archive/v1.3.1.tar.gz",
+        "sha512": "8c9642495bafd6fad4ab9fb67f09b268c69ff9af0f4f20cf15dfc18852ff1f312bd8ca41de761b3f8d8e90e77d79f2ccacd3d4c5b19e475ecf09d021fdfe9088",
+        "authority": "ports/zlib/portfile.cmake"
+      }
+    },
+    {
+      "path": "downloads/cmake-3.30.1-linux-x86_64.tar.gz",
+      "bytes": 53635525,
+      "sha256": "ac31f077ef3378641fa25a3cb980d21b2f083982d3149a8f2eb9154f2b53696b",
+      "role": "portable-tool",
+      "origin": {
+        "url": "https://github.com/Kitware/CMake/releases/download/v3.30.1/cmake-3.30.1-linux-x86_64.tar.gz",
+        "sha512": "84ce1333ed696a1736986fba2853c5d8db0e4c9addaf4a4723911248c6d49ecf545adf8bd46091d198fc7bd1e6c896798661463aa1ce3a726a093883aaa19adf",
+        "authority": "scripts/vcpkg-tools.json"
+      }
+    },
+    {
+      "path": "downloads/ninja-linux-1.13.1.zip",
+      "bytes": 134048,
+      "sha256": "0830252db77884957a1a4b87b05a1e2d9b5f658b8367f82999a941884cbe0238",
+      "role": "portable-tool",
+      "origin": {
+        "url": "https://github.com/ninja-build/ninja/releases/download/v1.13.1/ninja-linux.zip",
+        "sha512": "ca4e424c46c12f4e120ab2030edcff8e34cf5db9d05b4364f2d4be10f46e1a29eef64f7b4bf65fb33cd629b3bc3bcb9292341f92953968ef226f44b52959d916",
+        "authority": "scripts/vcpkg-tools.json"
+      }
+    },
+    {
+      "path": "tools/vcpkg",
+      "bytes": 8410064,
+      "sha256": "35b9a7a3ea7f8f88a42a1a5673669152e360ea39b5f301567ca8081e131abb65",
+      "role": "vcpkg-executable",
+      "origin": {
+        "url": "https://github.com/microsoft/vcpkg-tool/releases/download/2025-10-16/vcpkg-glibc",
+        "sha512": "191698aeff93fee0bdbfb3066afb50e40b3ac1b41d57ecb286e4fd74f99eaa9af55396eec67606c42362a67d5ac3f2114f52d7fe39a7955c99aeaea71e18a996",
+        "authority": "scripts/vcpkg-tool-metadata.txt"
+      }
+    },
+    {
+      "path": "downloads/patchelf-0.15.5-x86_64.tar.gz",
+      "bytes": 497060,
+      "sha256": "ed3b12af4b61733ee65e18d58c52855469ff7d879d91e1ba4239d3b73af8c295",
+      "role": "portable-tool",
+      "origin": {
+        "url": "https://github.com/NixOS/patchelf/releases/download/0.15.5/patchelf-0.15.5-x86_64.tar.gz",
+        "sha512": "1a638467dc71119d88657e83825bf9c4e65dbb2d3bbbd0267963a507e29429569dc7777490724928c86efc50af82d91b0163b29a09f8f99e62ebf6d9bb1567d2",
+        "authority": "scripts/cmake/vcpkg_find_acquire_program(PATCHELF).cmake"
+      }
+    },
+    {
+      "path": "sources/eqemu.tar.gz",
+      "bytes": 19974225,
+      "sha256": "537208716ea1dd1af562f7b5dbd2c5d96080f007e8d6d3b042d698a446dcc6dc",
+      "role": "source-tree",
+      "origin": {
+        "commit": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d"
+      }
+    },
+    {
+      "path": "sources/websocketpp.tar.gz",
+      "bytes": 717497,
+      "sha256": "0df78da0f74843ad0bf951d1f27259407af6f7c66df0aaf4ff3308d82db0326e",
+      "role": "source-tree",
+      "origin": {
+        "commit": "b9aeec6eaf3d5610503439b4fae3581d9aff08e8"
+      }
+    },
+    {
+      "path": "sources/vcpkg.bundle",
+      "bytes": 95762006,
+      "sha256": "5c33882ba3f588ed39bc9261c1b49f67281eed99e4dab954ea33145163575bfe",
+      "role": "source-tree",
+      "origin": {
+        "commit": "d1ff36c6520ee43f1a656c03cd6425c2974a449e"
+      }
+    },
+    {
+      "path": "debs/autoconf_2.71-3_all.deb",
+      "bytes": 338946,
+      "sha256": "cc3f9f7a1e576173fb59c36652c0a67c6426feae752b352404ba92dfcb1b26c9",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "autoconf",
+        "version": "2.71-3",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/a/autoconf/autoconf_2.71-3_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/automake_1%3a1.16.5-1.3ubuntu1_all.deb",
+      "bytes": 558172,
+      "sha256": "5ae9a98e73545002cd891f028859941af2a3c760cb6190e635c7ef36953912de",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "automake",
+        "version": "1:1.16.5-1.3ubuntu1",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/a/automake-1.16/automake_1.16.5-1.3ubuntu1_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/autotools-dev_20220109.1_all.deb",
+      "bytes": 44886,
+      "sha256": "d909f0327b09d9a9136239caca975df89782fa28efd721c4eb4caea422d3fc5a",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "autotools-dev",
+        "version": "20220109.1",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/a/autotools-dev/autotools-dev_20220109.1_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/binutils-common_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 240286,
+      "sha256": "d136073f5e2153f3df11c1d08d66727b9466b28ff483f50085f14bbe3464b5ee",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "binutils-common",
+        "version": "2.42-4ubuntu2.10",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/binutils/binutils-common_2.42-4ubuntu2.10_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/binutils-x86-64-linux-gnu_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 2462744,
+      "sha256": "1e510a15f30208d39edcd840e48f26a77bbca7c417805eeccb1e3f7de198ef29",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "binutils-x86-64-linux-gnu",
+        "version": "2.42-4ubuntu2.10",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/binutils/binutils-x86-64-linux-gnu_2.42-4ubuntu2.10_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/binutils_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 18154,
+      "sha256": "b3b5a84181a38fd191820b2cdcc1a3eeb1cd6333ad472f2092f96e81047e9c74",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "binutils",
+        "version": "2.42-4ubuntu2.10",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/binutils/binutils_2.42-4ubuntu2.10_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/bsdextrautils_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 73682,
+      "sha256": "aa1d336f8e54351528195a7e1bedb8176b04a81c60f3d9c97ecd044a044ac6fb",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "bsdextrautils",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/bsdextrautils_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/bsdextrautils_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/bsdutils_1%3a2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 96370,
+      "sha256": "761e5ad2ff5c30d1bfa9f41dcfe042b3475495c78c11949a9792585bd1f6765b",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "bsdutils",
+        "version": "1:2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/bsdutils_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/bsdutils_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/build-essential_12.10ubuntu1_amd64.deb",
+      "bytes": 4928,
+      "sha256": "9b2159b95a4c01937309783c7c8a6ec8dfbcb7ffd604951c9713ac52ee9c7268",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "build-essential",
+        "version": "12.10ubuntu1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/build-essential/build-essential_12.10ubuntu1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/bzip2_1.0.8-5.1ubuntu0.1_amd64.deb",
+      "bytes": 34560,
+      "sha256": "60fb79214dd8366fa39d7e69911294e72b9f1a4425a3d22f211359c8626e4b9e",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "bzip2",
+        "version": "1.0.8-5.1ubuntu0.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/bzip2/bzip2_1.0.8-5.1ubuntu0.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/bzip2/bzip2_1.0.8-5.1ubuntu0.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/ccache_4.9.1-1_amd64.deb",
+      "bytes": 591638,
+      "sha256": "d76d042ad067648c03597a3a809544439861e2ed02224c9760f90c60f1735a65",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "ccache",
+        "version": "4.9.1-1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/universe/binary-amd64/Packages",
+            "archive_path": "pool/universe/c/ccache/ccache_4.9.1-1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/cmake-data_3.28.3-1build7_all.deb",
+      "bytes": 2154936,
+      "sha256": "20a3b644211ce82f35c24f1f5052199adeb0ac159978a8740fd6c0959611557f",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "cmake-data",
+        "version": "3.28.3-1build7",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/c/cmake/cmake-data_3.28.3-1build7_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/cmake_3.28.3-1build7_amd64.deb",
+      "bytes": 11190006,
+      "sha256": "4b0a7f8c0daf27b26b46997d994ae5d1ee7a3d11dfcda9f7627bb1462c162295",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "cmake",
+        "version": "3.28.3-1build7",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/c/cmake/cmake_3.28.3-1build7_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/cpp-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 10714542,
+      "sha256": "2ca48bf0c2d6465bc39322899715a85d934b4d7442dd5586a7bebbe3ce0f806b",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "cpp-13-x86-64-linux-gnu",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/cpp-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/cpp-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/cpp-13_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 1042,
+      "sha256": "c7535331fbb183c802c3bf4b6b210872dcc12d0421b3212b3c4b940f2c59ed3a",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "cpp-13",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/cpp-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/cpp-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/cpp-x86-64-linux-gnu_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 5326,
+      "sha256": "85059b30960de3582e8612740614da3dfe47241d0368a28dea686188cf7648dd",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "cpp-x86-64-linux-gnu",
+        "version": "4:13.2.0-7ubuntu1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-defaults/cpp-x86-64-linux-gnu_13.2.0-7ubuntu1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/cpp_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 22442,
+      "sha256": "b51f8094760f7b41afdcb1fe1b5a57fc64b75a090859918af17450a10f8c7d31",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "cpp",
+        "version": "4:13.2.0-7ubuntu1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-defaults/cpp_13.2.0-7ubuntu1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/dpkg-dev_1.22.6ubuntu6.6_all.deb",
+      "bytes": 1074218,
+      "sha256": "70da073557dbed76dc14eb1e682e7ec30fcb736f3d98812490a4c785b4c481cb",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "dpkg-dev",
+        "version": "1.22.6ubuntu6.6",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/d/dpkg/dpkg-dev_1.22.6ubuntu6.6_all.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/d/dpkg/dpkg-dev_1.22.6ubuntu6.6_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/dpkg_1.22.6ubuntu6.6_amd64.deb",
+      "bytes": 1282284,
+      "sha256": "ceb6aa4da59fbcb8a3b0549b4280c60b7d849b519859797c8668bdfbe378fb3b",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "dpkg",
+        "version": "1.22.6ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/d/dpkg/dpkg_1.22.6ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/d/dpkg/dpkg_1.22.6ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/eject_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 26278,
+      "sha256": "e49024f6e5c1becc7bdff11589ea7973b8f522ad77f515a94cfb8176dbb699e3",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "eject",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/eject_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/eject_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/fdisk_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 121538,
+      "sha256": "4a27cce5a9ad937298ce82722912e8ceefd123773de5c39fa8cf2a2f61cf4657",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "fdisk",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/fdisk_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/fdisk_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/g++-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 12161938,
+      "sha256": "0bd6af6164252d4ea9170d201ee4c10a3120fe0fc04985a00be3bc9076353844",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "g++-13-x86-64-linux-gnu",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/g++-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/g++-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/g++-13_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 16048,
+      "sha256": "0f3ef964b8a91a9cd7bebfd126839a21941c55547cadcf4aa00204bc8cc43985",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "g++-13",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/g++-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/g++-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/g++-x86-64-linux-gnu_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 964,
+      "sha256": "145b027a542db5b21f85d4f9e242f51c62c69914fc484adb3a4881ca8e2f3913",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "g++-x86-64-linux-gnu",
+        "version": "4:13.2.0-7ubuntu1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-defaults/g++-x86-64-linux-gnu_13.2.0-7ubuntu1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/g++_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 1100,
+      "sha256": "800a84b369c64b18d65f0fb5c1533de0446c880ee4f1cadad64e3363327f63f0",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "g++",
+        "version": "4:13.2.0-7ubuntu1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-defaults/g++_13.2.0-7ubuntu1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/gcc-13-base_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 51616,
+      "sha256": "e859aca26585bb91113a451f1e66bc0e5283cb08797d679aacc1d936ae6dff8e",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "gcc-13-base",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/gcc-13-base_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/gcc-13-base_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/gcc-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 21084546,
+      "sha256": "a134b0319a82d14581b3a14820d2832af4ec9778ed8b9b4ddaeecfb0555ec325",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "gcc-13-x86-64-linux-gnu",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/gcc-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/gcc-13-x86-64-linux-gnu_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/gcc-13_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 494262,
+      "sha256": "7438ff160b020a74970672189ecae25d0ca650de6d7f543f12a3134192cffbd9",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "gcc-13",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/gcc-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/gcc-13_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/gcc-14-base_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 51014,
+      "sha256": "b95c172411a7fdae70307cf33a9f5320ba5e056b556454543dd5b679d5ce1c4f",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "gcc-14-base",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/gcc-14-base_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/gcc-14-base_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/gcc-x86-64-linux-gnu_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 1212,
+      "sha256": "72e79089a10e381360bfc6f03c5e5d8c2ff177d6dbac2cd7ffb3cc1383f57591",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "gcc-x86-64-linux-gnu",
+        "version": "4:13.2.0-7ubuntu1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-defaults/gcc-x86-64-linux-gnu_13.2.0-7ubuntu1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/gcc_4%3a13.2.0-7ubuntu1_amd64.deb",
+      "bytes": 5018,
+      "sha256": "0e0bb8b25153ed1c44ab92bc219eed469fcb5820c5c0bc6454b2fd366a33d3ee",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "gcc",
+        "version": "4:13.2.0-7ubuntu1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-defaults/gcc_13.2.0-7ubuntu1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libasan8_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 3026656,
+      "sha256": "8321aac6230fa1da320e76eb6288b7436164624aec449ed3933ea6c4cc86daac",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libasan8",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libasan8_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libasan8_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libatomic1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 10466,
+      "sha256": "fe49cbbc7be753528380c724a8eef5f1e31dffa9221f692c5069048d81c7449d",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libatomic1",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libatomic1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libatomic1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libbinutils_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 576834,
+      "sha256": "064dce00ce94e1fc2d33779cb0071088f4c8aac79e85345f2e78a020f7d14699",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libbinutils",
+        "version": "2.42-4ubuntu2.10",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/binutils/libbinutils_2.42-4ubuntu2.10_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libblkid1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 124124,
+      "sha256": "3bcf169cd65e2539059b2287924090fc629f9bf90f595fc25465a7efe950ee82",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libblkid1",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libblkid1_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libblkid1_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libbz2-1.0_1.0.8-5.1ubuntu0.1_amd64.deb",
+      "bytes": 34562,
+      "sha256": "36ee08b00b1ee5018b2fce02881b7d2d73c9b4e32990bde3388400d86c48126a",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libbz2-1.0",
+        "version": "1.0.8-5.1ubuntu0.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/bzip2/libbz2-1.0_1.0.8-5.1ubuntu0.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/bzip2/libbz2-1.0_1.0.8-5.1ubuntu0.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libcc1-0_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 48002,
+      "sha256": "454456436ca767817a860557263d7cc2489f0a410f03efff4c0bb236d579ec09",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libcc1-0",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libcc1-0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libcc1-0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libctf-nobfd0_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 98012,
+      "sha256": "da352eb7fa6c4369d2a6c1e5e680f574eda2e38576563326b18d9e47e61c4078",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libctf-nobfd0",
+        "version": "2.42-4ubuntu2.10",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/binutils/libctf-nobfd0_2.42-4ubuntu2.10_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libctf0_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 94474,
+      "sha256": "7ec86d697c3668503c85f308a6832f092075b5880ad002f22185264da0bd4645",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libctf0",
+        "version": "2.42-4ubuntu2.10",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/binutils/libctf0_2.42-4ubuntu2.10_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libdpkg-perl_1.22.6ubuntu6.6_all.deb",
+      "bytes": 268420,
+      "sha256": "db57f9f0608f78001b5f468e03541fdb88b7e30a07b46d0bcdb57a916a6e8c11",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libdpkg-perl",
+        "version": "1.22.6ubuntu6.6",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/d/dpkg/libdpkg-perl_1.22.6ubuntu6.6_all.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/d/dpkg/libdpkg-perl_1.22.6ubuntu6.6_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libfdisk1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 146344,
+      "sha256": "7f67b127d239f51218c1eb63c3b0c219bbf26f450349bed9ad5d9f10a6b80c1b",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libfdisk1",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libfdisk1_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libfdisk1_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libgcc-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 2680642,
+      "sha256": "cd689db2691edaa10f37329307292796bb599e722e0505c79e14caaa1fe9a93a",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libgcc-13-dev",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/libgcc-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/libgcc-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libgcc-s1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 78392,
+      "sha256": "aa7fadbe33b78bcf99885318040601c550c208929565b179891d9a3cc2aa68cd",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libgcc-s1",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libgcc-s1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libgcc-s1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libgomp1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 148062,
+      "sha256": "e8a95ec58125b4933597f30ff56c2ae10edf90f287262e366d4b6edea3019144",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libgomp1",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libgomp1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libgomp1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libgprofng0_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 848684,
+      "sha256": "1b7e3c2fc162e8358ca6e5a3fffdb4d0d632f790630323215841bb36a63c0ab8",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libgprofng0",
+        "version": "2.42-4ubuntu2.10",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/binutils/libgprofng0_2.42-4ubuntu2.10_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libhiredis1.1.0_1.2.0-6ubuntu3_amd64.deb",
+      "bytes": 41380,
+      "sha256": "912a25553f29a47d1524c0b58a3c5bff2d067109da2adae9fa9c4fb15efaa568",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libhiredis1.1.0",
+        "version": "1.2.0-6ubuntu3",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/universe/binary-amd64/Packages",
+            "archive_path": "pool/universe/h/hiredis/libhiredis1.1.0_1.2.0-6ubuntu3_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libhwasan0_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 1640706,
+      "sha256": "2195318cfe68fe16b601913ef7b33c9a900372f57861643fdc9ae6fef84534cd",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libhwasan0",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libhwasan0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libhwasan0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libisl23_0.26-3build1.1_amd64.deb",
+      "bytes": 679812,
+      "sha256": "4e040926e50fb961fae9bf95660189d468336a4a17bc321872c434fc8f777e7f",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libisl23",
+        "version": "0.26-3build1.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/i/isl/libisl23_0.26-3build1.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libitm1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 29702,
+      "sha256": "1fca498129dd3510294809d77ee754f72a9de281111200e9b7b9a5adf37faa9f",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libitm1",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libitm1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libitm1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libjsoncpp25_1.9.5-6build1_amd64.deb",
+      "bytes": 82754,
+      "sha256": "8efea5b75952f3ad1c40e6b5b31de687c297ea29f87f8b63efebb55e13467211",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libjsoncpp25",
+        "version": "1.9.5-6build1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/libj/libjsoncpp/libjsoncpp25_1.9.5-6build1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/liblsan0_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 1321652,
+      "sha256": "dc0c2a1a053e833ba4d71e1ec2ba4244fe301761ad4a91d6725f927a52d86a14",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "liblsan0",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/liblsan0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/liblsan0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libmount1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 134082,
+      "sha256": "8f2c25589f187dacfdc5bb6be2af0aee6c2ba7b4d2edd1ca4b26753469f07aae",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libmount1",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libmount1_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libmount1_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libmpc3_1.3.1-1build1.1_amd64.deb",
+      "bytes": 54636,
+      "sha256": "cebe6098bb3d66fdacac9dc6fe406a651216d9c00f27c3f9c159d15d96cdf864",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libmpc3",
+        "version": "1.3.1-1build1.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/m/mpclib3/libmpc3_1.3.1-1build1.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libperl-dev_5.38.2-3.2ubuntu0.6_amd64.deb",
+      "bytes": 1185340,
+      "sha256": "c44d080cebac4bf2c99263cf9de3d0e6d8f4618249c8feaddfb99a34450784b6",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libperl-dev",
+        "version": "5.38.2-3.2ubuntu0.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/libperl-dev_5.38.2-3.2ubuntu0.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/libperl-dev_5.38.2-3.2ubuntu0.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libperl5.38t64_5.38.2-3.2ubuntu0.6_amd64.deb",
+      "bytes": 4863614,
+      "sha256": "e9e5ac9a657e0cacf5f0de977c1573c696ee74515d5136c4e9a0ce9467d32ae7",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libperl5.38t64",
+        "version": "5.38.2-3.2ubuntu0.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/libperl5.38t64_5.38.2-3.2ubuntu0.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/libperl5.38t64_5.38.2-3.2ubuntu0.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libpkgconf3_1.8.1-2build1_amd64.deb",
+      "bytes": 30652,
+      "sha256": "fc3a57e8f931ec06cb7c51acc56878f1fec247ff02a7adcab26905c2faeb2792",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libpkgconf3",
+        "version": "1.8.1-2build1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/pkgconf/libpkgconf3_1.8.1-2build1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libquadmath0_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 153316,
+      "sha256": "dc8f0ca542e09d662f29370c8393c016440dd4bc5c996c5fcc19f632b63ce3b0",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libquadmath0",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libquadmath0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libquadmath0_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/librhash0_1.4.3-3build1_amd64.deb",
+      "bytes": 128748,
+      "sha256": "e9ee69963ff1a56378b9c5ffdd21ea0feaec9647c522349b7612b25103490528",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "librhash0",
+        "version": "1.4.3-3build1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/r/rhash/librhash0_1.4.3-3build1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libsframe1_2.42-4ubuntu2.10_amd64.deb",
+      "bytes": 15724,
+      "sha256": "72093fb456864db55f1352bfa5e952a94f7abaff64e71dff1fbf001db1984564",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libsframe1",
+        "version": "2.42-4ubuntu2.10",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/b/binutils/libsframe1_2.42-4ubuntu2.10_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libsmartcols1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 66282,
+      "sha256": "84f33a780d27cce20a2cd925e7ce8498daba2dbc614d433548a19fbb2c5dac18",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libsmartcols1",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libsmartcols1_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libsmartcols1_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb",
+      "bytes": 2419834,
+      "sha256": "ee5633e863e19c3381ed97842ce35ed32ede96a3d1ae4e94c051d3036fe21347",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libstdc++-13-dev",
+        "version": "13.3.0-6ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-13/libstdc++-13-dev_13.3.0-6ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libstdc++6_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 792064,
+      "sha256": "a51f8de7829211db961a31f02158058ad1a95f92ac6d0a5dff6350e2821c54c0",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libstdc++6",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libstdc++6_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libstdc++6_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libtool-bin_2.4.7-7build1_amd64.deb",
+      "bytes": 84062,
+      "sha256": "23959c8be74b4433d635c76e61a6c4bb62f10d3899362598c53173e8e57c0f8a",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libtool-bin",
+        "version": "2.4.7-7build1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/libt/libtool/libtool-bin_2.4.7-7build1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libtool_2.4.7-7build1_all.deb",
+      "bytes": 166404,
+      "sha256": "9d1d707179675d38e024bb13613b1d99e0d33fa6c45e5f3bcba19340781781d3",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libtool",
+        "version": "2.4.7-7build1",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/libt/libtool/libtool_2.4.7-7build1_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libtsan2_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 2771910,
+      "sha256": "8cbcc9b3ae5ef23b449383d47a9035b27596e307d7dce7df9b83d47a7acd1d91",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libtsan2",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libtsan2_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libtsan2_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libubsan1_14.2.0-4ubuntu2~24.04.1_amd64.deb",
+      "bytes": 1183812,
+      "sha256": "a16dea3abe2dcac99bcfae27e7e5672fde64573c3c170dcb0cd55631238f9814",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libubsan1",
+        "version": "14.2.0-4ubuntu2~24.04.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libubsan1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/g/gcc-14/libubsan1_14.2.0-4ubuntu2~24.04.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/libuuid1_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 36596,
+      "sha256": "7e2992d3a79fc05514dc5966558ee9c66a7214a47edf2a36017b9e2777528665",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "libuuid1",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libuuid1_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/libuuid1_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/lto-disabled-list_47_all.deb",
+      "bytes": 12400,
+      "sha256": "cac0f63c88188f376bb4df10a2af2b49a607bbef97a57db50ed58f678c21eee9",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "lto-disabled-list",
+        "version": "47",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/l/lto-disabled-list/lto-disabled-list_47_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/m4_1.4.19-4build1_amd64.deb",
+      "bytes": 243640,
+      "sha256": "30ea715845a1863abd55d11e47ab91513130bf347852d4cdeae69e9d98fa795c",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "m4",
+        "version": "1.4.19-4build1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/m/m4/m4_1.4.19-4build1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/make_4.3-4.1build2_amd64.deb",
+      "bytes": 179752,
+      "sha256": "1fe6a815b56c7b6e9ce4086a363f09444bbd0a0d30e230c453d0b78e44b57a99",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "make",
+        "version": "4.3-4.1build2",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/m/make-dfsg/make_4.3-4.1build2_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/mount_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 118192,
+      "sha256": "09e929ceb9fc5d11757f28429b3151601c44db4c96e0bc5ad46c501c8d56f4f9",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "mount",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/mount_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/mount_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/ninja-build_1.11.1-2_amd64.deb",
+      "bytes": 128926,
+      "sha256": "6a17f76a0f75586f1292f6c61a9b07fd0dec963baf6a102b17673f601c6b323a",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "ninja-build",
+        "version": "1.11.1-2",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/universe/binary-amd64/Packages",
+            "archive_path": "pool/universe/n/ninja-build/ninja-build_1.11.1-2_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/perl-base_5.38.2-3.2ubuntu0.6_amd64.deb",
+      "bytes": 1825574,
+      "sha256": "50e1b2c2646387a94664fbea144af1d1b16cf6e0778426baa198166ca3246697",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "perl-base",
+        "version": "5.38.2-3.2ubuntu0.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/perl-base_5.38.2-3.2ubuntu0.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/perl-base_5.38.2-3.2ubuntu0.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/perl-modules-5.38_5.38.2-3.2ubuntu0.6_all.deb",
+      "bytes": 3110182,
+      "sha256": "9c4c90145209d4f85be9255417008e8decb9cd5d189f446fd39ad096e31199cf",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "perl-modules-5.38",
+        "version": "5.38.2-3.2ubuntu0.6",
+        "architecture": "all",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/perl-modules-5.38_5.38.2-3.2ubuntu0.6_all.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/perl-modules-5.38_5.38.2-3.2ubuntu0.6_all.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/perl_5.38.2-3.2ubuntu0.6_amd64.deb",
+      "bytes": 231438,
+      "sha256": "1a2341674a1c69e3247537ab243dc3d5878b74a39a696964232e1a4f5a27502d",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "perl",
+        "version": "5.38.2-3.2ubuntu0.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/perl_5.38.2-3.2ubuntu0.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/perl/perl_5.38.2-3.2ubuntu0.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/pkg-config_1.8.1-2build1_amd64.deb",
+      "bytes": 7264,
+      "sha256": "16bda455d9216da31ad55d72df5a7380cb9d5ac32a2393941cab262a4e5b526f",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "pkg-config",
+        "version": "1.8.1-2build1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/pkgconf/pkg-config_1.8.1-2build1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/pkgconf-bin_1.8.1-2build1_amd64.deb",
+      "bytes": 20730,
+      "sha256": "7a812f05ee1610154b433e2ad54f6e4163fcbb306b9fb31afe959afb2e5e1545",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "pkgconf-bin",
+        "version": "1.8.1-2build1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/pkgconf/pkgconf-bin_1.8.1-2build1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/pkgconf_1.8.1-2build1_amd64.deb",
+      "bytes": 16790,
+      "sha256": "834a58031069d97d7cfb8b2f5bfd5effc69cecf7f30cc362071875f1f8dc1828",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "pkgconf",
+        "version": "1.8.1-2build1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble/main/binary-amd64/Packages",
+            "archive_path": "pool/main/p/pkgconf/pkgconf_1.8.1-2build1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/unzip_6.0-28ubuntu4.1_amd64.deb",
+      "bytes": 174454,
+      "sha256": "a505b9d491386167bd8e14e3383315a4a7d6539e4406745901ccf009a7988271",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "unzip",
+        "version": "6.0-28ubuntu4.1",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/unzip/unzip_6.0-28ubuntu4.1_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/unzip/unzip_6.0-28ubuntu4.1_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/util-linux_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 1128326,
+      "sha256": "08eb17ba3b83378ed1e73d8335d0ce03b429c0bbeb07e374f536234edab02465",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "util-linux",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/util-linux_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/util-linux_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/uuid-dev_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 33546,
+      "sha256": "266115cc3bcecef70b9f75c0cf8ca4daccd40958bf7872f8ccebec50502d2a13",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "uuid-dev",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/uuid-dev_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/uuid-dev_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/uuid-runtime_2.39.3-9ubuntu6.6_amd64.deb",
+      "bytes": 33066,
+      "sha256": "3517a3ae6cb6c6ad8ef9daa7fd95639d83abaa4f67859ba95fe444a4f25e6f6b",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "uuid-runtime",
+        "version": "2.39.3-9ubuntu6.6",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/uuid-runtime_2.39.3-9ubuntu6.6_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/u/util-linux/uuid-runtime_2.39.3-9ubuntu6.6_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/zip_3.0-13ubuntu0.2_amd64.deb",
+      "bytes": 175652,
+      "sha256": "30b325b542ef8e9a22a5e1e1cfce8c4f4b75db73e339e76bf405b635861f1f76",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "zip",
+        "version": "3.0-13ubuntu0.2",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/z/zip/zip_3.0-13ubuntu0.2_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "debs/zlib1g-dev_1%3a1.3.dfsg-3.1ubuntu2.2_amd64.deb",
+      "bytes": 894116,
+      "sha256": "e9152a08af21ab22bc99e8bfa98f1eb83955b2cc3653bcefecab394ecf9d1b63",
+      "role": "ubuntu-package",
+      "origin": {
+        "package": "zlib1g-dev",
+        "version": "1:1.3.dfsg-3.1ubuntu2.2",
+        "architecture": "amd64",
+        "signed_index_matches": [
+          {
+            "index": "noble-updates/main/binary-amd64/Packages",
+            "archive_path": "pool/main/z/zlib/zlib1g-dev_1.3.dfsg-3.1ubuntu2.2_amd64.deb"
+          },
+          {
+            "index": "noble-security/main/binary-amd64/Packages",
+            "archive_path": "pool/main/z/zlib/zlib1g-dev_1.3.dfsg-3.1ubuntu2.2_amd64.deb"
+          }
+        ]
+      }
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages",
+      "bytes": 7165069,
+      "sha256": "8f6f71ae839c8cba390a7643fcbbdacddb0bc7d12c1583a2dd80a1f8443a30e5",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble_universe_binary-amd64_Packages",
+      "bytes": 73379142,
+      "sha256": "687ffc969e7700137677b9cfe2f614ee2d638052a91a7c9bf31f3f6a3040a99a",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-updates_main_binary-amd64_Packages",
+      "bytes": 7120827,
+      "sha256": "e1330d4b0d1604808295d4af71bc14fdb83f4180ac982bbcf33a1b9bd54f94ee",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-updates_universe_binary-amd64_Packages",
+      "bytes": 10591098,
+      "sha256": "f518bf312aeb75c2e8c6c9a4fccc1ebc05876141087fb77f8f3b40f12ce07958",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-security_main_binary-amd64_Packages",
+      "bytes": 5721326,
+      "sha256": "207e1d251ecfc9215516c8db3a71c23cc6039298803c56bc5c2bca8c35bb4c55",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-security_universe_binary-amd64_Packages",
+      "bytes": 7666073,
+      "sha256": "69ef69e72ed3bd48f7e5feddbf114d32f45046a6fb4cefa43e2b394a550d9bf2",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble_InRelease",
+      "bytes": 255850,
+      "sha256": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-updates_InRelease",
+      "bytes": 126125,
+      "sha256": "269dd8e4030f0963cbbdbdc7e12a53d06494263f4cf9878e4a26fb13d42a6d63",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-security_InRelease",
+      "bytes": 126127,
+      "sha256": "6be2718be70acbf245b9fe37ca753c043b970db6cd27594ec081d6809cb9908d",
+      "role": "ubuntu-metadata",
+      "origin": null
+    },
+    {
+      "path": "ubuntu-archive-keyring.gpg",
+      "bytes": 3607,
+      "sha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31",
+      "role": "ubuntu-keyring",
+      "origin": null
+    },
+    {
+      "path": "provenance/ubuntu-package-proof.json",
+      "bytes": 53425,
+      "sha256": "ddcff66e4dcad52233c49c8706f85d44f7c7e4bd5df96ddd474242979dc10268",
+      "role": "provenance",
+      "origin": null
+    },
+    {
+      "path": "provenance/source-tree-proof.json",
+      "bytes": 6543,
+      "sha256": "90d114673d7d276536b1220fd9b7c46f7911801a687790d852eef67a0c32ffa3",
+      "role": "provenance",
+      "origin": null
+    },
+    {
+      "path": "provenance/static-input-plan.json",
+      "bytes": 28373,
+      "sha256": "145accafe11d954cff95df58c92094268fb8edbd912465d7d80ff6de84b601b7",
+      "role": "provenance",
+      "origin": null
+    }
+  ]
+}
