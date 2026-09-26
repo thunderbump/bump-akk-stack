@@ -1,0 +1,27 @@
+{
+  "status": "prepared-unexecuted",
+  "local_control_tests": 39,
+  "runtime_tests": 17,
+  "retained_build_tests": 16,
+  "static_check": {
+    "inputs_and_worker_verified": true,
+    "vm_started": false
+  },
+  "admission": {
+    "free_bytes": 259388903424,
+    "free_inodes": 49747876,
+    "mem_available": 25185968128
+  },
+  "input_copy_bytes": 1266475520,
+  "worker_peak_reserved_bytes": 35626213888,
+  "worker_cap_bytes": 42949672960,
+  "preparation_allocated_bytes": 770048,
+  "known_remaining_cases": [
+    "first missing-water-map plus positive guest execution",
+    "runtime cancellation",
+    "fresh successful repeat"
+  ],
+  "operator_required": "sudo password; sudo -n unavailable",
+  "real_apt_regression_tests": 1,
+  "shared_memory_regression_tests": 5
+}

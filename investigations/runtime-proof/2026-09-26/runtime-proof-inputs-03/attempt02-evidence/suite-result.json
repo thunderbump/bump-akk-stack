@@ -1,0 +1,36 @@
+{
+  "suite_passed": false,
+  "cases_passed": false,
+  "started_at": 1790457935.4498577,
+  "case": {
+    "case_passed": false,
+    "checks": {
+      "identity": true,
+      "host_pre_resume": true,
+      "workload": false,
+      "service": false,
+      "cleanup": true,
+      "cleanup_time": true,
+      "absence": true,
+      "quiescent": true
+    },
+    "report_sha256": "9c894aa6e61bb39ed14f3da6c4b24a53031e07f15906926a0c2d59353ca1165c",
+    "cleanup_sha256": "49653de5620e59ac4e85e4675a179309c413106a2dfd71218facb2a9c75b1806"
+  },
+  "error": "Build attempt failed; inspect worker evidence",
+  "finished_at": 1790459956.9954622,
+  "cleanup": {
+    "complete": true,
+    "rescued": [],
+    "started_at": 1790459957.0486984,
+    "controller_budget": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.current": "13418496",
+      "memory.peak": "1022382080",
+      "memory.events": "low 0\nhigh 0\nmax 751\noom 0\noom_kill 0\noom_group_kill 0"
+    },
+    "finished_at": 1790459957.116993
+  },
+  "service_result": "exit-code"
+}

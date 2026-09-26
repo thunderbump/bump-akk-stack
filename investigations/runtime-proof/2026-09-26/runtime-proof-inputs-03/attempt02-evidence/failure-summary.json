@@ -1,0 +1,196 @@
+{
+  "scope": "selected failure facts; full bounded raw evidence retained under runtime-proof-02",
+  "suite_sha256": "6947335e0f44e317bd20004af5c6cbeb2a33088fb1c842fc874ea4c0cccfba93",
+  "report_sha256": "9c894aa6e61bb39ed14f3da6c4b24a53031e07f15906926a0c2d59353ca1165c",
+  "error": "Guest build failed: Shared memory missing/empty",
+  "stages": {
+    "mount-input": {
+      "state": "passed",
+      "at": 1790458067.2341726
+    },
+    "mount-runtime": {
+      "state": "passed",
+      "at": 1790458067.2558365
+    },
+    "signature-0": {
+      "state": "passed",
+      "at": 1790458073.8497772
+    },
+    "signature-1": {
+      "state": "passed",
+      "at": 1790458073.8572757
+    },
+    "signature-2": {
+      "state": "passed",
+      "at": 1790458074.0641658
+    },
+    "apt-plan": {
+      "state": "passed",
+      "at": 1790458076.5403972
+    },
+    "apt-install": {
+      "state": "passed",
+      "at": 1790458089.825167
+    },
+    "dpkg-audit": {
+      "state": "passed",
+      "at": 1790458089.8366854
+    },
+    "package-identities": {
+      "state": "passed",
+      "at": 1790458089.842791
+    },
+    "system-zlib-link": {
+      "state": "passed",
+      "at": 1790458089.899817
+    },
+    "system-zlib-run": {
+      "state": "passed",
+      "at": 1790458089.904107
+    },
+    "registry-clone": {
+      "state": "passed",
+      "at": 1790458098.959003
+    },
+    "registry-checkout": {
+      "state": "passed",
+      "at": 1790458099.2524369
+    },
+    "registry-integrity": {
+      "state": "passed",
+      "at": 1790458109.0796294
+    },
+    "tool-compiler": {
+      "state": "passed",
+      "at": 1790458109.354295
+    },
+    "tool-cmake": {
+      "state": "passed",
+      "at": 1790458109.3664267
+    },
+    "tool-ninja": {
+      "state": "passed",
+      "at": 1790458109.3707418
+    },
+    "tool-perl": {
+      "state": "passed",
+      "at": 1790458109.3991725
+    },
+    "tool-make": {
+      "state": "passed",
+      "at": 1790458109.4033282
+    },
+    "tool-autoreconf": {
+      "state": "passed",
+      "at": 1790458109.4313974
+    },
+    "tool-pkgconfig": {
+      "state": "passed",
+      "at": 1790458109.4357207
+    },
+    "tool-vcpkg": {
+      "state": "passed",
+      "at": 1790458109.845545
+    },
+    "vcpkg-plan": {
+      "state": "passed",
+      "at": 1790458112.2461095
+    },
+    "intentional-exit-seven": {
+      "state": "running",
+      "at": 1790458112.250026
+    },
+    "configure": {
+      "state": "passed",
+      "at": 1790458385.9278464
+    },
+    "server-build": {
+      "state": "passed",
+      "at": 1790459880.149586
+    },
+    "upstream-tests": {
+      "state": "passed",
+      "at": 1790459880.3866699
+    },
+    "runtime-package-plan": {
+      "state": "passed",
+      "at": 1790459886.1271605
+    },
+    "runtime-service-mask": {
+      "state": "passed",
+      "at": 1790459886.2798424
+    },
+    "runtime-package-install": {
+      "state": "passed",
+      "at": 1790459893.978011
+    },
+    "runtime-package-audit": {
+      "state": "passed",
+      "at": 1790459893.9922793
+    },
+    "runtime-package-identities": {
+      "state": "passed",
+      "at": 1790459893.9999573
+    },
+    "runtime-perl-modules": {
+      "state": "passed",
+      "at": 1790459894.0233595
+    },
+    "negative-db-init": {
+      "state": "passed",
+      "at": 1790459896.339898
+    },
+    "negative-db-create": {
+      "state": "passed",
+      "at": 1790459896.6032944
+    },
+    "negative-import-content": {
+      "state": "passed",
+      "at": 1790459944.7906704
+    },
+    "negative-import-login": {
+      "state": "passed",
+      "at": 1790459945.0671313
+    },
+    "negative-import-player": {
+      "state": "passed",
+      "at": 1790459945.5608506
+    },
+    "negative-import-state": {
+      "state": "passed",
+      "at": 1790459945.8795214
+    },
+    "negative-import-system": {
+      "state": "passed",
+      "at": 1790459946.3558476
+    },
+    "negative-app-account": {
+      "state": "passed",
+      "at": 1790459946.9914935
+    },
+    "negative-fixture-settings": {
+      "state": "passed",
+      "at": 1790459947.00191
+    },
+    "negative-fixture-policy": {
+      "state": "passed",
+      "at": 1790459947.0081923
+    },
+    "negative-zone-content": {
+      "state": "passed",
+      "at": 1790459947.0491767
+    },
+    "negative-shared-memory": {
+      "state": "passed",
+      "at": 1790459949.4405916
+    }
+  },
+  "resource_observations": {
+    "memory.peak": "4500135936",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu.stat": "usage_usec 1806737100\nuser_usec 1761214864\nsystem_usec 45522235\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 19721\nnr_throttled 15\nthrottled_usec 199053\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "duration_minutes": 33.69,
+  "diagnosis": "Validator defect reproduced with nonempty items/spells and empty items.lock/spells.lock files. Pinned upstream IPCMutex code creates those empty lock files. Actual failed guest directory listing was not retained; fresh guest verification remains required."
+}

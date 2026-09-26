@@ -1,0 +1,50 @@
+test_failure_includes_required_file_sizes (__main__.SharedEvidence.test_failure_includes_required_file_sizes) ... FAIL
+test_missing_or_empty_payload_fails_even_with_locks (__main__.SharedEvidence.test_missing_or_empty_payload_fails_even_with_locks) ... ok
+test_payloads_with_empty_locks_pass_and_only_payloads_are_reported (__main__.SharedEvidence.test_payloads_with_empty_locks_pass_and_only_payloads_are_reported) ... ERROR
+test_symlink_payload_is_rejected (__main__.SharedEvidence.test_symlink_payload_is_rejected) ... FAIL
+test_unexpected_file_is_rejected (__main__.SharedEvidence.test_unexpected_file_is_rejected) ... FAIL
+
+======================================================================
+ERROR: test_payloads_with_empty_locks_pass_and_only_payloads_are_reported (__main__.SharedEvidence.test_payloads_with_empty_locks_pass_and_only_payloads_are_reported)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/bump/.local/state/eqemu-vm-proof/runtime-proof-inputs-03/test-shared-evidence.py", line 12, in test_payloads_with_empty_locks_pass_and_only_payloads_are_reported
+    evidence=G.shared_evidence(self.root);self.assertEqual(set(evidence),{'items','spells'})
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/home/bump/.local/state/eqemu-vm-proof/runtime-proof-inputs-03/guest-runtime.py", line 235, in shared_evidence
+    if not {'items','spells'}.issubset(shared) or any(v['bytes']==0 for v in shared.values()):raise RuntimeError('Shared memory missing/empty')
+                                                                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+RuntimeError: Shared memory missing/empty
+
+======================================================================
+FAIL: test_failure_includes_required_file_sizes (__main__.SharedEvidence.test_failure_includes_required_file_sizes)
+----------------------------------------------------------------------
+RuntimeError: Shared memory missing/empty
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/home/bump/.local/state/eqemu-vm-proof/runtime-proof-inputs-03/test-shared-evidence.py", line 33, in test_failure_includes_required_file_sizes
+    with self.assertRaisesRegex(RuntimeError,'spells.*0'):G.shared_evidence(self.root)
+AssertionError: "spells.*0" does not match "Shared memory missing/empty"
+
+======================================================================
+FAIL: test_symlink_payload_is_rejected (__main__.SharedEvidence.test_symlink_payload_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/bump/.local/state/eqemu-vm-proof/runtime-proof-inputs-03/test-shared-evidence.py", line 26, in test_symlink_payload_is_rejected
+    with self.assertRaises(RuntimeError):G.shared_evidence(self.root)
+AssertionError: RuntimeError not raised
+
+======================================================================
+FAIL: test_unexpected_file_is_rejected (__main__.SharedEvidence.test_unexpected_file_is_rejected)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/home/bump/.local/state/eqemu-vm-proof/runtime-proof-inputs-03/test-shared-evidence.py", line 30, in test_unexpected_file_is_rejected
+    with self.assertRaises(RuntimeError):G.shared_evidence(self.root)
+AssertionError: RuntimeError not raised
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.002s
+
+FAILED (failures=3, errors=1)

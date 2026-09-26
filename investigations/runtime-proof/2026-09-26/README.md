@@ -55,3 +55,36 @@ sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-proof-02.py
 This needs the operator's sudo password. Progress/final evidence goes under
 `/var/lib/eqemu-vm-proof/runtime-proof-02/`. Cancel the owned run with
 `sudo systemctl stop eqemu-vm-runtime-02-suite.service`. Never reuse retained state.
+
+## Attempt 03: distinguish payloads from mutex files
+
+Attempt 02 passed build/tests, offline package installation/audit, Perl probes and
+all five database imports. The shared_memory program exited 0, then the guest
+validator reported "Shared memory missing/empty". World/zone startup was not reached.
+The failed outcome and complete cleanup are preserved under
+`runtime-proof-inputs-03/attempt02-evidence/`.
+
+Pinned EQEmu 4aceae18b94ffaafc08e2b17bc41cd72c77f795d creates zero-byte
+`items.lock` and `spells.lock` through common/ipc_mutex.cpp beside the payloads.
+The old validator incorrectly demanded every file in that directory be nonempty.
+Synthetic filesystem tests reproduce that rejection even with valid nonempty
+items/spells. The actual failed guest listing was not retained, so the next real
+guest run must confirm the source-backed diagnosis. No upstream code ran on host.
+
+The guest now permits those two known mutex files while requiring regular,
+non-symlink, nonempty items/spells payloads. Unknown entries fail. Only payload
+sizes/hashes enter the unchanged host protocol. Failure diagnostics include a
+bounded inventory of names and sizes. Five regressions pass, alongside all 34
+prior controls. Static media/XML/AppArmor checks pass. The launcher verifies
+attempt 02's exact failed outcome and cleanup before creating fresh attempt 03.
+Sealed inputs, earlier attempt files, limits and isolation are unchanged.
+
+Prepared, not executed. Operator sudo password is required:
+
+```sh
+sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-proof-03.py
+```
+
+Progress/final evidence: `/var/lib/eqemu-vm-proof/runtime-proof-03/`.
+Cancel: `sudo systemctl stop eqemu-vm-runtime-03-suite.service`.
+Runtime cases, runtime cancellation and a fresh successful repeat remain open.

@@ -1,0 +1,10 @@
+test_failure_includes_required_file_sizes (__main__.SharedEvidence.test_failure_includes_required_file_sizes) ... ok
+test_missing_or_empty_payload_fails_even_with_locks (__main__.SharedEvidence.test_missing_or_empty_payload_fails_even_with_locks) ... ok
+test_payloads_with_empty_locks_pass_and_only_payloads_are_reported (__main__.SharedEvidence.test_payloads_with_empty_locks_pass_and_only_payloads_are_reported) ... ok
+test_symlink_payload_is_rejected (__main__.SharedEvidence.test_symlink_payload_is_rejected) ... ok
+test_unexpected_file_is_rejected (__main__.SharedEvidence.test_unexpected_file_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.002s
+
+OK

@@ -1,0 +1,14 @@
+{
+  "status": "prepared-unexecuted",
+  "seed_bytes": 411648,
+  "files": {
+    "guest-build.py": "6c42bab74502b66590cff281f666a8c6596bb6966bcdf8446fdb3967f3a7848a",
+    "guest-runtime.py": "69de3ef7224f5e0e110c8d922a7f5a38ada67369204f94c4308bb3ac0143c3a3",
+    "runtime-protocol.py": "393ede9c2eb58eb4b217533c8106b6d8a74d4cf235869846b5f7d5414bbb373a",
+    "build-worker.py": "1e62bc430c285ab58c833841bd262f6e434cbeddaf9f0bbbe1f56d2fcf1793b5",
+    "seed.iso": "995d1dc4467b387e1b8491a9ed188ee3d499f49ba0fe32db974c017317da183b",
+    "offline-runtime-proof-03.py": "9821b8423db872a3b5fbfd2919f1cc3759a9fc7994b9b6b227fbb3676a0bc9f5"
+  },
+  "runtime_input_iso_sha256": "5fa2a4822e03ee7693c566e8670ddab5ee35c7a5d25d4671ac57c53ddf82c767",
+  "build_input_iso_sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4"
+}
