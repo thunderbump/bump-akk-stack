@@ -16,4 +16,6 @@ The producer formats a fully allocated 4 GiB raw disk inside its VM and writes a
 
 The proof inherits worker admission, ownership checks, controller/QEMU memory limits, disk reservations, and cleanup from the archived runtime worker. Preparation checks are not proof that VM handoff or cleanup succeeds. A failed run retains its outcome even if later rescue cleanup succeeds.
 
+The first handoff is exploratory. Producer/export cancellation and failed-publication controls remain mandatory before handoff qualification or an expensive build.
+
 Still pending: executing this proof, compiling and running the separate C++ runner controls, measuring the real executable/library closure, sealing an actual build, integrating service diagnostics, and rerunning the world/zone success and failure scenarios. No general artifact cache, automatic retry policy, or retention service is introduced here.

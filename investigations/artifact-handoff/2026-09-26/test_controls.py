@@ -5,7 +5,10 @@ from pathlib import Path
 import tempfile
 import time
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, Mock
+from types import SimpleNamespace
+import shutil
+import stat
 from artifact import copy_blob, hash_file, validate_inventory, consume_files
 from diagnostics import DiagnosticTail, utility_result
 
@@ -105,6 +108,43 @@ class OutcomeTests(unittest.TestCase):
         self.assertEqual(result['retained_bytes'],len(result['text'].encode()))
         self.assertNotIn('\x9b',result['text'])
         self.assertNotIn('\x1b',result['text'])
+
+
+class RescueTests(unittest.TestCase):
+    def test_rescue_preserves_first_cleanup_failure_and_stays_failed(self):
+        # Exercise the actual suite cleanup with external VM operations replaced.
+        namespace={}
+        exec(Path(__file__).with_name('suite_extension.py').read_text(),namespace)
+        with tempfile.TemporaryDirectory() as temporary:
+            root=Path(temporary); evidence=root/'producer'/'evidence';evidence.mkdir(parents=True)
+            def write(path,value):path.write_text(json.dumps(value))
+            def read(path):return json.loads(path.read_text())
+            first={'complete':False,'error':'original cleanup failure'}
+            write(evidence/'cleanup.json',first)
+            write(evidence/'report.json',{'cleanup':first,'ok':False})
+            write(root/'custody.json',{'eligible':False})
+            write(root/'leases.json',{'active':{}})
+            write(root/'suite-result.json',{'cases_passed':True})
+            ctl=root/'controller.slice';ctl.write_text('owned')
+            def rescue(preserve_failed_outcome):
+                self.assertTrue(preserve_failed_outcome)
+                write(evidence/'cleanup.json',{'complete':True})
+                write(evidence/'report.json',{'cleanup':{'complete':True},'ok':False})
+                return 0
+            worker=SimpleNamespace(ROOT=evidence.parent,EVIDENCE=evidence,UNIT='owned',
+                                   state=lambda:{'uuid':'owned'},cleanup=rescue)
+            namespace.update(ROOT=root,CASES=('producer',),module=lambda _:worker,
+                             properties=lambda _: {},quiescent=lambda _:True,
+                             absent=Mock(side_effect=[False,True]),ownership=lambda _:None,
+                             read=read,write=write,shutil=shutil,stat=stat,time=time,os=os,
+                             CTLFILE=ctl,CTLTEXT='owned',controller_budget=lambda:{})
+            with patch.dict(os.environ,{'SERVICE_RESULT':'success'}):
+                self.assertEqual(namespace['cleanup'](),0)
+            self.assertEqual(read(evidence/'before-suite-rescue'/'cleanup.json'),first)
+            self.assertFalse(read(evidence/'before-suite-rescue'/'custody.json')['eligible'])
+            result=read(root/'suite-result.json')
+            self.assertFalse(result['suite_passed'])
+            self.assertEqual(result['cleanup']['rescued'],['producer'])
 
 
 if __name__=='__main__': unittest.main()

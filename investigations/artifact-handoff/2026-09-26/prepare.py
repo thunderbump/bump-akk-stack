@@ -73,7 +73,7 @@ def prepare():
             readonly = '' if role=='producer' else '<readonly/>'
             disk = '    <disk type="file" device="disk"><driver name="qemu" type="raw" cache="none" discard="ignore"/><source file="{DATA}/artifact.raw"/><target dev="vdb" bus="virtio"/>'+readonly+'</disk>\n'
             worker = replace_once(worker,'    <serial type="unix">', disk+'    <serial type="unix">')
-            worker = replace_once(worker,"        raw=DATA/'root.raw'", "        prepare_artifact()\n        raw=DATA/'root.raw'")
+            worker = replace_once(worker,"        raw=DATA/'root.raw'", "        artifact_started = time.monotonic()\n        prepare_artifact()\n        artifact_info = (DATA/'artifact.raw').stat()\n        report['artifact_allocation'] = {'bytes':artifact_info.st_size, 'allocated_bytes':artifact_info.st_blocks*512, 'seconds':time.monotonic()-artifact_started}\n        if artifact_info.st_size != ARTIFACT_BYTES or artifact_info.st_blocks*512 < ARTIFACT_BYTES:raise RuntimeError('Artifact allocation incomplete')\n        raw=DATA/'root.raw'")
             effective = '''        disks=tree.findall('./devices/disk')
         if len(disks)!=3:raise RuntimeError('Unexpected disk count')
         artifact_disk=next((disk for disk in disks if disk.find('target').get('dev')=='vdb'),None)

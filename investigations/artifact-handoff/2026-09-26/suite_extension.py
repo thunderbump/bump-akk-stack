@@ -70,6 +70,16 @@ def cleanup():
                 s = m.state()
                 if not absent(m, s):
                     ownership(m)
+                    saved = m.EVIDENCE / 'before-suite-rescue'
+                    saved.mkdir(mode=0o755)
+                    saved.chmod(0o755)
+                    for name in ['report.json', 'cleanup.json']:
+                        if (m.EVIDENCE / name).exists():
+                            read(m.EVIDENCE / name)  # Validate type, owner and size before copying.
+                            shutil.copyfile(m.EVIDENCE / name, saved / name)
+                    if (ROOT / 'custody.json').exists():
+                        read(ROOT / 'custody.json')
+                        shutil.copyfile(ROOT / 'custody.json', saved / 'custody.json')
                     receipt['rescued'].append(case)
                     if m.cleanup(preserve_failed_outcome=True): raise RuntimeError('Rescue failed')
                 if not absent(m, s): raise RuntimeError('Owned resources remain')
