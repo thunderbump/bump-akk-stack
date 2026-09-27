@@ -1,0 +1,35 @@
+{
+  "scope": "real build export and fresh consumer; unexecuted",
+  "build_id": "3b021c4816aec69c5cb54f18e83f11741faed5b31d2c9bf213a050ede5261000",
+  "identity_inputs": {
+    "corrected_recipe": "848d34ce037ba2648f15a54ba40914c6c46f2aad632a9b47bb07d9cdf032ddae",
+    "candidate": {
+      "baseline": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d",
+      "candidate": "1c561d442638b3da8d20e93ac105f98a227d37f2",
+      "overlay_sha256": "05a01a4b73090602e54b54fe9346edef0ab407940be106bab7925e8f2c3c3ceb"
+    },
+    "format": 1,
+    "base_sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "media_sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4"
+  },
+  "recipe_sha256": "4a1179fdfb90c82451e5172abcb837f6e3de97b7c0e00920542c1866540282ac",
+  "worker_files": {
+    "producer-worker.py": "2115a0aa31d8d46ac5ba67b81e5ff7221c6861a0b766cd95e399015a91ae344c",
+    "consumer-worker.py": "f4efee5f6f7410df95248e141d5fc296ae37c6335a67040415b8c3856060ff9f"
+  },
+  "launcher_sha256": "95af87b3fbc22926e0b597f6d104aa03eb3e5c3ca5ec3f651fd7db153325865e",
+  "sources": {
+    "investigations/artifact-handoff/2026-09-26/artifact.py": "31637feaa2070bb84dd93615a86a4e1d2877ac150666d2235372504333b3c17e",
+    "investigations/artifact-handoff/2026-09-26/suite_extension.py": "82f3c625e848da810a370c928219480445fb50fd03bfb88ad77a5526f7583548",
+    "investigations/artifact-handoff/2026-09-26/worker_extension.py": "43d76209bf928ce2265884dd3b2e1a261e4618dcb5eaee6081487b183c35a610",
+    "investigations/build-handoff/2026-09-27/guest_handoff.py": "bb63ca1ad27627d8aa0bee0f9172bf37e1434185a62fec8b9ef372774442ff06",
+    "investigations/build-handoff/2026-09-27/host_handoff.py": "b979d00778ef720b5adb9761c88c5c4a4baa800c8ac30da46df436cc271774d0",
+    "investigations/build-handoff/2026-09-27/payload.py": "59f9da46f85397bf1ef0209292d8799df616f186b44ab4cab441847e82f8327a",
+    "investigations/build-handoff/2026-09-27/prepare.py": "4d96c5c332dffa7eb035a66cc8ebc134c3a056ba7d47dfe5d2726d61df12e605",
+    "investigations/build-handoff/2026-09-27/retention.py": "985950a7a8a422f6c08cfb46fa9ef7becea79653792c3092e3c42bb7eba18b12",
+    "investigations/build-handoff/2026-09-27/test_handoff.py": "2e4b63a897e6fa2b62489b46450fd286486e941161821172128f438019149b28"
+  },
+  "retention_bytes": 4294967296,
+  "retention_days": 7,
+  "retention_cleanup": "explicit discard; no scheduled collector"
+}

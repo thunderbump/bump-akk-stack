@@ -1,0 +1,13 @@
+{
+  "complete": true,
+  "rescued": [],
+  "started_at": 1790485346.2155538,
+  "controller_budget": {
+    "memory.max": "1073741824",
+    "memory.swap.max": "0",
+    "memory.current": "18071552",
+    "memory.peak": "1021005824",
+    "memory.events": "low 0\nhigh 0\nmax 441\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "finished_at": 1790485346.5292594
+}
