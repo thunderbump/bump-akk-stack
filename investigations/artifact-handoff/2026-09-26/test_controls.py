@@ -9,6 +9,10 @@ from unittest.mock import patch, Mock
 from types import SimpleNamespace
 import shutil
 import stat
+import io
+import contextlib
+import subprocess
+import copy_probe
 from artifact import copy_blob, hash_file, validate_inventory, consume_files
 from diagnostics import DiagnosticTail, utility_result
 
@@ -166,6 +170,25 @@ class RescueTests(unittest.TestCase):
                 self.assertFalse(result['suite_passed'])
                 self.assertEqual(result['error'],'original failure')
                 self.assertEqual(result['cleanup']['controller_budget_error'],str(error))
+
+
+class CopyProbeTests(unittest.TestCase):
+    def test_probe_propagates_child_failure_and_requires_evidence(self):
+        for code, evidence, expected in [(1, {'bounded_copy_memory':True}, 1),
+                                        (0, None, 1), (0, {'bounded_copy_memory':False}, 1),
+                                        (0, {'bounded_copy_memory':True}, 0)]:
+            with self.subTest(code=code,evidence=evidence), tempfile.TemporaryDirectory() as temporary:
+                home=Path(temporary);base=home/'.local/state/eqemu-vm-proof';base.mkdir(parents=True)
+                def run(args, **kwargs):
+                    if args[0]=='systemd-run':
+                        if evidence is not None:(Path(args[-1])/'result.json').write_text(json.dumps(evidence))
+                        return subprocess.CompletedProcess(args,code,stdout='',stderr='observed service')
+                    return subprocess.CompletedProcess(args,0,stdout='MainPID=0\nControlPID=0\nActiveState=inactive\n',stderr='')
+                with patch('copy_probe.Path.home',return_value=home), patch('copy_probe.sys.argv',['copy_probe.py']), \
+                     patch('copy_probe.shutil.disk_usage',return_value=SimpleNamespace(free=200*1024**3)), \
+                     patch('copy_probe.subprocess.run',side_effect=run), contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(copy_probe.main(),expected)
+                self.assertEqual(list(base.iterdir()),[])
 
 
 if __name__=='__main__': unittest.main()

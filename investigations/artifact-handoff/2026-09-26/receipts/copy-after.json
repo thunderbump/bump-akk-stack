@@ -1,16 +1,16 @@
 {
-  "unit": "eqemu-copy-probe-5d1f399c5ef6.service",
+  "unit": "eqemu-copy-probe-4e4101c8042c.service",
   "scope": "synthetic host bytes only",
   "cleanup": true,
   "exit_code": 0,
-  "service_output": "Running as unit: eqemu-copy-probe-5d1f399c5ef6.service; invocation ID: 18181b947ba64312ac913105f99112f7\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 6.055s\nCPU time consumed: 4.779s\nMemory peak: 1.5M\nMemory swap peak: 0B\n",
+  "service_output": "Running as unit: eqemu-copy-probe-4e4101c8042c.service; invocation ID: 58b927cc088c4e278ad4d85b963211c5\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 5.968s\nCPU time consumed: 4.795s\nMemory peak: 1.2M\nMemory swap peak: 0B\n",
   "copy": {
     "bytes": 4294967296,
     "sha256": "8479e43911dc45e89f934fe48d01297e16f51d17aa561d4d1c216b1ae0fcddca",
-    "copy_seconds": 3.440605233423412,
+    "copy_seconds": 3.3559335693717003,
     "memory": {
       "memory.max": "1006632960",
-      "memory.peak": "45998080",
+      "memory.peak": "46686208",
       "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
     },
     "bounded_copy_memory": true

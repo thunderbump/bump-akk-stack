@@ -29,7 +29,8 @@ def child(root):
     result = {'bytes': SIZE, 'sha256': expected, 'copy_seconds': time.monotonic()-started,
               'memory': {name:(group/name).read_text().strip() for name in ['memory.max', 'memory.peak', 'memory.events']}}
     result['bounded_copy_memory'] = int(result['memory']['memory.peak']) < 256 * 1024**2
-    assert hash_file(target, SIZE, deadline) == expected
+    if hash_file(target, SIZE, deadline) != expected:
+        raise RuntimeError('Copied bytes differ')
     (root / 'result.json').write_text(json.dumps(result))
     if not result['bounded_copy_memory']:
         raise RuntimeError('Copy cache exceeded the regression budget')
@@ -66,6 +67,8 @@ def main():
         outcome['cleanup'] = True
         subprocess.run(['systemctl', '--user', 'reset-failed', unit], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     print(json.dumps(outcome, indent=2))
+    return 0 if (outcome.get('exit_code') == 0 and outcome.get('copy', {}).get('bounded_copy_memory') is True
+                 and outcome['cleanup']) else 1
 
 
-if __name__ == '__main__': main()
+if __name__ == '__main__': sys.exit(main())
