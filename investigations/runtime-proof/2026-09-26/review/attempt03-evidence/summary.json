@@ -1,0 +1,220 @@
+{
+  "scope": "selected runtime attempt 03 evidence; no complete guest service logs were exported",
+  "error": "Guest build failed: database: 2026-09-27  0:08:16 22 [Warning] Aborted connection 22 to db: 'eqemu_proof' user: 'eqemu' host: '127.0.0.1' (Got an error reading communication packets)",
+  "stages": {
+    "mount-input": {
+      "state": "passed",
+      "at": 1790465814.5576072
+    },
+    "mount-runtime": {
+      "state": "passed",
+      "at": 1790465814.5789895
+    },
+    "signature-0": {
+      "state": "passed",
+      "at": 1790465818.9937444
+    },
+    "signature-1": {
+      "state": "passed",
+      "at": 1790465818.9996688
+    },
+    "signature-2": {
+      "state": "passed",
+      "at": 1790465819.006291
+    },
+    "apt-plan": {
+      "state": "passed",
+      "at": 1790465821.1067982
+    },
+    "apt-install": {
+      "state": "passed",
+      "at": 1790465836.7087061
+    },
+    "dpkg-audit": {
+      "state": "passed",
+      "at": 1790465836.722343
+    },
+    "package-identities": {
+      "state": "passed",
+      "at": 1790465836.7287972
+    },
+    "system-zlib-link": {
+      "state": "passed",
+      "at": 1790465836.7908034
+    },
+    "system-zlib-run": {
+      "state": "passed",
+      "at": 1790465836.794807
+    },
+    "registry-clone": {
+      "state": "passed",
+      "at": 1790465845.4356298
+    },
+    "registry-checkout": {
+      "state": "passed",
+      "at": 1790465845.6668966
+    },
+    "registry-integrity": {
+      "state": "passed",
+      "at": 1790465855.729767
+    },
+    "tool-compiler": {
+      "state": "passed",
+      "at": 1790465856.0035367
+    },
+    "tool-cmake": {
+      "state": "passed",
+      "at": 1790465856.0231092
+    },
+    "tool-ninja": {
+      "state": "passed",
+      "at": 1790465856.027627
+    },
+    "tool-perl": {
+      "state": "passed",
+      "at": 1790465856.0888152
+    },
+    "tool-make": {
+      "state": "passed",
+      "at": 1790465856.0931878
+    },
+    "tool-autoreconf": {
+      "state": "passed",
+      "at": 1790465856.1223338
+    },
+    "tool-pkgconfig": {
+      "state": "passed",
+      "at": 1790465856.1269228
+    },
+    "tool-vcpkg": {
+      "state": "passed",
+      "at": 1790465856.1391137
+    },
+    "vcpkg-plan": {
+      "state": "passed",
+      "at": 1790465858.9780836
+    },
+    "intentional-exit-seven": {
+      "state": "running",
+      "at": 1790465858.981963
+    },
+    "configure": {
+      "state": "passed",
+      "at": 1790466131.908802
+    },
+    "server-build": {
+      "state": "passed",
+      "at": 1790467626.293282
+    },
+    "upstream-tests": {
+      "state": "passed",
+      "at": 1790467626.3217454
+    },
+    "runtime-package-plan": {
+      "state": "passed",
+      "at": 1790467632.1670268
+    },
+    "runtime-service-mask": {
+      "state": "passed",
+      "at": 1790467632.3742425
+    },
+    "runtime-package-install": {
+      "state": "passed",
+      "at": 1790467640.904248
+    },
+    "runtime-package-audit": {
+      "state": "passed",
+      "at": 1790467640.9221883
+    },
+    "runtime-package-identities": {
+      "state": "passed",
+      "at": 1790467640.9335659
+    },
+    "runtime-perl-modules": {
+      "state": "passed",
+      "at": 1790467640.968388
+    },
+    "negative-db-init": {
+      "state": "passed",
+      "at": 1790467642.5547342
+    },
+    "negative-db-create": {
+      "state": "passed",
+      "at": 1790467642.8212047
+    },
+    "negative-import-content": {
+      "state": "passed",
+      "at": 1790467688.9113715
+    },
+    "negative-import-login": {
+      "state": "passed",
+      "at": 1790467688.9729688
+    },
+    "negative-import-player": {
+      "state": "passed",
+      "at": 1790467689.4366014
+    },
+    "negative-import-state": {
+      "state": "passed",
+      "at": 1790467689.7223327
+    },
+    "negative-import-system": {
+      "state": "passed",
+      "at": 1790467691.1146343
+    },
+    "negative-app-account": {
+      "state": "passed",
+      "at": 1790467691.7297938
+    },
+    "negative-fixture-settings": {
+      "state": "passed",
+      "at": 1790467691.7390938
+    },
+    "negative-fixture-policy": {
+      "state": "passed",
+      "at": 1790467691.7447262
+    },
+    "negative-zone-content": {
+      "state": "passed",
+      "at": 1790467691.844039
+    },
+    "negative-shared-memory": {
+      "state": "passed",
+      "at": 1790467694.2230787
+    },
+    "negative-before-tables": {
+      "state": "passed",
+      "at": 1790467694.5307515
+    },
+    "negative-before-version": {
+      "state": "passed",
+      "at": 1790467694.5400755
+    },
+    "negative-before-policy": {
+      "state": "passed",
+      "at": 1790467694.5468225
+    },
+    "negative-before-empty": {
+      "state": "passed",
+      "at": 1790467694.5692718
+    },
+    "negative-before-schema": {
+      "state": "passed",
+      "at": 1790467694.6026497
+    },
+    "negative-before-checksums": {
+      "state": "passed",
+      "at": 1790467697.5126271
+    }
+  },
+  "resource_observations": {
+    "memory.peak": "4457152512",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu.stat": "usage_usec 1809880812\nuser_usec 1764492729\nsystem_usec 45388083\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 19976\nnr_throttled 21\nthrottled_usec 144756\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "report_sha256": "964da0398092888dad153c38bd376e151972affefdc49bc38ae3310a1216f1c3",
+  "suite_sha256": "98e31067b2aca62b1c68d2d2f8cacce132f5847c19fb09772f51cb4ee64adf75",
+  "correction": "A passed upstream-tests stage proves exit zero only. Pinned tests/main.cpp ignores Test::Suite::run return value. Assertions were not independently verified.",
+  "review": "Warning replay matches generic Aborted expression; scanner initiates database kill. Cause of aborted connection remains unresolved. Runtime proof paused for validation redesign."
+}
