@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 SOURCE=Path(__file__).resolve().parent
-LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-02')
+LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-03')
 
 def load(name,path):
     spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
@@ -116,10 +116,19 @@ class Processes(unittest.TestCase):
         service=types.SimpleNamespace(name='zone',flags=set())
         G.observe(service,'Listening for clients; ready')
         self.assertEqual(service.flags,set())
-        G.observe(service,'Booting [poknowledge] ([202]:[0])')
-        G.observe(service,'Zone booted successfully zone_id [202]')
-        G.observe(service,'Received Message SyncWorldTime')
+        lines=json.loads((SOURCE/'startup-lines.json').read_text())
+        world=types.SimpleNamespace(name='world',flags=set())
+        for record in lines.values():
+            G.observe(world if record['service']=='world' else service,record['line'])
         self.assertEqual(service.flags,{'instance','zone_boot','world_time'})
+        self.assertEqual(world.flags,{'registration'})
+
+    def test_boot_completion_rejects_wrong_instance(self):
+        line=json.loads((SOURCE/'startup-lines.json').read_text())['instance']['line']
+        service=types.SimpleNamespace(name='zone',flags=set())
+        G.observe(service,line.replace('instance_id [0]','instance_id [1]'))
+        self.assertNotIn('instance',service.flags)
+
 
 
 class Diagnostics(unittest.TestCase):

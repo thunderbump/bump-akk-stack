@@ -33,10 +33,27 @@ controller pool had memory-limit pressure but no OOM. Receipts are preserved in
 `receipts/attempt-01`; diagnostic contents remain private at the original host
 path, with their digest recorded. The failed outcome is unchanged.
 
-The current commands target fresh attempt 02. Original attempt 01 preparation,
+The current commands target fresh attempt 03. Original attempt 01 preparation,
 launcher and retained receipts are not regenerated. `receipts/preparation.json`
-remains the first attempt's identity; `receipts/preparation-02.json` identifies
+remains the first attempt's identity; `receipts/preparation-03.json` identifies
 the new preparation. No new C++ build or host dependency is required.
+
+## Second result and MVP retry
+
+Attempt 02 reached static poknowledge boot, instance 0, world registration and
+world-time exchange, then timed out waiting for a different instance log phrase.
+It never reached the sixty-second health check. All 79 utility functions passed;
+zone, world and database exited zero during cleanup, with no forced kills.
+Diagnostic export and owned cleanup completed. The earlier MariaDB warning did
+not recur, but remains unexplained. Receipts are under `receipts/attempt-02`.
+
+Attempt 03 changes one scenario predicate to recognize the actual boot-completion
+record. `startup-lines.json` holds four selected readiness lines from attempt 02,
+without credentials or player data. The existing readiness regression failed
+against the old predicate and passes with the correction; one additional check
+rejects an incorrect instance ID. No new runtime gate, abstraction, dependency
+or resource allowance is introduced. Original attempt 01/02 inputs and results
+remain unchanged. The retained artifact is reused without compilation.
 
 ## One guest scenario
 
@@ -75,28 +92,28 @@ remain visible as a failure. Independent host cleanup is the outer safeguard.
 Preparation reads pinned previous inputs and archived fixture helpers as data.
 It excludes the archived warning scanner, old scenario and data checksums.
 Source hashes, artifact identity, worker, launcher and seed are recorded in
-`receipts/preparation-02.json`. Preparation refuses existing attempt/output paths.
+`receipts/preparation-03.json`. Preparation refuses existing attempt/output paths.
 No VM starts during preparation or local checks.
 
 ```sh
 python3 investigations/runtime-reuse/2026-09-27/prepare.py
 timeout 60s python3 -m unittest discover -s investigations/runtime-reuse/2026-09-27 -v
-python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-02.py --check
-sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-02.py
+python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-03.py --check
+sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-03.py
 ```
 
-The eighteen local checks exercise synthetic processes, actual warning capture,
+The nineteen local checks exercise synthetic processes, actual warning capture,
 early exits, forced shutdown, descendants, output limits, failed event export,
 cleanup retry, deadline allowance, readiness/connection failure, redaction and
 bounded protocol rejection. They do not establish real service behavior.
 
 Progress and retained evidence are under
-`/var/lib/eqemu-vm-proof/runtime-reuse-02/consumer/evidence/`:
+`/var/lib/eqemu-vm-proof/runtime-reuse-03/consumer/evidence/`:
 `report.json`, `diagnostics.jsonl`, `serial.log`, and `cleanup.json`.
 The attempt root contains `suite-result.json` and `suite-cleanup.json`.
 
 ```sh
-sudo systemctl stop eqemu-vm-runtime-reuse-02-suite.service
+sudo systemctl stop eqemu-vm-runtime-reuse-03-suite.service
 ```
 
 Cancellation retains a non-pass outcome and runs owned cleanup. Do not

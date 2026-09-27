@@ -1,0 +1,23 @@
+{
+  "scope": "diagnostic-only startup replay; no accepted runtime validation or new compilation",
+  "recipe_sha256": "77a6bc73c70a7ec90f4a9d7ba17acc3bb7826340130c3a0e79c29723bf867df5",
+  "build_id": "3b021c4816aec69c5cb54f18e83f11741faed5b31d2c9bf213a050ede5261000",
+  "artifact": {
+    "bytes": 4294967296,
+    "sha256": "bdbca5fa1755d2286694d5ea0e9cc8e93c20b4d6f289c729c6ae5cb0146e91b3",
+    "manifest_sha256": "0450955cbac44b100dfbb29bf30dd190160c1167f4cd2bd99279235b7e2e3e62",
+    "expires_at": 1791137728.05155
+  },
+  "sources": {
+    "investigations/runtime-reuse/2026-09-27/prepare.py": "c461cb0c4e20bdfff1486167747ab055c8f4febf567c9bdefd59b8dd8f4fc3bd",
+    "investigations/runtime-reuse/2026-09-27/protocol.py": "a78ce06067b7f30042b4894da84d851be5d337bf8db4bd9be1e213c924c76868",
+    "investigations/runtime-reuse/2026-09-27/scenario.py": "079e0f8b998ab157377b907d4f457310102c0c1a20c7ed7882b31542a22166db",
+    "investigations/runtime-reuse/2026-09-27/services.py": "36053a3047a69dc0f5f2b27bca4b68ff41ce27aa6996913f93c1e7cecf369f6b",
+    "investigations/runtime-reuse/2026-09-27/test_runtime.py": "9fec3f0bd820fc3d3a1dbfe1d070bbd1aeacf1cb78a4234603051f56d134f978",
+    "investigations/runtime-proof/2026-09-26/runtime-proof-inputs-03/guest-runtime.py": "69de3ef7224f5e0e110c8d922a7f5a38ada67369204f94c4308bb3ac0143c3a3",
+    "investigations/artifact-handoff/2026-09-26/diagnostics.py": "47157b5a874950534c5338ee982b1c2060d7ee0ad75bc0d1f41ad39f23f50438"
+  },
+  "worker_sha256": "ef6bc7bf13c32982ff14b8fe07b22d91a23cef11dd24fcb9708bd23fc77f94e3",
+  "launcher_sha256": "cedd6c3e2799b9410b9f0df02be0f74e184b2af3500b2e261ba77a536ab21872",
+  "seed_sha256": "1bd7221863aab4057de9e822da7a885e8786f6df4b53cb9c80db82c2c6b8987f"
+}

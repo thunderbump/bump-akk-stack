@@ -15,7 +15,7 @@ def observe(service,line):
     if service.name=='world' and 'Setting zone process to Zone [The Plane of Knowledge] [poknowledge] zone_id [202]' in line and '(Static)' in line and 'Instance ID' not in line:service.flags.add('registration')
     if service.name=='zone':
         if 'Zone booted successfully zone_id [202]' in line:service.flags.add('zone_boot')
-        if 'Booting [poknowledge] ([202]:[0])' in line:service.flags.add('instance')
+        if 'Zone bootup type [Static] short_name [poknowledge] zone_id [202] instance_id [0]' in line:service.flags.add('instance')
         if 'Received Message SyncWorldTime' in line:service.flags.add('world_time')
         if 'Zone->Init failed' in line:service.flags.add('init_failed')
 

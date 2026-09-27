@@ -1,0 +1,18 @@
+{
+  "registration": {
+    "service": "world",
+    "line": " World |    Info    | SetZone Setting zone process to Zone [The Plane of Knowledge] [poknowledge] zone_id [202]  (Static) "
+  },
+  "zone_boot": {
+    "service": "zone",
+    "line": "  Zone |    Info    | Init Zone booted successfully zone_id [202] time_offset [0] "
+  },
+  "instance": {
+    "service": "zone",
+    "line": "  Zone |    Info    | Bootup Zone bootup type [Static] short_name [poknowledge] zone_id [202] instance_id [0] -- [poknowledge] (The Plane of Knowledge) inst_id [0]"
+  },
+  "world_time": {
+    "service": "zone",
+    "line": "  Zone |    Info    | HandleMessage [HandleMessage] Received Message SyncWorldTime -- [poknowledge] (The Plane of Knowledge) inst_id [0]"
+  }
+}
