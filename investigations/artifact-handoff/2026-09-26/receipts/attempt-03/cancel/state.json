@@ -1,0 +1,13 @@
+{
+  "uuid": "e8480bba-6bfe-4514-8e68-5d77d84cf594",
+  "name": "eqemu-handoff-can03",
+  "profile": "libvirt-e8480bba-6bfe-4514-8e68-5d77d84cf594",
+  "admission": {
+    "free_bytes": 259234168832,
+    "free_inodes": 49738235,
+    "mem_available": 24781684736
+  },
+  "created_at": 1790479738.7027287,
+  "controller_sha256": "efddac6d5f0cb7f08aa9a66cda227498b545c4ab079b1efa0f03e39289406fbe",
+  "slice_file_sha256": "9f56459b15672dba24ba4fd228d188336e109adb817be1612f39f9f5e9131e3a"
+}

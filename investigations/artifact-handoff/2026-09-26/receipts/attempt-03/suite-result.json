@@ -1,0 +1,67 @@
+{
+  "suite_passed": true,
+  "cases_passed": true,
+  "cases": {
+    "cancel": {
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "host_pre_resume": true,
+        "workload_not_accepted": true,
+        "cleanup": true,
+        "cleanup_time": true,
+        "resources_absent": true,
+        "quiescent": true,
+        "no_promotion": true,
+        "cancel_requested": true,
+        "export_started": true,
+        "interrupted": true,
+        "no_completion": true,
+        "no_custody": true,
+        "consumer_refused": true
+      },
+      "report_sha256": "7ff03928113bfc1ea7f5e375a180e8cd7f7fe70da2448fef542a71a1b4eb11b5",
+      "cleanup_sha256": "87cf19886a24afd3d7b25877453fe75f86a609a6c19da9a47d5991622f4896cc"
+    },
+    "publish": {
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "host_pre_resume": true,
+        "workload_not_accepted": true,
+        "cleanup": true,
+        "cleanup_time": true,
+        "resources_absent": true,
+        "quiescent": true,
+        "no_promotion": true,
+        "producer_completed": true,
+        "injected_failure": true,
+        "publication_failed": true,
+        "pending_custody": true,
+        "service_failed": true,
+        "consumer_refused": true
+      },
+      "report_sha256": "7f78623a661ca19616953541dbbec80f6f0acaa7f141c4adcfed67b6dad187d8",
+      "cleanup_sha256": "9a5a0bb46fd7f5591e73eb39fcc063d09728fbe6b4dfd8930b121b08ba1aa1cc"
+    }
+  },
+  "started_at": 1790479738.2013552,
+  "cancel_requested_at": 1790479901.219616,
+  "finished_at": 1790480067.4458518,
+  "cleanup": {
+    "complete": true,
+    "rescued": [],
+    "started_at": 1790480067.5124204,
+    "retained_artifact_absent": true,
+    "controller_budget": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.current": "23732224",
+      "memory.peak": "1024237568",
+      "memory.events": "low 0\nhigh 0\nmax 12641\noom 0\noom_kill 0\noom_group_kill 0"
+    },
+    "controller_slice_file_absent": true,
+    "finished_at": 1790480067.8234296
+  },
+  "service_result": "success"
+}

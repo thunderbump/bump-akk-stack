@@ -1,0 +1,13 @@
+{
+  "uuid": "1e6ee65c-f9bd-4d63-b34e-f212a7284046",
+  "name": "eqemu-handoff-pub03",
+  "profile": "libvirt-1e6ee65c-f9bd-4d63-b34e-f212a7284046",
+  "admission": {
+    "free_bytes": 259233824768,
+    "free_inodes": 49738224,
+    "mem_available": 24802930688
+  },
+  "created_at": 1790479902.4230142,
+  "controller_sha256": "33324fda3b413d7fe3e2fcebf37e000c36bbf97859729fae01a4c46f8b8c50e0",
+  "slice_file_sha256": "9f56459b15672dba24ba4fd228d188336e109adb817be1612f39f9f5e9131e3a"
+}

@@ -11,6 +11,11 @@ BLOCK = 1024 * 1024
 WRITE_WINDOW = 16 * BLOCK
 
 
+def check_deadline(deadline, operation):
+    if time.monotonic() >= deadline:
+        raise TimeoutError('Artifact ' + operation + ' deadline')
+
+
 def regular_fd(path, expected_size=None):
     fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
     info = os.fstat(fd)
@@ -21,12 +26,12 @@ def regular_fd(path, expected_size=None):
 
 
 def hash_file(path, size, deadline):
+    check_deadline(deadline, 'hash')
     digest = hashlib.sha256()
     with os.fdopen(regular_fd(path, size), 'rb') as source:
         remaining = size
         while remaining:
-            if time.monotonic() >= deadline:
-                raise TimeoutError('Artifact hash deadline')
+            check_deadline(deadline, 'hash')
             block = source.read(min(BLOCK, remaining))
             if not block:
                 raise ValueError('Truncated artifact')
@@ -34,11 +39,13 @@ def hash_file(path, size, deadline):
             remaining -= len(block)
         if source.read(1):
             raise ValueError('Artifact grew')
+    check_deadline(deadline, 'hash')
     return digest.hexdigest()
 
 
 def copy_blob(source, target, size, expected, deadline):
     """Copy into a new owned file; remove only that file on any failure."""
+    check_deadline(deadline, 'copy')
     with os.fdopen(regular_fd(source, size), 'rb') as src:
         fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
         try:
@@ -49,8 +56,7 @@ def copy_blob(source, target, size, expected, deadline):
                 remaining = size
                 synced = 0
                 while remaining:
-                    if time.monotonic() >= deadline:
-                        raise TimeoutError('Artifact copy deadline')
+                    check_deadline(deadline, 'copy')
                     block = src.read(min(BLOCK, remaining))
                     if not block:
                         raise ValueError('Truncated artifact')
@@ -62,6 +68,7 @@ def copy_blob(source, target, size, expected, deadline):
                         # Dirty page cache counts against the controller's memory cap.
                         dst.flush()
                         os.fdatasync(dst.fileno())
+                        check_deadline(deadline, 'copy')
                         for stream in (src, dst):
                             os.posix_fadvise(stream.fileno(), synced, copied - synced, os.POSIX_FADV_DONTNEED)
                         synced = copied
@@ -69,6 +76,7 @@ def copy_blob(source, target, size, expected, deadline):
                     raise ValueError('Artifact bytes changed')
                 dst.flush()
                 os.fsync(dst.fileno())
+                check_deadline(deadline, 'copy')
         except BaseException:
             Path(target).unlink()
             raise

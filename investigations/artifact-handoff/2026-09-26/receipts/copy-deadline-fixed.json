@@ -1,0 +1,18 @@
+{
+  "unit": "eqemu-copy-probe-043877eae0ae.service",
+  "scope": "synthetic host bytes only",
+  "cleanup": true,
+  "exit_code": 0,
+  "service_output": "Running as unit: eqemu-copy-probe-043877eae0ae.service; invocation ID: b8293c42e3da4ed8805e7ce9258ebdbd\nFinished with result: success\nMain processes terminated with: code=exited/status=0\nService runtime: 5.900s\nCPU time consumed: 4.737s\nMemory peak: 1.5M\nMemory swap peak: 0B\n",
+  "copy": {
+    "bytes": 4294967296,
+    "sha256": "8479e43911dc45e89f934fe48d01297e16f51d17aa561d4d1c216b1ae0fcddca",
+    "copy_seconds": 3.3151294672861695,
+    "memory": {
+      "memory.max": "1006632960",
+      "memory.peak": "45948928",
+      "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0"
+    },
+    "bounded_copy_memory": true
+  }
+}
