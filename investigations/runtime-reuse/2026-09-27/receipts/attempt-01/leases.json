@@ -1,0 +1,16 @@
+{
+  "active": {},
+  "released": [
+    {
+      "state": "active",
+      "name": "eqemu-rreuse01",
+      "worker_sha256": "ff2ff8ad35296451f5f112e8c7f8974cb1ddd291761e5992438495f6d9ffa598",
+      "admission": {
+        "free_bytes": 254860963840,
+        "free_inodes": 49733281,
+        "mem_available": 25115197440
+      },
+      "uuid": "d5932f61-a632-4378-9a19-c1eb58d06cfd"
+    }
+  ]
+}

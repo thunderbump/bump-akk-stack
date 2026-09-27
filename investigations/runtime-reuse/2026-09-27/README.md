@@ -13,6 +13,31 @@ all scenario checks finish, the worker and suite deliberately remain non-pass:
 Check `diagnostic_complete`, the guest result, service evidence and cleanup
 separately. An expected non-pass is not evidence that cleanup succeeded.
 
+## First result and listener correction
+
+Attempt 01 stopped after 6.30 minutes at the world listener check. Reuse and all
+79 utility functions passed, as did runtime packages, public database imports
+and shared data. World reported listening on port 9000 and stayed alive, but
+the readiness predicate required 127.0.0.1. The server's IPv4 TCP implementation
+binds 0.0.0.0. The retry accepts either wildcard or loopback in LISTEN state on
+port 9000; authenticated zone registration and world-time exchange remain the
+later readiness checks. It rejects wrong ports, unrelated addresses and
+non-listening states.
+
+World and MariaDB exited zero during failure cleanup, without forced termination.
+Bounded diagnostics exported completely; the earlier Aborted connection warning
+did not recur in the retained database tail. This does not explain that earlier
+warning or prove zone behavior: no zone was started. Worker/suite cleanup passed
+without rescue, released ownership and removed the disposable disk/copy. The
+controller pool had memory-limit pressure but no OOM. Receipts are preserved in
+`receipts/attempt-01`; diagnostic contents remain private at the original host
+path, with their digest recorded. The failed outcome is unchanged.
+
+The current commands target fresh attempt 02. Original attempt 01 preparation,
+launcher and retained receipts are not regenerated. `receipts/preparation.json`
+remains the first attempt's identity; `receipts/preparation-02.json` identifies
+the new preparation. No new C++ build or host dependency is required.
+
 ## One guest scenario
 
 The fresh offline VM consumes its own read-only artifact copy. It checks the
@@ -50,28 +75,28 @@ remain visible as a failure. Independent host cleanup is the outer safeguard.
 Preparation reads pinned previous inputs and archived fixture helpers as data.
 It excludes the archived warning scanner, old scenario and data checksums.
 Source hashes, artifact identity, worker, launcher and seed are recorded in
-`receipts/preparation.json`. Preparation refuses existing attempt/output paths.
+`receipts/preparation-02.json`. Preparation refuses existing attempt/output paths.
 No VM starts during preparation or local checks.
 
 ```sh
 python3 investigations/runtime-reuse/2026-09-27/prepare.py
 timeout 60s python3 -m unittest discover -s investigations/runtime-reuse/2026-09-27 -v
-python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-01.py --check
-sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-01.py
+python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-02.py --check
+sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-02.py
 ```
 
-The sixteen local checks exercise synthetic processes, actual warning capture,
+The eighteen local checks exercise synthetic processes, actual warning capture,
 early exits, forced shutdown, descendants, output limits, failed event export,
 cleanup retry, deadline allowance, readiness/connection failure, redaction and
 bounded protocol rejection. They do not establish real service behavior.
 
 Progress and retained evidence are under
-`/var/lib/eqemu-vm-proof/runtime-reuse-01/consumer/evidence/`:
+`/var/lib/eqemu-vm-proof/runtime-reuse-02/consumer/evidence/`:
 `report.json`, `diagnostics.jsonl`, `serial.log`, and `cleanup.json`.
 The attempt root contains `suite-result.json` and `suite-cleanup.json`.
 
 ```sh
-sudo systemctl stop eqemu-vm-runtime-reuse-01-suite.service
+sudo systemctl stop eqemu-vm-runtime-reuse-02-suite.service
 ```
 
 Cancellation retains a non-pass outcome and runs owned cleanup. Do not

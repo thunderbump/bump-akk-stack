@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 SOURCE=Path(__file__).resolve().parent
-LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-01')
+LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-02')
 
 def load(name,path):
     spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
@@ -100,6 +100,17 @@ class Processes(unittest.TestCase):
         service=types.SimpleNamespace(live=lambda:None,pid=123,flags=set())
         with patch.object(G,'guard'),patch.object(G,'connection',return_value=False):
             with self.assertRaisesRegex(RuntimeError,'connection absent'):G.check_health(types.SimpleNamespace(service=service),service,service)
+
+    def test_world_listener_accepts_wildcard_and_loopback(self):
+        for address in ['00000000','0100007F']:
+            with self.subTest(address=address):
+                self.assertTrue(G.world_listener_ready('header\n0: '+address+':2328 00000000:0000 0A\n'))
+
+    def test_world_listener_rejects_wrong_port_address_and_state(self):
+        for local,state in [('00000000:2329','0A'),('0200007F:2328','0A'),('00000000:2328','01'),('0100007F:2328','06')]:
+            with self.subTest(local=local,state=state):
+                self.assertFalse(G.world_listener_ready('header\n0: '+local+' 00000000:0000 '+state+'\n'))
+        self.assertFalse(G.world_listener_ready('header\n'))
 
     def test_readiness_is_not_a_port_open_phrase(self):
         service=types.SimpleNamespace(name='zone',flags=set())

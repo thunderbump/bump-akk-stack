@@ -55,6 +55,15 @@ def check_health(db,world,zone):
     if not connection(zone.pid):raise RuntimeError('Zone-owned world connection absent')
 
 
+def world_listener_ready(tcp_table):
+    # EQEmu binds its IPv4 server listener to all interfaces in this offline VM.
+    for line in tcp_table.splitlines()[1:]:
+        fields=line.split()
+        if fields[1] in {'00000000:2328','0100007F:2328'} and fields[3]=='0A':
+            return True
+    return False
+
+
 def scenario():
     root=ROOT/'startup';root.mkdir();db=Database('startup',root)
     event('setup',{'fixture':RUNTIME_SHA})
@@ -69,7 +78,7 @@ def scenario():
     deadline=min(B.DEADLINE,time.monotonic()+120)
     while time.monotonic()<deadline:
         guard();world.live();db.service.live()
-        if any(line.split()[1]=='0100007F:2328' and line.split()[3]=='0A' for line in P('/proc/net/tcp').read_text().splitlines()[1:]):break
+        if world_listener_ready(P('/proc/net/tcp').read_text()):break
         time.sleep(.25)
     else:raise RuntimeError('World listener deadline')
     zone=Service('zone',[str(B.WORK/'build/bin/zone'),'poknowledge:7000'],server,root/'zone-console.log')
