@@ -1,0 +1,301 @@
+{
+  "schema": 1,
+  "ok": true,
+  "workload_ok": true,
+  "scope": "offline EQEmu build experiment; guest evidence remains untrusted",
+  "uuid": "96f222c4-7437-43c4-ab42-8bb0ee50fa11",
+  "checks": {
+    "host_pre_resume": true
+  },
+  "inputs": {
+    "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "seed.iso": "7fe6e0b21fcb4c0f3d60ef0efd12dba8c4fcb8782c937656c10da02865a2d9bd",
+    "fixture.iso": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4"
+  },
+  "started_at": 1790532714.9040124,
+  "virtlogd": {
+    "max_size": 2097152,
+    "max_backups": 3
+  },
+  "inputs_verified_at": 1790532719.1847985,
+  "allocated_disk_bytes": 34359754752,
+  "io_device": {
+    "filesystem": "259:2",
+    "backing_disk": "259:0"
+  },
+  "limits": {
+    "memory.max": "6442450944",
+    "memory.swap.max": "0",
+    "pids.max": "256",
+    "cpu.max": "200000 100000",
+    "io.max": "259:0 rbps=104857600 wbps=52428800 riops=max wiops=max"
+  },
+  "qemu": {
+    "pid": 2993239,
+    "uid": "64055\t64055\t64055\t64055",
+    "gid": "993\t993\t993\t993",
+    "groups": "993 64055",
+    "cap_eff": "0000000000000000",
+    "seccomp": "2",
+    "apparmor": "libvirt-96f222c4-7437-43c4-ab42-8bb0ee50fa11 (enforce)",
+    "cgroup": "0::/eqemuvmbuildhandoffcons01worker.slice/machine-qemu\\x2d2\\x2deqemu\\x2dbh\\x2dcons01.scope/libvirt/emulator",
+    "cmdline": [
+      "/usr/bin/qemu-system-x86_64",
+      "-name",
+      "guest=eqemu-bh-cons01,debug-threads=on",
+      "-S",
+      "-object",
+      "{\"qom-type\":\"secret\",\"id\":\"masterKey0\",\"format\":\"raw\",\"file\":\"/var/lib/libvirt/qemu/domain-2-eqemu-bh-cons01/master-key.aes\"}",
+      "-machine",
+      "pc-q35-8.2,usb=off,dump-guest-core=off,memory-backend=pc.ram,acpi=on",
+      "-accel",
+      "kvm",
+      "-cpu",
+      "host,migratable=on,svm=off,vmx=off",
+      "-m",
+      "size=4194304k",
+      "-object",
+      "{\"qom-type\":\"memory-backend-ram\",\"id\":\"pc.ram\",\"size\":4294967296}",
+      "-overcommit",
+      "mem-lock=off",
+      "-smp",
+      "2,sockets=2,cores=1,threads=1",
+      "-uuid",
+      "96f222c4-7437-43c4-ab42-8bb0ee50fa11",
+      "-display",
+      "none",
+      "-no-user-config",
+      "-nodefaults",
+      "-chardev",
+      "socket,id=charmonitor,fd=32,server=on,wait=off",
+      "-mon",
+      "chardev=charmonitor,id=monitor,mode=control",
+      "-rtc",
+      "base=utc",
+      "-no-shutdown",
+      "-boot",
+      "strict=on",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":8,\"chassis\":1,\"id\":\"pci.1\",\"bus\":\"pcie.0\",\"multifunction\":true,\"addr\":\"0x1\"}",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":9,\"chassis\":2,\"id\":\"pci.2\",\"bus\":\"pcie.0\",\"addr\":\"0x1.0x1\"}",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":10,\"chassis\":3,\"id\":\"pci.3\",\"bus\":\"pcie.0\",\"addr\":\"0x1.0x2\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-handoff-01/consumer/data/root.raw\",\"node-name\":\"libvirt-4-storage\",\"auto-read-only\":true,\"discard\":\"unmap\",\"cache\":{\"direct\":true,\"no-flush\":false}}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-4-format\",\"read-only\":false,\"cache\":{\"direct\":true,\"no-flush\":false},\"driver\":\"raw\",\"file\":\"libvirt-4-storage\"}",
+      "-device",
+      "{\"driver\":\"virtio-blk-pci\",\"bus\":\"pci.1\",\"addr\":\"0x0\",\"drive\":\"libvirt-4-format\",\"id\":\"virtio-disk0\",\"bootindex\":1,\"write-cache\":\"on\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-handoff-01/consumer/data/artifact.raw\",\"node-name\":\"libvirt-3-storage\",\"auto-read-only\":true,\"discard\":\"unmap\",\"cache\":{\"direct\":true,\"no-flush\":false}}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-3-format\",\"read-only\":true,\"discard\":\"ignore\",\"cache\":{\"direct\":true,\"no-flush\":false},\"driver\":\"raw\",\"file\":\"libvirt-3-storage\"}",
+      "-device",
+      "{\"driver\":\"virtio-blk-pci\",\"bus\":\"pci.2\",\"addr\":\"0x0\",\"drive\":\"libvirt-3-format\",\"id\":\"virtio-disk1\",\"write-cache\":\"on\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-handoff-01/consumer/data/seed.iso\",\"node-name\":\"libvirt-2-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-2-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-2-storage\"}",
+      "-device",
+      "{\"driver\":\"ide-cd\",\"bus\":\"ide.0\",\"drive\":\"libvirt-2-format\",\"id\":\"sata0-0-0\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-handoff-01/consumer/data/fixture.iso\",\"node-name\":\"libvirt-1-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-1-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-1-storage\"}",
+      "-device",
+      "{\"driver\":\"ide-cd\",\"bus\":\"ide.1\",\"drive\":\"libvirt-1-format\",\"id\":\"sata0-0-1\"}",
+      "-chardev",
+      "socket,id=charserial0,fd=31,server=on,wait=off",
+      "-device",
+      "{\"driver\":\"isa-serial\",\"chardev\":\"charserial0\",\"id\":\"serial0\",\"index\":0}",
+      "-audiodev",
+      "{\"id\":\"audio1\",\"driver\":\"none\"}",
+      "-global",
+      "ICH9-LPC.noreboot=off",
+      "-watchdog-action",
+      "reset",
+      "-sandbox",
+      "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny",
+      "-msg",
+      "timestamp=on"
+    ],
+    "fds": [
+      "/dev/null",
+      "pipe:[723498459]",
+      "pipe:[723498459]",
+      "anon_inode:[eventfd]",
+      "/run/libvirt/qemu/eqemu-bh-cons01.pid",
+      "anon_inode:[signalfd]",
+      "anon_inode:[eventfd]",
+      "anon_inode:[eventfd]",
+      "/var/lib/eqemu-vm-proof/build-handoff-01/consumer/data/artifact.raw",
+      "/var/lib/eqemu-vm-proof/build-handoff-01/consumer/data/seed.iso",
+      "/var/lib/eqemu-vm-proof/build-handoff-01/consumer/data/fixture.iso",
+      "/dev/kvm",
+      "anon_inode:kvm-vm",
+      "socket:[723464728]",
+      "anon_inode:[eventfd]",
+      "anon_inode:[eventfd]",
+      "anon_inode:kvm-vcpu:0",
+      "anon_inode:kvm-vcpu-stats:0",
+      "anon_inode:kvm-vcpu:1",
+      "anon_inode:kvm-vcpu-stats:1",
+      "/var/lib/eqemu-vm-proof/build-handoff-01/consumer/data/root.raw",
+      "socket:[723486909]",
+      "socket:[723486910]"
+    ]
+  },
+  "resumed_at": 1790532720.7832382,
+  "stages": {
+    "mount-input": {
+      "state": "passed",
+      "at": 1790532881.8088667
+    },
+    "signature-0": {
+      "state": "passed",
+      "at": 1790532886.212775
+    },
+    "signature-1": {
+      "state": "passed",
+      "at": 1790532886.220317
+    },
+    "signature-2": {
+      "state": "passed",
+      "at": 1790532886.2290163
+    },
+    "apt-plan": {
+      "state": "passed",
+      "at": 1790532889.8764198
+    },
+    "apt-install": {
+      "state": "passed",
+      "at": 1790532904.3802333
+    },
+    "dpkg-audit": {
+      "state": "passed",
+      "at": 1790532904.3942337
+    },
+    "package-identities": {
+      "state": "passed",
+      "at": 1790532904.4015956
+    },
+    "artifact-mount": {
+      "state": "passed",
+      "at": 1790532904.4175918
+    },
+    "artifact-unmount": {
+      "state": "passed",
+      "at": 1790532920.905841
+    },
+    "consumer-loader-0": {
+      "state": "passed",
+      "at": 1790532920.9189637
+    },
+    "consumer-verify-0": {
+      "state": "passed",
+      "at": 1790532920.924866
+    },
+    "consumer-loader-1": {
+      "state": "passed",
+      "at": 1790532920.9357285
+    },
+    "consumer-verify-1": {
+      "state": "passed",
+      "at": 1790532920.9415061
+    },
+    "consumer-loader-2": {
+      "state": "passed",
+      "at": 1790532920.9533288
+    },
+    "consumer-verify-2": {
+      "state": "passed",
+      "at": 1790532920.9591486
+    },
+    "consumer-loader-3": {
+      "state": "passed",
+      "at": 1790532920.9706078
+    },
+    "consumer-verify-3": {
+      "state": "passed",
+      "at": 1790532920.9765627
+    },
+    "upstream-tests": {
+      "state": "passed",
+      "at": 1790532921.081556
+    }
+  },
+  "ready_at": 1790532881.7769516,
+  "serial_bytes": 99375,
+  "observations_untrusted": {
+    "utility": {
+      "version": 1,
+      "selected": 79,
+      "started": 79,
+      "completed": 79,
+      "failed": 0,
+      "finalized": true,
+      "passed": true
+    }
+  },
+  "guest_report_untrusted": {
+    "consumer": {
+      "identity": "3b021c4816aec69c5cb54f18e83f11741faed5b31d2c9bf213a050ede5261000",
+      "manifest_sha256": "0450955cbac44b100dfbb29bf30dd190160c1167f4cd2bd99279235b7e2e3e62",
+      "utility": {
+        "version": 1,
+        "selected": 79,
+        "started": 79,
+        "completed": 79,
+        "failed": 0,
+        "finalized": true,
+        "passed": true
+      },
+      "binaries": {
+        "shared_memory": "fb538841057c7d302d9e53409dcff2bf5877c11b009622d5fca43f10e7ae7649",
+        "tests": "aa2498d49b8c0154026300dc9a8d061d877dc679922cd3359390edd49a9d8dc9",
+        "world": "1e4f3b0badb934b01a720c8a70617de523f6bcfbfd4b77a8f751841752daac6d",
+        "zone": "28d9daf7b2e2b108f6a9c98a8167e457f6b600ea013a3f29258ccec7ddc14bc2"
+      },
+      "libraries": {
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2": "c20a2dc8917c755f02b94049356320fe1f62ac7d9f8994731f807d9df39302da",
+        "/usr/lib/x86_64-linux-gnu/libc.so.6": "3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf",
+        "/usr/lib/x86_64-linux-gnu/libcrypt.so.1.1.0": "1502636e3be8232c9cf801dfb533694aea985d449904f3e1295db26d7b348946",
+        "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1": "d93224d2b0dab4247598be683adca02f5cf00586f99c187579cd7e92058fb7cb",
+        "/usr/lib/x86_64-linux-gnu/libm.so.6": "fce00b6f25f459cf4ae0b7fae4257909a1a8a86f9149e7c029a5d617baf1ccd0",
+        "/usr/lib/x86_64-linux-gnu/libperl.so.5.38.2": "0b96743f48736a5d3558a2c08185447c568372b4542bcbb1006237b48f352cc4",
+        "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33": "1fd75fe70354a416d75aef22bcae68c47bd25d20e2d0568c30b1a9838cf62f11",
+        "/usr/lib/x86_64-linux-gnu/libuuid.so.1.3.0": "78d7f4d6f27b7dffc1c84dfe2f83e84aefa6f6ceeffc6ac4bc41f9fbc61cb84e"
+      },
+      "before_status": "eb4fcbb8f264b0e601ef4f79c92195d6dfb7b3a4cd07f25425fed92affae48d5",
+      "after_status": "3efc38e1a9fca07cb6324493b2f3062d186cd207e8fa10135abd5ee876b13ef1",
+      "readonly": true,
+      "unmounted": true,
+      "compiled": false
+    },
+    "kind": "result",
+    "ok": true,
+    "nonce": "6dcb256441fb496fb627517a88e4c6e6"
+  },
+  "finished_at": 1790532924.053726,
+  "resource_observations": {
+    "memory.peak": "2487832576",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu.stat": "usage_usec 33705437\nuser_usec 20497554\nsystem_usec 13207883\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 1535\nnr_throttled 13\nthrottled_usec 136628\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "cleanup": {
+    "complete": true,
+    "uuid": "96f222c4-7437-43c4-ab42-8bb0ee50fa11",
+    "started_at": 1790532924.1209257,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "cgroup_absent": true,
+    "readonly_inputs_unchanged": true,
+    "artifact_input_unchanged": true,
+    "data_absent": true,
+    "finished_at": 1790532927.3364465
+  },
+  "service_result": "success"
+}

@@ -1,0 +1,13 @@
+{
+  "complete": true,
+  "uuid": "96f222c4-7437-43c4-ab42-8bb0ee50fa11",
+  "started_at": 1790532924.1209257,
+  "domain_absent": true,
+  "profile_absent": true,
+  "slice_file_absent": true,
+  "cgroup_absent": true,
+  "readonly_inputs_unchanged": true,
+  "artifact_input_unchanged": true,
+  "data_absent": true,
+  "finished_at": 1790532927.3364465
+}

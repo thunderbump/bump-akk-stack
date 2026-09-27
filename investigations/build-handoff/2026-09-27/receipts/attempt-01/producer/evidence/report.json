@@ -1,0 +1,755 @@
+{
+  "schema": 1,
+  "ok": true,
+  "workload_ok": true,
+  "scope": "offline EQEmu build experiment; guest evidence remains untrusted",
+  "uuid": "dda6cf65-afe5-48ba-a09a-188e450b9a5b",
+  "checks": {
+    "host_pre_resume": true
+  },
+  "inputs": {
+    "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "seed.iso": "97879d530dae53fe1fc0b58ec0b4658765b6aa2b7bb7f82c5822cbf95874bbe0",
+    "fixture.iso": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4"
+  },
+  "started_at": 1790530705.7488837,
+  "virtlogd": {
+    "max_size": 2097152,
+    "max_backups": 3
+  },
+  "inputs_verified_at": 1790530707.7157688,
+  "allocated_disk_bytes": 34359750656,
+  "io_device": {
+    "filesystem": "259:2",
+    "backing_disk": "259:0"
+  },
+  "limits": {
+    "memory.max": "6442450944",
+    "memory.swap.max": "0",
+    "pids.max": "256",
+    "cpu.max": "200000 100000",
+    "io.max": "259:0 rbps=104857600 wbps=52428800 riops=max wiops=max"
+  },
+  "qemu": {
+    "pid": 2958542,
+    "uid": "64055\t64055\t64055\t64055",
+    "gid": "993\t993\t993\t993",
+    "groups": "993 64055",
+    "cap_eff": "0000000000000000",
+    "seccomp": "2",
+    "apparmor": "libvirt-dda6cf65-afe5-48ba-a09a-188e450b9a5b (enforce)",
+    "cgroup": "0::/eqemuvmbuildhandoffprod01worker.slice/machine-qemu\\x2d1\\x2deqemu\\x2dbh\\x2dprod01.scope/libvirt/emulator",
+    "cmdline": [
+      "/usr/bin/qemu-system-x86_64",
+      "-name",
+      "guest=eqemu-bh-prod01,debug-threads=on",
+      "-S",
+      "-object",
+      "{\"qom-type\":\"secret\",\"id\":\"masterKey0\",\"format\":\"raw\",\"file\":\"/var/lib/libvirt/qemu/domain-1-eqemu-bh-prod01/master-key.aes\"}",
+      "-machine",
+      "pc-q35-8.2,usb=off,dump-guest-core=off,memory-backend=pc.ram,acpi=on",
+      "-accel",
+      "kvm",
+      "-cpu",
+      "host,migratable=on,svm=off,vmx=off",
+      "-m",
+      "size=4194304k",
+      "-object",
+      "{\"qom-type\":\"memory-backend-ram\",\"id\":\"pc.ram\",\"size\":4294967296}",
+      "-overcommit",
+      "mem-lock=off",
+      "-smp",
+      "2,sockets=2,cores=1,threads=1",
+      "-uuid",
+      "dda6cf65-afe5-48ba-a09a-188e450b9a5b",
+      "-display",
+      "none",
+      "-no-user-config",
+      "-nodefaults",
+      "-chardev",
+      "socket,id=charmonitor,fd=32,server=on,wait=off",
+      "-mon",
+      "chardev=charmonitor,id=monitor,mode=control",
+      "-rtc",
+      "base=utc",
+      "-no-shutdown",
+      "-boot",
+      "strict=on",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":8,\"chassis\":1,\"id\":\"pci.1\",\"bus\":\"pcie.0\",\"multifunction\":true,\"addr\":\"0x1\"}",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":9,\"chassis\":2,\"id\":\"pci.2\",\"bus\":\"pcie.0\",\"addr\":\"0x1.0x1\"}",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":10,\"chassis\":3,\"id\":\"pci.3\",\"bus\":\"pcie.0\",\"addr\":\"0x1.0x2\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-handoff-01/producer/data/root.raw\",\"node-name\":\"libvirt-4-storage\",\"auto-read-only\":true,\"discard\":\"unmap\",\"cache\":{\"direct\":true,\"no-flush\":false}}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-4-format\",\"read-only\":false,\"cache\":{\"direct\":true,\"no-flush\":false},\"driver\":\"raw\",\"file\":\"libvirt-4-storage\"}",
+      "-device",
+      "{\"driver\":\"virtio-blk-pci\",\"bus\":\"pci.1\",\"addr\":\"0x0\",\"drive\":\"libvirt-4-format\",\"id\":\"virtio-disk0\",\"bootindex\":1,\"write-cache\":\"on\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-handoff-01/producer/data/artifact.raw\",\"node-name\":\"libvirt-3-storage\",\"auto-read-only\":true,\"discard\":\"unmap\",\"cache\":{\"direct\":true,\"no-flush\":false}}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-3-format\",\"read-only\":false,\"discard\":\"ignore\",\"cache\":{\"direct\":true,\"no-flush\":false},\"driver\":\"raw\",\"file\":\"libvirt-3-storage\"}",
+      "-device",
+      "{\"driver\":\"virtio-blk-pci\",\"bus\":\"pci.2\",\"addr\":\"0x0\",\"drive\":\"libvirt-3-format\",\"id\":\"virtio-disk1\",\"write-cache\":\"on\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-handoff-01/producer/data/seed.iso\",\"node-name\":\"libvirt-2-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-2-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-2-storage\"}",
+      "-device",
+      "{\"driver\":\"ide-cd\",\"bus\":\"ide.0\",\"drive\":\"libvirt-2-format\",\"id\":\"sata0-0-0\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-vm-proof/build-handoff-01/producer/data/fixture.iso\",\"node-name\":\"libvirt-1-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-1-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-1-storage\"}",
+      "-device",
+      "{\"driver\":\"ide-cd\",\"bus\":\"ide.1\",\"drive\":\"libvirt-1-format\",\"id\":\"sata0-0-1\"}",
+      "-chardev",
+      "socket,id=charserial0,fd=31,server=on,wait=off",
+      "-device",
+      "{\"driver\":\"isa-serial\",\"chardev\":\"charserial0\",\"id\":\"serial0\",\"index\":0}",
+      "-audiodev",
+      "{\"id\":\"audio1\",\"driver\":\"none\"}",
+      "-global",
+      "ICH9-LPC.noreboot=off",
+      "-watchdog-action",
+      "reset",
+      "-sandbox",
+      "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny",
+      "-msg",
+      "timestamp=on"
+    ],
+    "fds": [
+      "/dev/null",
+      "pipe:[723275917]",
+      "pipe:[723275917]",
+      "/var/lib/eqemu-vm-proof/build-handoff-01/producer/data/artifact.raw",
+      "anon_inode:[eventfd]",
+      "/run/libvirt/qemu/eqemu-bh-prod01.pid",
+      "anon_inode:[signalfd]",
+      "anon_inode:[eventfd]",
+      "anon_inode:[eventfd]",
+      "/var/lib/eqemu-vm-proof/build-handoff-01/producer/data/seed.iso",
+      "/var/lib/eqemu-vm-proof/build-handoff-01/producer/data/fixture.iso",
+      "/dev/kvm",
+      "anon_inode:kvm-vm",
+      "socket:[723273079]",
+      "anon_inode:[eventfd]",
+      "anon_inode:[eventfd]",
+      "anon_inode:kvm-vcpu:0",
+      "anon_inode:kvm-vcpu-stats:0",
+      "anon_inode:kvm-vcpu:1",
+      "anon_inode:kvm-vcpu-stats:1",
+      "/var/lib/eqemu-vm-proof/build-handoff-01/producer/data/root.raw",
+      "socket:[723273073]",
+      "socket:[723273074]"
+    ]
+  },
+  "resumed_at": 1790530709.3229077,
+  "stages": {
+    "mount-input": {
+      "state": "passed",
+      "at": 1790530870.7731066
+    },
+    "signature-0": {
+      "state": "passed",
+      "at": 1790530875.3670456
+    },
+    "signature-1": {
+      "state": "passed",
+      "at": 1790530875.3743246
+    },
+    "signature-2": {
+      "state": "passed",
+      "at": 1790530875.382428
+    },
+    "apt-plan": {
+      "state": "passed",
+      "at": 1790530877.8046649
+    },
+    "apt-install": {
+      "state": "passed",
+      "at": 1790530892.2215376
+    },
+    "dpkg-audit": {
+      "state": "passed",
+      "at": 1790530892.239439
+    },
+    "package-identities": {
+      "state": "passed",
+      "at": 1790530892.2468936
+    },
+    "system-zlib-link": {
+      "state": "passed",
+      "at": 1790530892.3117833
+    },
+    "system-zlib-run": {
+      "state": "passed",
+      "at": 1790530892.3160105
+    },
+    "registry-clone": {
+      "state": "passed",
+      "at": 1790530900.9434068
+    },
+    "registry-checkout": {
+      "state": "passed",
+      "at": 1790530901.268501
+    },
+    "registry-integrity": {
+      "state": "passed",
+      "at": 1790530910.7622852
+    },
+    "tool-compiler": {
+      "state": "passed",
+      "at": 1790530910.974713
+    },
+    "tool-cmake": {
+      "state": "passed",
+      "at": 1790530910.9847713
+    },
+    "tool-ninja": {
+      "state": "passed",
+      "at": 1790530910.988728
+    },
+    "tool-perl": {
+      "state": "passed",
+      "at": 1790530911.0201945
+    },
+    "tool-make": {
+      "state": "passed",
+      "at": 1790530911.024319
+    },
+    "tool-autoreconf": {
+      "state": "passed",
+      "at": 1790530911.0524857
+    },
+    "tool-pkgconfig": {
+      "state": "passed",
+      "at": 1790530911.0567727
+    },
+    "tool-vcpkg": {
+      "state": "passed",
+      "at": 1790530911.0715117
+    },
+    "vcpkg-plan": {
+      "state": "passed",
+      "at": 1790530913.6131394
+    },
+    "intentional-exit-seven": {
+      "state": "running",
+      "at": 1790530913.6168656
+    },
+    "configure": {
+      "state": "passed",
+      "at": 1790531185.6746209
+    },
+    "runner-control-build": {
+      "state": "passed",
+      "at": 1790531189.0840325
+    },
+    "runner-pass": {
+      "state": "passed",
+      "at": 1790531189.0887978
+    },
+    "runner-fail": {
+      "state": "passed",
+      "at": 1790531189.0952349
+    },
+    "runner-empty": {
+      "state": "passed",
+      "at": 1790531189.1017175
+    },
+    "runner-setup-exception": {
+      "state": "passed",
+      "at": 1790531189.1472216
+    },
+    "runner-body-exception": {
+      "state": "passed",
+      "at": 1790531189.1563904
+    },
+    "server-build": {
+      "state": "passed",
+      "at": 1790532682.6229713
+    },
+    "upstream-tests": {
+      "state": "passed",
+      "at": 1790532682.6533773
+    },
+    "loader-0": {
+      "state": "passed",
+      "at": 1790532682.6644769
+    },
+    "loader-1": {
+      "state": "passed",
+      "at": 1790532682.6742835
+    },
+    "loader-2": {
+      "state": "passed",
+      "at": 1790532682.6865275
+    },
+    "loader-3": {
+      "state": "passed",
+      "at": 1790532682.89765
+    },
+    "elf-0": {
+      "state": "passed",
+      "at": 1790532682.907445
+    },
+    "elf-1": {
+      "state": "passed",
+      "at": 1790532683.4275334
+    },
+    "elf-2": {
+      "state": "passed",
+      "at": 1790532683.4494536
+    },
+    "elf-3": {
+      "state": "passed",
+      "at": 1790532685.1201863
+    },
+    "elf-4": {
+      "state": "passed",
+      "at": 1790532687.2602062
+    },
+    "elf-5": {
+      "state": "passed",
+      "at": 1790532687.2708125
+    },
+    "elf-6": {
+      "state": "passed",
+      "at": 1790532687.2841392
+    },
+    "elf-7": {
+      "state": "passed",
+      "at": 1790532687.2968032
+    },
+    "elf-8": {
+      "state": "passed",
+      "at": 1790532687.308794
+    },
+    "elf-9": {
+      "state": "passed",
+      "at": 1790532687.3209362
+    },
+    "elf-10": {
+      "state": "passed",
+      "at": 1790532687.3377337
+    },
+    "elf-11": {
+      "state": "passed",
+      "at": 1790532687.3530045
+    },
+    "artifact-format": {
+      "state": "passed",
+      "at": 1790532687.9932106
+    },
+    "artifact-mount": {
+      "state": "passed",
+      "at": 1790532688.002508
+    },
+    "artifact-unmount": {
+      "state": "passed",
+      "at": 1790532709.3197143
+    }
+  },
+  "ready_at": 1790530870.7510433,
+  "serial_bytes": 127383,
+  "observations_untrusted": {
+    "candidate": {
+      "baseline": "4aceae18b94ffaafc08e2b17bc41cd72c77f795d",
+      "candidate": "1c561d442638b3da8d20e93ac105f98a227d37f2",
+      "overlay_sha256": "05a01a4b73090602e54b54fe9346edef0ab407940be106bab7925e8f2c3c3ceb"
+    },
+    "runner-pass": {
+      "version": 1,
+      "selected": 1,
+      "started": 1,
+      "completed": 1,
+      "failed": 0,
+      "finalized": true,
+      "passed": true,
+      "exit_code": 0
+    },
+    "runner-fail": {
+      "version": 1,
+      "selected": 1,
+      "started": 1,
+      "completed": 1,
+      "failed": 1,
+      "finalized": true,
+      "passed": false,
+      "exit_code": 1
+    },
+    "runner-empty": {
+      "version": 1,
+      "selected": 0,
+      "started": 0,
+      "completed": 0,
+      "failed": 0,
+      "finalized": true,
+      "passed": false,
+      "exit_code": 1
+    },
+    "runner-setup-exception": {
+      "version": 1,
+      "selected": 1,
+      "started": 1,
+      "completed": 0,
+      "failed": 0,
+      "finalized": false,
+      "passed": false,
+      "exit_code": 1
+    },
+    "runner-body-exception": {
+      "version": 1,
+      "selected": 1,
+      "started": 1,
+      "completed": 1,
+      "failed": 1,
+      "finalized": true,
+      "passed": false,
+      "exit_code": 1
+    },
+    "utility": {
+      "version": 1,
+      "selected": 79,
+      "started": 79,
+      "completed": 79,
+      "failed": 0,
+      "finalized": true,
+      "passed": true
+    },
+    "loader-0": {
+      "executable": "/opt/eqemu-build/build/bin/shared_memory",
+      "resolved_paths": [
+        "/lib/x86_64-linux-gnu/libstdc++.so.6",
+        "/lib/x86_64-linux-gnu/libm.so.6",
+        "/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib64/ld-linux-x86-64.so.2"
+      ]
+    },
+    "loader-1": {
+      "executable": "/opt/eqemu-build/build/bin/tests",
+      "resolved_paths": [
+        "/lib/x86_64-linux-gnu/libm.so.6",
+        "/lib/x86_64-linux-gnu/libstdc++.so.6",
+        "/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib64/ld-linux-x86-64.so.2"
+      ]
+    },
+    "loader-2": {
+      "executable": "/opt/eqemu-build/build/bin/world",
+      "resolved_paths": [
+        "/lib/x86_64-linux-gnu/libuuid.so.1",
+        "/lib/x86_64-linux-gnu/libstdc++.so.6",
+        "/lib/x86_64-linux-gnu/libm.so.6",
+        "/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib64/ld-linux-x86-64.so.2"
+      ]
+    },
+    "loader-3": {
+      "executable": "/opt/eqemu-build/build/bin/zone",
+      "resolved_paths": [
+        "/lib/x86_64-linux-gnu/libuuid.so.1",
+        "/lib/x86_64-linux-gnu/libperl.so.5.38",
+        "/lib/x86_64-linux-gnu/libstdc++.so.6",
+        "/lib/x86_64-linux-gnu/libm.so.6",
+        "/lib/x86_64-linux-gnu/libgcc_s.so.1",
+        "/lib/x86_64-linux-gnu/libc.so.6",
+        "/lib64/ld-linux-x86-64.so.2",
+        "/lib/x86_64-linux-gnu/libcrypt.so.1"
+      ]
+    },
+    "elf-0": {
+      "path": "/opt/eqemu-build/build/bin/shared_memory",
+      "bytes": 62057040,
+      "sha256": "fb538841057c7d302d9e53409dcff2bf5877c11b009622d5fca43f10e7ae7649",
+      "build_file": true,
+      "debug_info": true,
+      "build_id": "e484eac2306dade324ade744d2316ce66aff6e1c",
+      "needed": [
+        "libstdc++.so.6",
+        "libm.so.6",
+        "libgcc_s.so.1",
+        "libc.so.6"
+      ],
+      "rpath": [],
+      "interpreter": [
+        "/lib64/ld-linux-x86-64.so.2"
+      ]
+    },
+    "elf-1": {
+      "path": "/opt/eqemu-build/build/bin/tests",
+      "bytes": 25738808,
+      "sha256": "aa2498d49b8c0154026300dc9a8d061d877dc679922cd3359390edd49a9d8dc9",
+      "build_file": true,
+      "debug_info": true,
+      "build_id": "7013862b7d3c5b7803850f265f2b746d67c6643d",
+      "needed": [
+        "libm.so.6",
+        "libstdc++.so.6",
+        "libgcc_s.so.1",
+        "libc.so.6"
+      ],
+      "rpath": [],
+      "interpreter": [
+        "/lib64/ld-linux-x86-64.so.2"
+      ]
+    },
+    "elf-2": {
+      "path": "/opt/eqemu-build/build/bin/world",
+      "bytes": 168977704,
+      "sha256": "1e4f3b0badb934b01a720c8a70617de523f6bcfbfd4b77a8f751841752daac6d",
+      "build_file": true,
+      "debug_info": true,
+      "build_id": "f78f665218b752c65e9ca83ff1cd4da0e4eabac7",
+      "needed": [
+        "libuuid.so.1",
+        "libstdc++.so.6",
+        "libm.so.6",
+        "libgcc_s.so.1",
+        "libc.so.6"
+      ],
+      "rpath": [],
+      "interpreter": [
+        "/lib64/ld-linux-x86-64.so.2"
+      ]
+    },
+    "elf-3": {
+      "path": "/opt/eqemu-build/build/bin/zone",
+      "bytes": 581723608,
+      "sha256": "28d9daf7b2e2b108f6a9c98a8167e457f6b600ea013a3f29258ccec7ddc14bc2",
+      "build_file": true,
+      "debug_info": true,
+      "build_id": "2a5b2f348309a7cf59b66bd9b234085c7c6e17f4",
+      "needed": [
+        "libuuid.so.1",
+        "libperl.so.5.38",
+        "libstdc++.so.6",
+        "libm.so.6",
+        "libgcc_s.so.1",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "rpath": [],
+      "interpreter": [
+        "/lib64/ld-linux-x86-64.so.2"
+      ]
+    },
+    "elf-4": {
+      "path": "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2",
+      "bytes": 236616,
+      "sha256": "c20a2dc8917c755f02b94049356320fe1f62ac7d9f8994731f807d9df39302da",
+      "build_file": false,
+      "debug_info": false,
+      "build_id": "0d77dbd4379bf0b5af3e05be7fb6af1e4cea7c96",
+      "needed": [],
+      "rpath": [],
+      "interpreter": []
+    },
+    "elf-5": {
+      "path": "/usr/lib/x86_64-linux-gnu/libc.so.6",
+      "bytes": 2129424,
+      "sha256": "3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf",
+      "build_file": false,
+      "debug_info": false,
+      "build_id": "a4a7992a8e66555c8141ab2a08a8465ff6e0ea65",
+      "needed": [
+        "ld-linux-x86-64.so.2"
+      ],
+      "rpath": [],
+      "interpreter": [
+        "/lib64/ld-linux-x86-64.so.2"
+      ]
+    },
+    "elf-6": {
+      "path": "/usr/lib/x86_64-linux-gnu/libcrypt.so.1.1.0",
+      "bytes": 198664,
+      "sha256": "1502636e3be8232c9cf801dfb533694aea985d449904f3e1295db26d7b348946",
+      "build_file": false,
+      "debug_info": false,
+      "build_id": "4f68861fd543a61ddbbd732908a6be38bbf34bd2",
+      "needed": [
+        "libc.so.6"
+      ],
+      "rpath": [],
+      "interpreter": []
+    },
+    "elf-7": {
+      "path": "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1",
+      "bytes": 183024,
+      "sha256": "d93224d2b0dab4247598be683adca02f5cf00586f99c187579cd7e92058fb7cb",
+      "build_file": false,
+      "debug_info": false,
+      "build_id": "58736497cba1173fec6ad05c75e996dacefd1def",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "rpath": [],
+      "interpreter": []
+    },
+    "elf-8": {
+      "path": "/usr/lib/x86_64-linux-gnu/libm.so.6",
+      "bytes": 952616,
+      "sha256": "fce00b6f25f459cf4ae0b7fae4257909a1a8a86f9149e7c029a5d617baf1ccd0",
+      "build_file": false,
+      "debug_info": false,
+      "build_id": "d53fcbff9f855463606b25cfbe2a2e10856ea3a7",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "rpath": [],
+      "interpreter": []
+    },
+    "elf-9": {
+      "path": "/usr/lib/x86_64-linux-gnu/libperl.so.5.38.2",
+      "bytes": 3861568,
+      "sha256": "0b96743f48736a5d3558a2c08185447c568372b4542bcbb1006237b48f352cc4",
+      "build_file": false,
+      "debug_info": false,
+      "build_id": "f71db2028d05fac94f970cc63692285abf069565",
+      "needed": [
+        "libm.so.6",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "libcrypt.so.1"
+      ],
+      "rpath": [],
+      "interpreter": []
+    },
+    "elf-10": {
+      "path": "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33",
+      "bytes": 2592224,
+      "sha256": "1fd75fe70354a416d75aef22bcae68c47bd25d20e2d0568c30b1a9838cf62f11",
+      "build_file": false,
+      "debug_info": false,
+      "build_id": "753c6c8608b61d4e67be8f0c890e03e0aa046b8b",
+      "needed": [
+        "libm.so.6",
+        "libc.so.6",
+        "ld-linux-x86-64.so.2",
+        "libgcc_s.so.1"
+      ],
+      "rpath": [],
+      "interpreter": []
+    },
+    "elf-11": {
+      "path": "/usr/lib/x86_64-linux-gnu/libuuid.so.1.3.0",
+      "bytes": 35032,
+      "sha256": "78d7f4d6f27b7dffc1c84dfe2f83e84aefa6f6ceeffc6ac4bc41f9fbc61cb84e",
+      "build_file": false,
+      "debug_info": false,
+      "build_id": "279d9d30e580ddf723c7d91bf1da905c7481572e",
+      "needed": [
+        "libc.so.6",
+        "ld-linux-x86-64.so.2"
+      ],
+      "rpath": [],
+      "interpreter": []
+    },
+    "measurement": {
+      "files": 12,
+      "build_bytes": 838497160,
+      "system_bytes": 10189168,
+      "total_bytes": 848686328,
+      "within_payload_budget": true,
+      "artifact_eligible": false,
+      "runtime_closure_proven": false
+    }
+  },
+  "preflight_untrusted": {
+    "kind": "preflight",
+    "before_status": "eb4fcbb8f264b0e601ef4f79c92195d6dfb7b3a4cd07f25425fed92affae48d5",
+    "after_status": "3efc38e1a9fca07cb6324493b2f3062d186cd207e8fa10135abd5ee876b13ef1",
+    "solver_sha256": "ff12921bfdef6da6dce1924c78a48ffbfb4049b912254dd4cb2af26fd619e006",
+    "ports": 51,
+    "negative_control": true,
+    "tools": {
+      "system-zlib": "1.3",
+      "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0\nCopyright (C) 2023 Free Software Foundation, Inc.\nThis is free software; see the source for copying conditions.  There is NO\nwarranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n",
+      "cmake": "cmake version 3.28.3\n\nCMake suite maintained and supported by Kitware (kitware.com/cmake).\n",
+      "ninja": "1.11.1\n",
+      "perl": "v5.38.2\n",
+      "make": "GNU Make 4.3\nBuilt for x86_64-pc-linux-gnu\nCopyright (C) 1988-2020 Free Software Foundation, Inc.\nLicense GPLv3+: GNU GPL version 3 or later <http://gnu.org/licenses/gpl.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n",
+      "autoreconf": "autoreconf (GNU Autoconf) 2.71\nCopyright (C) 2021 Free Software Foundation, Inc.\nLicense GPLv3+/Autoconf: GNU GPL version 3 or later\n<https://gnu.org/licenses/gpl.html>, <https://gnu.org/licenses/exceptions.html>\nThis is free software: you are free to change and redistribute it.\nThere is NO WARRANTY, to the extent permitted by law.\n\nWritten by David J. MacKenzie and Akim Demaille.\n",
+      "pkgconfig": "1.8.1\n",
+      "vcpkg": "vcpkg package management program version 2025-10-16-71538f2694db93da4668782d094768ba74c45991\n\nSee LICENSE.txt for license information.\n"
+    },
+    "nonce": "747b160f9e5243afa676ccb7b0deecc8"
+  },
+  "guest_report_untrusted": {
+    "effective_cmake": {
+      "CMAKE_BUILD_TYPE:STRING": "RelWithDebInfo",
+      "CMAKE_CXX_COMPILER:STRING": "/usr/bin/g++",
+      "CMAKE_C_COMPILER:UNINITIALIZED": "/usr/bin/gcc",
+      "EQEMU_BUILD_CLIENT_FILES:BOOL": "ON",
+      "EQEMU_BUILD_LOGIN:BOOL": "ON",
+      "EQEMU_BUILD_LUA:BOOL": "ON",
+      "EQEMU_BUILD_PCH:BOOL": "ON",
+      "EQEMU_BUILD_PERL:BOOL": "ON",
+      "EQEMU_BUILD_SERVER:BOOL": "ON",
+      "EQEMU_BUILD_TESTS:BOOL": "ON",
+      "PERL_INCLUDE_PATH:PATH": "/usr/lib/x86_64-linux-gnu/perl/5.38/CORE",
+      "PERL_LIBRARY:FILEPATH": "/usr/lib/x86_64-linux-gnu/libperl.so.5.38"
+    },
+    "checks": {
+      "inputs": true,
+      "packages": true,
+      "solver": true,
+      "negative_control": true,
+      "perl": true,
+      "system_zlib": true,
+      "build": true,
+      "tests": true
+    },
+    "binaries": {
+      "world": "1e4f3b0badb934b01a720c8a70617de523f6bcfbfd4b77a8f751841752daac6d",
+      "zone": "28d9daf7b2e2b108f6a9c98a8167e457f6b600ea013a3f29258ccec7ddc14bc2",
+      "shared_memory": "fb538841057c7d302d9e53409dcff2bf5877c11b009622d5fca43f10e7ae7649",
+      "loginserver": "bc553a8b40b71f4b5cdc886f8146ca3d1c80bcb529a5398b218d0b0b54e5b7da",
+      "ucs": "a86a51b89ba2ec1f82ec9831ed68622832d8103623a088fba1c163f8c5f0a3dc",
+      "queryserv": "48cd088ff0a1bb8c2282799d1c927a48c8f704ff48bbe82921ac161e4c13b1d0",
+      "eqlaunch": "fbd0d3ab1a55acf664c19e30ec32d4cab4ee842b3ba2fc9e1916945084f72793",
+      "tests": "aa2498d49b8c0154026300dc9a8d061d877dc679922cd3359390edd49a9d8dc9"
+    },
+    "cache_sha256": "86d4973ee73a9cd515f959c4d0164a899a294dd3cd2339ade77e3d8d831efd0e",
+    "guest_disk_used_bytes": 8247803904,
+    "artifact": {
+      "identity": "3b021c4816aec69c5cb54f18e83f11741faed5b31d2c9bf213a050ede5261000",
+      "manifest_sha256": "0450955cbac44b100dfbb29bf30dd190160c1167f4cd2bd99279235b7e2e3e62",
+      "files": 4,
+      "payload_bytes": 838497160,
+      "unmounted": true
+    },
+    "kind": "result",
+    "ok": true,
+    "nonce": "747b160f9e5243afa676ccb7b0deecc8"
+  },
+  "finished_at": 1790532710.8267672,
+  "resource_observations": {
+    "memory.peak": "4662235136",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu.stat": "usage_usec 1766097360\nuser_usec 1730268797\nsystem_usec 35828562\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 19679\nnr_throttled 24\nthrottled_usec 47189\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "cleanup": {
+    "complete": true,
+    "uuid": "dda6cf65-afe5-48ba-a09a-188e450b9a5b",
+    "started_at": 1790532710.8834753,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "cgroup_absent": true,
+    "readonly_inputs_unchanged": true,
+    "artifact_staged": true,
+    "data_absent": true,
+    "finished_at": 1790532713.606894
+  },
+  "service_result": "success"
+}

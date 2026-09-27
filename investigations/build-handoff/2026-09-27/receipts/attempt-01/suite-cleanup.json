@@ -1,0 +1,20 @@
+{
+  "complete": true,
+  "rescued": [],
+  "started_at": 1790532927.7515907,
+  "controller_budget": {
+    "memory.max": "1073741824",
+    "memory.swap.max": "0",
+    "memory.current": "21921792",
+    "memory.peak": "1073594368",
+    "memory.events": "low 0\nhigh 0\nmax 27531\noom 0\noom_kill 0\noom_group_kill 0"
+  },
+  "controller_slice_file_absent": true,
+  "artifact_retained": {
+    "bytes": 4294967296,
+    "sha256": "bdbca5fa1755d2286694d5ea0e9cc8e93c20b4d6f289c729c6ae5cb0146e91b3",
+    "manifest_sha256": "0450955cbac44b100dfbb29bf30dd190160c1167f4cd2bd99279235b7e2e3e62",
+    "expires_at": 1791137728.05155
+  },
+  "finished_at": 1790532928.0517533
+}
