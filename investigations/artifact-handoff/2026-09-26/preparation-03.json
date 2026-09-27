@@ -1,13 +1,13 @@
 {
   "scope": "fixed cancellation and failed-publication controls; unexecuted",
   "worker_files": {
-    "cancel-worker.py": "353fe7e1502be7c4fd863bb5937ef624843611e890d637ddba516b830947e98b",
-    "publish-worker.py": "c1293e7be49c72f9ef239622f283b50cb28ae3fdf584030ee5cd77578ce7604f"
+    "cancel-worker.py": "efddac6d5f0cb7f08aa9a66cda227498b545c4ab079b1efa0f03e39289406fbe",
+    "publish-worker.py": "33324fda3b413d7fe3e2fcebf37e000c36bbf97859729fae01a4c46f8b8c50e0"
   },
-  "launcher_sha256": "e151e3205d941f26a37844bac85a1e760f9c61ff5387d4a255b8d11b46f6616a",
+  "launcher_sha256": "2c87982e05c6a522b5a85b49d2f78da5e1bbe957c0f35d2fe33c8580258de68f",
   "sources": {
     "control_suite.py": "47d9b716069e6f4a5b467a3414600e5fa150361f9668a21acb3f9c0cfb4e14b8",
-    "prepare_controls.py": "eb5c4be94baece25a3e95189d924f43883090dce20c1a41c8021bd58b71e08be",
+    "prepare_controls.py": "af00d553a3096bc03e8ee6d4fc7a8b377898d9d6f918124da09d0da5d6672722",
     "copy_probe.py": "ee77218ce66466f0cadb698254ff94b15801cd0f6fa2a76d8e2ef3f777b10da5",
     "prepare.py": "16365176b7a4a1402cdf4323f5a78f79c2be943d1024337ec5db73c583c6111d",
     "control_worker.py": "ff3d441be4e0320a7884b1de699984125798a5673405a4ee4c53da2bcb4b8965",

@@ -27,6 +27,8 @@ def prepare():
     previous = json.loads((SOURCE/'preparation-02.json').read_text())
     if digest(PREVIOUS/'producer-worker.py') != previous['worker_files']['producer-worker.py'] or digest(PREVIOUS/'launcher.py') != previous['launcher_sha256']:
         raise RuntimeError('Successful controller template changed')
+    if digest(PREVIOUS/'producer-user-data') != '466ec353a2410e3acda22c03414cffb128087448c0a96c02dced9f230b5d2f31':
+        raise RuntimeError('Successful seed configuration changed')
     stage = Path(tempfile.mkdtemp(prefix='.handoff-controls-',dir=LOCAL))
     try:
         hashes = {}
