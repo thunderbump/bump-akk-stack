@@ -1,0 +1,13 @@
+{
+  "uuid": "ad51d2ac-3d16-4140-9819-206dfdbfd31f",
+  "name": "eqemu-handoff-cons02",
+  "profile": "libvirt-ad51d2ac-3d16-4140-9819-206dfdbfd31f",
+  "admission": {
+    "free_bytes": 254955810816,
+    "free_inodes": 49739233,
+    "mem_available": 25088860160
+  },
+  "created_at": 1790477700.23787,
+  "controller_sha256": "afd825f5781be04b3ce52e074452c750b56af91dc8f3995ec841402087b037ad",
+  "slice_file_sha256": "9f56459b15672dba24ba4fd228d188336e109adb817be1612f39f9f5e9131e3a"
+}

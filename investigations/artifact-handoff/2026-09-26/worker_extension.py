@@ -6,6 +6,14 @@ EXPECTED_MANIFEST = '@MANIFEST@'
 EXPECTED_PAYLOAD = '@PAYLOAD@'
 
 
+def write_custody(value):
+    # Apply the private mode before the atomic rename; no fallible work after promotion.
+    temporary = CUSTODY.with_suffix('.new')
+    temporary.write_text(json.dumps(value, indent=2)+'\n')
+    temporary.chmod(0o600)
+    os.replace(temporary, CUSTODY)
+
+
 def custody():
     safe_dir(ROOT.parent)
     facts = CUSTODY.lstat()
@@ -51,10 +59,9 @@ def artifact_before_data_removal(receipt):
         os.chown(path, 0, 0)
         path.chmod(0o400)
         os.rename(path, STORE / 'artifact.raw')
-        write_json(CUSTODY, {'eligible': False, 'producer_uuid': state()['uuid'],
+        write_custody({'eligible': False, 'producer_uuid': state()['uuid'],
                             'bytes': ARTIFACT_BYTES, 'sha256': digest_value,
                             'manifest_sha256': EXPECTED_MANIFEST, 'scope': 'synthetic proof only'})
-        CUSTODY.chmod(0o600)
         receipt['artifact_staged'] = True
     elif CASE == 'consumer' and path.exists():
         receipt['artifact_input_unchanged'] = hash_file(path, ARTIFACT_BYTES, time.monotonic() + 300) == custody()['sha256']
@@ -70,8 +77,14 @@ def cleanup(preserve_failed_outcome=False):
         report = json.loads((EVIDENCE / 'report.json').read_text())
         record['eligible'] = result == 0 and report.get('ok') is True and not preserve_failed_outcome
         record['cleanup_sha256'] = digest(EVIDENCE / 'cleanup.json')
-        write_json(CUSTODY, record)
-        CUSTODY.chmod(0o600)
+        try:
+            write_custody(record)
+        except Exception as error:
+            # Pending custody stays ineligible; publication failure cannot report success.
+            report['ok'] = False
+            report['publication_error'] = str(error)[:2000]
+            write_json(EVIDENCE / 'report.json', report)
+            return 1
     return result
 
 

@@ -27,3 +27,13 @@ Attempt 01 passed the producer and hit the consumer controller memory limit befo
 Cleanup records controller-budget errors separately from resource removal and still keeps the suite failed. Attempt 02 has fresh identities. Before launch it verifies the immutable failed-attempt receipts and absence of its workers/resources, then removes only the exactly identified old controller slice file. It adds a reconciliation receipt without modifying the failed result. Sudo is still needed for that operation and the VM launch.
 
 `preparation.json` remains attempt 01's receipt. The new generated receipt is `preparation-02.json`. The original local inputs, launch script and failed-attempt receipts remain unchanged. A successful host copy probe does not establish a successful VM consumer; that remains the fresh experiment's question.
+
+## Fixed failure controls
+
+Attempt 02 passed both guests and complete cleanup in 341.87 seconds. Its immutable receipts are under `receipts/attempt-02/`. The full controller pool recorded memory-limit pressure but no OOM; the separate copy-phase measurement does not describe peak memory of the entire run.
+
+`prepare_controls.py` prepares attempt 03 from the hash-pinned successful controller, with two sequential producer cases. `cancel` waits for an authenticated export-start checkpoint while the guest output filesystem is mounted, then stops the owned worker controller. `publish` allows a normal producer completion and injects an I/O exception at custody finalization. This fixed test adapter is embedded only in the publication control's worker. It is not a production or gameplay failure switch.
+
+The ordinary publication path now applies private file mode before the atomic custody rename and records finalization exceptions as publication failure. A pending record remains ineligible. The control suite requires the intended cause, a rejected workload, actual consumer-custody refusal and successful owned cleanup. Unknown crashes, unexpected success, incomplete cleanup or an eligible artifact do not satisfy the negative controls. The final suite may pass because both expected failures were handled correctly; the underlying worker outcomes must remain non-pass.
+
+These controls are prepared, not executed. They test cancellation during producer export and failure of final custody promotion, not power-loss durability, every filesystem error, consumer-copy cancellation or whole-AFK cancellation. The other artifact-content controls and eventual real candidate build remain separate qualification requirements.

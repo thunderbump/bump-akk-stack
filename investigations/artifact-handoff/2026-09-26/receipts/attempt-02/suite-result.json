@@ -1,0 +1,56 @@
+{
+  "suite_passed": true,
+  "cases_passed": true,
+  "cases": {
+    "producer": {
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "host_pre_resume": true,
+        "workload": true,
+        "service": true,
+        "cleanup": true,
+        "cleanup_time": true,
+        "absence": true,
+        "quiescent": true,
+        "artifact_eligible": true
+      },
+      "report_sha256": "cad56358e10a9d783e506e4548af31501b05586d4699798fb6d3978e0ce24564",
+      "cleanup_sha256": "c23a344a0ccbf92b2e82887092e8f14ef546a6edfb37928385ac8d61a17a77f9"
+    },
+    "consumer": {
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "host_pre_resume": true,
+        "workload": true,
+        "service": true,
+        "cleanup": true,
+        "cleanup_time": true,
+        "absence": true,
+        "quiescent": true,
+        "artifact_input_unchanged": true
+      },
+      "report_sha256": "a8c0255fd5566180c7ecbc97b1fe5eea7f10c7e7d5981070b61fdc1529a9e589",
+      "cleanup_sha256": "5dffb3bb95d004c117dfab9818f0b355e4a1a7c3921685c1d0018b9c630dad95"
+    }
+  },
+  "started_at": 1790477529.4751194,
+  "finished_at": 1790477870.9601192,
+  "cleanup": {
+    "complete": true,
+    "rescued": [],
+    "started_at": 1790477871.020996,
+    "retained_artifact_absent": true,
+    "controller_budget": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.current": "14737408",
+      "memory.peak": "1073254400",
+      "memory.events": "low 0\nhigh 0\nmax 25265\noom 0\noom_kill 0\noom_group_kill 0"
+    },
+    "controller_slice_file_absent": true,
+    "finished_at": 1790477871.3439007
+  },
+  "service_result": "success"
+}

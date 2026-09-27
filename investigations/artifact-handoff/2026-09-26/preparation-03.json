@@ -1,0 +1,23 @@
+{
+  "scope": "fixed cancellation and failed-publication controls; unexecuted",
+  "worker_files": {
+    "cancel-worker.py": "353fe7e1502be7c4fd863bb5937ef624843611e890d637ddba516b830947e98b",
+    "publish-worker.py": "c1293e7be49c72f9ef239622f283b50cb28ae3fdf584030ee5cd77578ce7604f"
+  },
+  "launcher_sha256": "e151e3205d941f26a37844bac85a1e760f9c61ff5387d4a255b8d11b46f6616a",
+  "sources": {
+    "control_suite.py": "47d9b716069e6f4a5b467a3414600e5fa150361f9668a21acb3f9c0cfb4e14b8",
+    "prepare_controls.py": "eb5c4be94baece25a3e95189d924f43883090dce20c1a41c8021bd58b71e08be",
+    "copy_probe.py": "ee77218ce66466f0cadb698254ff94b15801cd0f6fa2a76d8e2ef3f777b10da5",
+    "prepare.py": "16365176b7a4a1402cdf4323f5a78f79c2be943d1024337ec5db73c583c6111d",
+    "control_worker.py": "ff3d441be4e0320a7884b1de699984125798a5673405a4ee4c53da2bcb4b8965",
+    "test_failure_controls.py": "b9db8f6bd7d09c05c81d2cdb89579c6e2be105933bb394bb132b2add77e91889",
+    "diagnostics.py": "47157b5a874950534c5338ee982b1c2060d7ee0ad75bc0d1f41ad39f23f50438",
+    "artifact.py": "f657c0ffa406e4058bb4dfe65311febfc1c3699946a81a4631ed328c0984f9fa",
+    "worker_extension.py": "43d76209bf928ce2265884dd3b2e1a261e4618dcb5eaee6081487b183c35a610",
+    "guest.py": "4ae514f99b19aed83637a63f5ebf2a334a6e2d02049eab233e8e860a896c8ec5",
+    "reconcile_previous.py": "25de0805f9393fa0f160af96c29483baaee61409ac51900a3500e8ff1719fa23",
+    "test_controls.py": "2e5cb113dd28b2f1f815a45f870fc5da215581b7ee71cc2e79c2e011a04a8484",
+    "suite_extension.py": "82f3c625e848da810a370c928219480445fb50fd03bfb88ad77a5526f7583548"
+  }
+}
