@@ -5,7 +5,7 @@ This experiment belongs to central-t0e1.37. It prepares two sequential offline V
 Run helper checks from the repository root:
 
 ```sh
-python3 -m unittest discover -s investigations/artifact-handoff/2026-09-26 -v
+timeout 60s python3 -m unittest discover -s investigations/artifact-handoff/2026-09-26 -v
 ```
 
 `prepare.py` creates immutable local inputs and a launcher beneath the existing `~/.local/state/eqemu-vm-proof` cache. It needs `cloud-localds` and the already acquired base image. It starts no VM and refuses to overwrite an existing preparation or attempt. The launcher accepts `--check` without sudo. Its default action requires sudo and starts the systemd suite.
@@ -47,3 +47,5 @@ The remaining byte and flat-inventory checks run against small synthetic files t
 The audit found that an expired empty transfer or late final flush could return success. Deadline checks now cover entry and completion, including synchronization. They reject late completion; they do not make a blocking filesystem syscall preemptible. The worker service deadline remains the outer bound. Twenty helper tests pass. A fresh 4 GiB copy probe also passed under the same memory cap, recorded in `receipts/copy-deadline-fixed.json`.
 
 This closes the identified synthetic transfer-helper gaps before preparing the corrected candidate build. It does not prove malformed guest filesystem handling, power-loss durability, or a real executable/library package. The synthetic identity exercises exact identity rejection; real source/toolchain/build-profile identities, loader/symbol closure, nested payload handling if needed, and utility completion must be established with the real candidate before it can be promoted. The completed VM inputs are immutable and still contain their original helper versions; the deadline correction is tested locally and will enter the next fresh worker.
+
+Run the helper suite with the documented outer timeout when automating it. This also bounds a future regression that accidentally makes a FIFO open block.
