@@ -19,3 +19,11 @@ The proof inherits worker admission, ownership checks, controller/QEMU memory li
 The first handoff is exploratory. Producer/export cancellation and failed-publication controls remain mandatory before handoff qualification or an expensive build.
 
 Still pending: executing this proof, compiling and running the separate C++ runner controls, measuring the real executable/library closure, sealing an actual build, integrating service diagnostics, and rerunning the world/zone success and failure scenarios. No general artifact cache, automatic retry policy, or retention service is introduced here.
+
+## Attempt 02 correction
+
+Attempt 01 passed the producer and hit the consumer controller memory limit before VM startup. Kernel accounting attributes most memory to dirty file-cache pages. `copy_blob` now flushes and syncs each 16 MiB window, then advises releasing the completed source/destination cache ranges. `copy_probe.py` runs a synthetic 4 GiB copy in an unprivileged systemd service under the same 960 MiB cap. The preserved before/after receipts show 960 MiB versus about 44 MiB copy peaks; the unchanged byte digest passed both runs. The old probe reproduced memory-limit pressure, not an OOM kill. The original VM attempt supplies the OOM evidence.
+
+Cleanup records controller-budget errors separately from resource removal and still keeps the suite failed. Attempt 02 has fresh identities. Before launch it verifies the immutable failed-attempt receipts and absence of its workers/resources, then removes only the exactly identified old controller slice file. It adds a reconciliation receipt without modifying the failed result. Sudo is still needed for that operation and the VM launch.
+
+`preparation.json` remains attempt 01's receipt. The new generated receipt is `preparation-02.json`. The original local inputs, launch script and failed-attempt receipts remain unchanged. A successful host copy probe does not establish a successful VM consumer; that remains the fresh experiment's question.

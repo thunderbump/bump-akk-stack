@@ -8,6 +8,7 @@ import stat
 import time
 
 BLOCK = 1024 * 1024
+WRITE_WINDOW = 16 * BLOCK
 
 
 def regular_fd(path, expected_size=None):
@@ -46,6 +47,7 @@ def copy_blob(source, target, size, expected, deadline):
                     os.posix_fallocate(dst.fileno(), 0, size)
                 digest = hashlib.sha256()
                 remaining = size
+                synced = 0
                 while remaining:
                     if time.monotonic() >= deadline:
                         raise TimeoutError('Artifact copy deadline')
@@ -55,6 +57,14 @@ def copy_blob(source, target, size, expected, deadline):
                     dst.write(block)
                     digest.update(block)
                     remaining -= len(block)
+                    copied = size - remaining
+                    if copied - synced >= WRITE_WINDOW or remaining == 0:
+                        # Dirty page cache counts against the controller's memory cap.
+                        dst.flush()
+                        os.fdatasync(dst.fileno())
+                        for stream in (src, dst):
+                            os.posix_fadvise(stream.fileno(), synced, copied - synced, os.POSIX_FADV_DONTNEED)
+                        synced = copied
                 if src.read(1) or digest.hexdigest() != expected:
                     raise ValueError('Artifact bytes changed')
                 dst.flush()

@@ -1,0 +1,34 @@
+{
+  "suite_passed": false,
+  "cases_passed": false,
+  "cases": {
+    "producer": {
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "host_pre_resume": true,
+        "workload": true,
+        "service": true,
+        "cleanup": true,
+        "cleanup_time": true,
+        "absence": true,
+        "quiescent": true,
+        "artifact_eligible": true
+      },
+      "report_sha256": "d869d8c737cfe8210f0f6a34a8b199e26afd7caa728b8c56f9e52b0fbcfaa398",
+      "cleanup_sha256": "135e3cd2e03a9f54707e735a533bcfbeece19a7d2c8012ee0ef995b4746b7a19"
+    }
+  },
+  "started_at": 1790474579.2936497,
+  "error": "Controller pool OOM",
+  "finished_at": 1790474754.591512,
+  "cleanup": {
+    "complete": false,
+    "rescued": [],
+    "started_at": 1790474754.6443257,
+    "retained_artifact_absent": true,
+    "error": "Controller pool OOM",
+    "finished_at": 1790474757.0131593
+  },
+  "service_result": "exit-code"
+}

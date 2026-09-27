@@ -1,0 +1,27 @@
+{
+  "active": {},
+  "released": [
+    {
+      "state": "active",
+      "name": "eqemu-handoff-prod01",
+      "worker_sha256": "dcdbcdb269666cc073b077574de5fc14871755c4c724c90f1cee84142df569f2",
+      "admission": {
+        "free_bytes": 259243044864,
+        "free_inodes": 49740249,
+        "mem_available": 24813342720
+      },
+      "uuid": "29a77eca-a5bc-4819-baf1-6ac9782ef129"
+    },
+    {
+      "state": "active",
+      "name": "eqemu-handoff-cons01",
+      "worker_sha256": "7ecad65df8921e0e86343216f76d6488d0a7d0323491aea9b9720aa271ca68e7",
+      "admission": {
+        "free_bytes": 254947651584,
+        "free_inodes": 49740232,
+        "mem_available": 25063292928
+      },
+      "uuid": "46d9f624-e724-4115-8067-089b24de957e"
+    }
+  ]
+}

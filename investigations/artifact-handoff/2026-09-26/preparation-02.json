@@ -1,0 +1,20 @@
+{
+  "scope": "synthetic artifact handoff, unexecuted",
+  "worker_files": {
+    "producer-worker.py": "e0029198b20f13ca58d84e8758dc873cc5b6b0e306c13ab50040f637711cd98f",
+    "consumer-worker.py": "1f6c20fa0fc68057f07e14432e93625342cd3e64f491bfde241e6e13faad73b8"
+  },
+  "launcher_sha256": "3fa3fb0f6427e0c3ae5b7a89e052298e56432c56ac2157bbf9f23a7cb3992bb7",
+  "sources": {
+    "copy_probe.py": "62eae8806b8397771226acac872cac96bcae66ce59e49182690011f7e312dc84",
+    "prepare.py": "16365176b7a4a1402cdf4323f5a78f79c2be943d1024337ec5db73c583c6111d",
+    "diagnostics.py": "47157b5a874950534c5338ee982b1c2060d7ee0ad75bc0d1f41ad39f23f50438",
+    "artifact.py": "f657c0ffa406e4058bb4dfe65311febfc1c3699946a81a4631ed328c0984f9fa",
+    "worker_extension.py": "9e8ab231a50d3ac551e27e54d7a25581bd2e24cb322fe2655a97ce3296e1c5bb",
+    "guest.py": "4ae514f99b19aed83637a63f5ebf2a334a6e2d02049eab233e8e860a896c8ec5",
+    "reconcile_previous.py": "25de0805f9393fa0f160af96c29483baaee61409ac51900a3500e8ff1719fa23",
+    "test_controls.py": "3e9720a08260f462405a3f2889388f23fc34e07df103296cdb6fac87a8483a71",
+    "suite_extension.py": "82f3c625e848da810a370c928219480445fb50fd03bfb88ad77a5526f7583548"
+  },
+  "artifact_bytes": 4294967296
+}

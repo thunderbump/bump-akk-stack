@@ -137,7 +137,7 @@ class RescueTests(unittest.TestCase):
                              properties=lambda _: {},quiescent=lambda _:True,
                              absent=Mock(side_effect=[False,True]),ownership=lambda _:None,
                              read=read,write=write,shutil=shutil,stat=stat,time=time,os=os,
-                             CTLFILE=ctl,CTLTEXT='owned',controller_budget=lambda:{})
+                             CTLFILE=ctl,CTLTEXT='owned',controller_budget=lambda:{},run=Mock())
             with patch.dict(os.environ,{'SERVICE_RESULT':'success'}):
                 self.assertEqual(namespace['cleanup'](),0)
             self.assertEqual(read(evidence/'before-suite-rescue'/'cleanup.json'),first)
@@ -145,6 +145,27 @@ class RescueTests(unittest.TestCase):
             result=read(root/'suite-result.json')
             self.assertFalse(result['suite_passed'])
             self.assertEqual(result['cleanup']['rescued'],['producer'])
+
+    def test_budget_failure_does_not_prevent_owned_slice_removal(self):
+        for error in [RuntimeError('Controller pool OOM'), FileNotFoundError('cgroup absent')]:
+            with self.subTest(error=str(error)), tempfile.TemporaryDirectory() as temporary:
+                root=Path(temporary)
+                def write(path,value):path.write_text(json.dumps(value))
+                def read(path):return json.loads(path.read_text())
+                write(root/'leases.json',{'active':{}})
+                write(root/'suite-result.json',{'cases_passed':True,'error':'original failure'})
+                ctl=root/'controller.slice';ctl.write_text('owned')
+                namespace={}
+                exec(Path(__file__).with_name('suite_extension.py').read_text(),namespace)
+                namespace.update(ROOT=root,CASES=(),read=read,write=write,time=time,os=os,
+                    CTLFILE=ctl,CTLTEXT='owned',controller_budget=Mock(side_effect=error),run=Mock())
+                with patch.dict(os.environ,{'SERVICE_RESULT':'success'}):
+                    self.assertEqual(namespace['cleanup'](),0)
+                self.assertFalse(ctl.exists())
+                result=read(root/'suite-result.json')
+                self.assertFalse(result['suite_passed'])
+                self.assertEqual(result['error'],'original failure')
+                self.assertEqual(result['cleanup']['controller_budget_error'],str(error))
 
 
 if __name__=='__main__': unittest.main()

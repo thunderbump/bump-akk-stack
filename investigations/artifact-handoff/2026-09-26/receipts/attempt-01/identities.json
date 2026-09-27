@@ -1,0 +1,11 @@
+{
+  "suite-result.json": "292ea8b3bcf690c180d53a8a07c079019f7c91323112209567abbbb8fe255513",
+  "suite-cleanup.json": "779191bbea1c3f3b94dd3608d45c9af9d4818425d436a89e39af37aaa1434547",
+  "leases.json": "521c405f81ae7dc57f2ca1f1d0a7be8afbb1e8f37776157f7bc0650aec6bebce",
+  "producer/state.json": "f4ba9f12d84fc9ed86ebd2396fa875e33b10a5f865cfcf8e9761a599220224cf",
+  "producer/evidence/report.json": "d869d8c737cfe8210f0f6a34a8b199e26afd7caa728b8c56f9e52b0fbcfaa398",
+  "producer/evidence/cleanup.json": "135e3cd2e03a9f54707e735a533bcfbeece19a7d2c8012ee0ef995b4746b7a19",
+  "consumer/state.json": "af9d1348d26dd76b80e559a7a67042ec8422c4b68f91b558245ec49c5dce7139",
+  "consumer/evidence/report.json": "922441bb1ed1e0120971dcb1c4889c7fa65ddde4ee848a76ab4fa8dc1e9f83fb",
+  "consumer/evidence/cleanup.json": "f0d6e98abd47ae29e5302e6de3364b05f7b1d447c8b7ed0e216a8f30192dfbc9"
+}

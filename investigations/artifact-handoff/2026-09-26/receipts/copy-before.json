@@ -1,0 +1,18 @@
+{
+  "unit": "eqemu-copy-probe-d1c8c68549fe.service",
+  "scope": "synthetic host bytes only",
+  "cleanup": true,
+  "exit_code": 1,
+  "service_output": "Running as unit: eqemu-copy-probe-d1c8c68549fe.service; invocation ID: 58b53f17e5f043c2ad8724afef0b7a10\nTraceback (most recent call last):\n  File \"/home/bump/Projects/bump-eqemu/artifact-handoff-preparation/investigations/artifact-handoff/2026-09-26/copy_probe.py\", line 71, in <module>\n    if __name__ == '__main__': main()\n                               ^^^^^^\n  File \"/home/bump/Projects/bump-eqemu/artifact-handoff-preparation/investigations/artifact-handoff/2026-09-26/copy_probe.py\", line 43, in main\n    child(args.child)\n  File \"/home/bump/Projects/bump-eqemu/artifact-handoff-preparation/investigations/artifact-handoff/2026-09-26/copy_probe.py\", line 35, in child\n    raise RuntimeError('Copy cache exceeded the regression budget')\nRuntimeError: Copy cache exceeded the regression budget\nFinished with result: exit-code\nMain processes terminated with: code=exited/status=1\nService runtime: 8.228s\nCPU time consumed: 5.303s\nMemory peak: 1.2M\nMemory swap peak: 0B\n",
+  "copy": {
+    "bytes": 4294967296,
+    "sha256": "8479e43911dc45e89f934fe48d01297e16f51d17aa561d4d1c216b1ae0fcddca",
+    "copy_seconds": 5.575266242027283,
+    "memory": {
+      "memory.max": "1006632960",
+      "memory.peak": "1006632960",
+      "memory.events": "low 0\nhigh 0\nmax 9326\noom 0\noom_kill 0\noom_group_kill 0"
+    },
+    "bounded_copy_memory": false
+  }
+}

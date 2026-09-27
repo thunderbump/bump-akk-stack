@@ -98,9 +98,14 @@ def cleanup():
                 artifact.unlink()
             store.rmdir()
         receipt['retained_artifact_absent'] = not store.exists()
-        receipt['controller_budget'] = controller_budget()
+        try:
+            receipt['controller_budget'] = controller_budget()
+        except Exception as error:
+            receipt['controller_budget_error'] = str(error)[:2000]
         if CTLFILE.is_symlink() or CTLFILE.read_text() != CTLTEXT: raise RuntimeError('Controller slice identity changed')
         CTLFILE.unlink()
+        run(['systemctl', 'daemon-reload'])
+        receipt['controller_slice_file_absent'] = not CTLFILE.exists()
         receipt['complete'] = True
     except Exception as error: receipt['error'] = str(error)
     receipt['finished_at'] = time.time()
@@ -108,6 +113,7 @@ def cleanup():
     report = read(ROOT / 'suite-result.json') if (ROOT / 'suite-result.json').exists() else {}
     report.update(cleanup=receipt, service_result=os.environ.get('SERVICE_RESULT', 'unknown'))
     report['suite_passed'] = (report.get('cases_passed') is True and receipt['complete']
-                            and not receipt['rescued'] and report['service_result'] == 'success')
+                            and not receipt['rescued'] and 'controller_budget_error' not in receipt
+                            and report['service_result'] == 'success')
     write(ROOT / 'suite-result.json', report)
     return 0 if receipt['complete'] else 1

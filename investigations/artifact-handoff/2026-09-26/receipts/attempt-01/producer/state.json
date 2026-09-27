@@ -1,0 +1,13 @@
+{
+  "uuid": "29a77eca-a5bc-4819-baf1-6ac9782ef129",
+  "name": "eqemu-handoff-prod01",
+  "profile": "libvirt-29a77eca-a5bc-4819-baf1-6ac9782ef129",
+  "admission": {
+    "free_bytes": 259243044864,
+    "free_inodes": 49740249,
+    "mem_available": 24814284800
+  },
+  "created_at": 1790474579.7968833,
+  "controller_sha256": "dcdbcdb269666cc073b077574de5fc14871755c4c724c90f1cee84142df569f2",
+  "slice_file_sha256": "9f56459b15672dba24ba4fd228d188336e109adb817be1612f39f9f5e9131e3a"
+}

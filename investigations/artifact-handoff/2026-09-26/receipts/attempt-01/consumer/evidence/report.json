@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "ok": false,
+  "workload_ok": false,
+  "scope": "offline EQEmu build experiment; guest evidence remains untrusted",
+  "uuid": "46d9f624-e724-4115-8067-089b24de957e",
+  "checks": {},
+  "inputs": {},
+  "started_at": 1790474750.609529,
+  "cleanup": {
+    "complete": true,
+    "uuid": "46d9f624-e724-4115-8067-089b24de957e",
+    "started_at": 1790474754.1311219,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "cgroup_absent": true,
+    "readonly_inputs_unchanged": true,
+    "artifact_input_unchanged": true,
+    "data_absent": true,
+    "finished_at": 1790474756.9319685
+  },
+  "service_result": "oom-kill"
+}

@@ -11,9 +11,9 @@ import tempfile
 SOURCE = Path(__file__).resolve().parent
 ARCHIVE = SOURCE.parents[1] / 'runtime-proof' / '2026-09-26'
 LOCAL = Path('/home/bump/.local/state/eqemu-vm-proof')
-OUTPUT = LOCAL / 'artifact-handoff-inputs-01'
-LAUNCHER = LOCAL / 'offline-artifact-handoff-01.py'
-ROOT = Path('/var/lib/eqemu-vm-proof/artifact-handoff-01')
+OUTPUT = LOCAL / 'artifact-handoff-inputs-02'
+LAUNCHER = LOCAL / 'offline-artifact-handoff-02.py'
+ROOT = Path('/var/lib/eqemu-vm-proof/artifact-handoff-02')
 BASE_FILE = ('inputs/ubuntu-noble-20260911/ubuntu-24.04-server-cloudimg-amd64.img',
              625256960, '612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354')
 
@@ -60,12 +60,12 @@ def prepare():
                               ['python3','-I','/opt/handoff/guest.py']]}
             ud = stage/(role+'-user-data');md=stage/(role+'-meta-data');seed=stage/(role+'-seed.iso')
             ud.write_text('#cloud-config\n'+json.dumps(user,indent=2)+'\n')
-            md.write_text('instance-id: eqemu-handoff-01-'+role+'\nlocal-hostname: eqemu-handoff\n')
+            md.write_text('instance-id: eqemu-handoff-02-'+role+'\nlocal-hostname: eqemu-handoff\n')
             subprocess.run(['cloud-localds','--disk-format','raw',str(seed),str(ud),str(md)],check=True)
-            worker = worker_base.replace('runtime-proof-03','artifact-handoff-01').replace('runtime-03','handoff-'+short+'01').replace('runtime03worker','handoff'+short+'01worker').replace('runtime03ctl','handoff01ctl')
-            worker = replace_once(worker,"ROOT=BASE/'artifact-handoff-01'/'build'", "ROOT=BASE/'artifact-handoff-01'/"+repr(role))
+            worker = worker_base.replace('runtime-proof-03','artifact-handoff-02').replace('runtime-03','handoff-'+short+'02').replace('runtime03worker','handoff'+short+'02worker').replace('runtime03ctl','handoff02ctl')
+            worker = replace_once(worker,"ROOT=BASE/'artifact-handoff-02'/'build'", "ROOT=BASE/'artifact-handoff-02'/"+repr(role))
             worker = replace_once(worker,"CASE='build'",'CASE='+repr(role))
-            files = {'base.qcow2':BASE_FILE,'seed.iso':('artifact-handoff-inputs-01/'+seed.name,seed.stat().st_size,sha(seed))}
+            files = {'base.qcow2':BASE_FILE,'seed.iso':('artifact-handoff-inputs-02/'+seed.name,seed.stat().st_size,sha(seed))}
             worker = re.sub(r'FILES=\{.*?\n\}', 'FILES='+repr(files), worker, count=1, flags=re.S)
             worker = '\n'.join(line for line in worker.split('\n') if '{DATA}/fixture.iso' not in line and '{DATA}/runtime.iso' not in line)
             mode = 'rwk' if role=='producer' else 'rk'
@@ -92,12 +92,12 @@ def prepare():
             worker=worker[:main]+(SOURCE/'artifact.py').read_text()+'\n'+extension+'\n'+worker[main:]
             compile(worker,role+'-worker.py','exec')
             target=stage/(role+'-worker.py');target.write_text(worker);worker_hashes[target.name]=sha(target)
-        suite=(ARCHIVE/'offline-runtime-proof-03.py').read_text().replace('runtime-proof-03','artifact-handoff-01').replace('runtime-03','handoff-01').replace('runtime03','handoff01')
-        suite=suite.replace('runtime-proof-inputs-03','artifact-handoff-inputs-01')
+        suite=(ARCHIVE/'offline-runtime-proof-03.py').read_text().replace('runtime-proof-03','artifact-handoff-02').replace('runtime-03','handoff-02').replace('runtime03','handoff02')
+        suite=suite.replace('runtime-proof-inputs-03','artifact-handoff-inputs-02')
         suite=replace_once(suite,"CASES=('build',)","CASES=('producer','consumer')")
         suite=re.sub(r'HASHES=\{[^\n]+\}', 'HASHES='+repr(worker_hashes),suite,count=1)
         # The new proof has current input identities, not a historical receipt chain.
-        suite=replace_function(suite,'prerequisites',"def prerequisites():\n    return None")
+        suite=replace_function(suite,'prerequisites',"def prerequisites():\n    if ROOT.exists() or ROOT.is_symlink():raise RuntimeError('Retained attempt exists')\n    reconcile_previous(apply=True)")
         start=suite.index("    prior=BASE/'build-proof-04/suite-result.json';")
         end=suite.index('    if ROOT.exists()',start)
         suite=suite[:start]+suite[end:]
@@ -115,7 +115,9 @@ def prepare():
         for name in ['admit','supervise','cleanup']:
             suite=replace_function(suite,name,'')
         main=suite.index("if __name__=='__main__':")
-        suite=suite[:main]+(SOURCE/'suite_extension.py').read_text()+'\n'+suite[main:]
+        previous = json.loads((SOURCE/'receipts/attempt-01/identities.json').read_text())
+        reconcile = (SOURCE/'reconcile_previous.py').read_text().replace('{}  # @PREVIOUS_HASHES@', repr(previous)).replace('@PREVIOUS_CTL_SHA@', '82d7385a760b98312dfdcd2ac43e6e1631f558719542e9a530d863163ea594df')
+        suite=suite[:main]+(SOURCE/'suite_extension.py').read_text()+'\n'+reconcile+'\n'+suite[main:]
         suite=suite.replace('Fixed offline EQEmu build and runtime proof.','Fixed synthetic artifact handoff proof; no EQEmu build or server.')
         compile(suite,'launcher.py','exec')
         (stage/'launcher.py').write_text(suite)
