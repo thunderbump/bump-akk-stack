@@ -1,0 +1,18 @@
+{
+  "scope": "synthetic artifact handoff, unexecuted",
+  "worker_files": {
+    "producer-worker.py": "dcdbcdb269666cc073b077574de5fc14871755c4c724c90f1cee84142df569f2",
+    "consumer-worker.py": "7ecad65df8921e0e86343216f76d6488d0a7d0323491aea9b9720aa271ca68e7"
+  },
+  "launcher_sha256": "2653c3fec4462bf969aebe44732be68f8f9313e941716cc42301e80e62c90d79",
+  "sources": {
+    "prepare.py": "277f9ae4cd8086668ba1b40e3ad0222c5a11af4ea9cefbcdfaf8012ca1162ba1",
+    "diagnostics.py": "47157b5a874950534c5338ee982b1c2060d7ee0ad75bc0d1f41ad39f23f50438",
+    "artifact.py": "e4d825478ad03fb634f8f9c754ecd3d5654c82ba708cff20cadc7babeee452be",
+    "worker_extension.py": "9e8ab231a50d3ac551e27e54d7a25581bd2e24cb322fe2655a97ce3296e1c5bb",
+    "guest.py": "4ae514f99b19aed83637a63f5ebf2a334a6e2d02049eab233e8e860a896c8ec5",
+    "test_controls.py": "6030081530b4a209a035b64df7a9f4868a009505de0a80c763f9afebbe72241e",
+    "suite_extension.py": "6cbc7748bd0e265bbc9d75e418256899a949777fe9424a9d886e69a10010803d"
+  },
+  "artifact_bytes": 4294967296
+}
