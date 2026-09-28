@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "run_id": "a1cc755edc",
+  "owner_uid": 997,
+  "terminal": true,
+  "accepted": false,
+  "diagnostic_only": true,
+  "diagnostic_complete": false,
+  "cleanup_complete": true,
+  "error": "Supervisor interrupted",
+  "report_directory": "/var/lib/eqemu-test/reports/a1cc755edc"
+}

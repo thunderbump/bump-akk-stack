@@ -1,0 +1,20 @@
+{
+  "checks": {
+    "malformed": true,
+    "duplicate": true,
+    "oversized": true,
+    "host_path": true,
+    "host_command": true,
+    "bad_id": true,
+    "unknown_profile": true,
+    "extra_arguments": true,
+    "root_shell": true,
+    "direct_python": true,
+    "not_writable_control.py": true,
+    "not_writable_eqemu-test-request": true,
+    "not_writable_worker.py.in": true,
+    "reports_traversable": true
+  },
+  "vm_started": false,
+  "authorization_checks_passed": true
+}

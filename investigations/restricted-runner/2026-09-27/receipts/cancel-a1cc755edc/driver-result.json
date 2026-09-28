@@ -1,0 +1,44 @@
+{
+  "cancellation_checks_passed": true,
+  "accepted": false,
+  "started_at": 1790569687.8949397,
+  "run_id": "a1cc755edc",
+  "receipt_path": "/tmp/eqemu-cancel-proof-4qgj1mmj/result.json",
+  "ready": {
+    "kind": "scenario-event",
+    "name": "ready",
+    "value": {
+      "observed": [
+        "instance",
+        "registration",
+        "world_time",
+        "zone_boot"
+      ],
+      "zone_connection": true,
+      "elapsed": 112.051
+    },
+    "nonce": "9772a492e5c14765b72c50aece56d4d7",
+    "host_received_at": 1790569970.5431435
+  },
+  "worker_uuid": "7d644150-c469-45c1-bc8c-4a495aa1ad94",
+  "cancel_requested_at": 1790569970.8762178,
+  "cancel_result": {
+    "version": 1,
+    "run_id": "a1cc755edc",
+    "owner_uid": 997,
+    "terminal": true,
+    "accepted": false,
+    "diagnostic_only": true,
+    "diagnostic_complete": false,
+    "cleanup_complete": true,
+    "error": "Supervisor interrupted",
+    "report_directory": "/var/lib/eqemu-test/reports/a1cc755edc"
+  },
+  "receipt_sha256": {
+    "worker.json": "ceda1c55efddabed9fa84e082cbcfe03cacbb4dcb272655e1359260460992fbe",
+    "suite.json": "031b358bb4196065785f26a372503ce20f0bc272742bbe78b61450634e3026a0",
+    "cleanup.json": "1d8601036382ea6d2540a8b5ce08078643c0cb37fb7d872eca9d46e4f4133f11",
+    "worker-cleanup.json": "e92cc179b17aeded82f0ea503c591f19eda8edc0ff381083dc40255ae513beff"
+  },
+  "finished_at": 1790569974.9772131
+}
