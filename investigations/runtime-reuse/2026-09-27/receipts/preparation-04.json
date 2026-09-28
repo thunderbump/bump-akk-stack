@@ -1,0 +1,23 @@
+{
+  "scope": "deliberate zone exit after first health probe; expected non-pass, no new compilation",
+  "recipe_sha256": "ab5ad1526ad6238bc20673119962da4006109f86123095475a6760c2965e54fb",
+  "build_id": "3b021c4816aec69c5cb54f18e83f11741faed5b31d2c9bf213a050ede5261000",
+  "artifact": {
+    "bytes": 4294967296,
+    "sha256": "bdbca5fa1755d2286694d5ea0e9cc8e93c20b4d6f289c729c6ae5cb0146e91b3",
+    "manifest_sha256": "0450955cbac44b100dfbb29bf30dd190160c1167f4cd2bd99279235b7e2e3e62",
+    "expires_at": 1791137728.05155
+  },
+  "sources": {
+    "investigations/runtime-reuse/2026-09-27/prepare.py": "ea0bb76174518542e6680a2a6dca8f0f75bcf4e84a05155afd4137a5072a37c6",
+    "investigations/runtime-reuse/2026-09-27/protocol.py": "a78ce06067b7f30042b4894da84d851be5d337bf8db4bd9be1e213c924c76868",
+    "investigations/runtime-reuse/2026-09-27/scenario.py": "48fb32502b9e54c51f8a9ba551ed7eb0a29edb7c86f8182cb3c9dc3ded900755",
+    "investigations/runtime-reuse/2026-09-27/services.py": "36053a3047a69dc0f5f2b27bca4b68ff41ce27aa6996913f93c1e7cecf369f6b",
+    "investigations/runtime-reuse/2026-09-27/test_runtime.py": "e4d6cec3c52137b6eb49bef9635277f02e63c4368c2f9d41ee036354152c8c44",
+    "investigations/runtime-proof/2026-09-26/runtime-proof-inputs-03/guest-runtime.py": "69de3ef7224f5e0e110c8d922a7f5a38ada67369204f94c4308bb3ac0143c3a3",
+    "investigations/artifact-handoff/2026-09-26/diagnostics.py": "47157b5a874950534c5338ee982b1c2060d7ee0ad75bc0d1f41ad39f23f50438"
+  },
+  "worker_sha256": "f08d889150e86ae23d270213c2ebf770d89e682931a3decb91ceca1157745b07",
+  "launcher_sha256": "ff2c7eab4f7ea3c68d6ed6d5ff2b9ebec0fad89eaf85a9273569ae8f0a86606a",
+  "seed_sha256": "132e78dba125833bab08a6ae00cb65994043de78c5e974da7dbdd0c1b262ee14"
+}

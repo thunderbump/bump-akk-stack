@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 SOURCE=Path(__file__).resolve().parent
-LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-03')
+LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-04')
 
 def load(name,path):
     spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module
@@ -95,6 +95,21 @@ class Processes(unittest.TestCase):
                 wait_for(lambda:service.proc.poll() is not None)
             finally:result=service.stop(timeout=1)
             self.assertTrue(result['forced']);self.assertTrue(result['capture_complete'])
+
+    def test_control_stops_actual_service_and_normal_health_check_rejects_zero_exit(self):
+        with tempfile.TemporaryDirectory() as folder:
+            zone=self.spawn(folder,'import signal,sys,time;signal.signal(signal.SIGTERM,lambda *_:sys.exit(0));print("ready");time.sleep(60)')
+            zone.name='zone';events=[]
+            healthy=types.SimpleNamespace(live=lambda:None)
+            try:
+                wait_for(lambda:zone.tail.total>0)
+                with patch.object(G,'guard'),patch.object(G,'connection',return_value=True),patch.object(G,'event',side_effect=lambda name,value:events.append((name,value))):
+                    G.check_health(types.SimpleNamespace(service=healthy),healthy,zone)
+                    G.stop_zone_control(zone)
+                    with self.assertRaisesRegex(RuntimeError,'zone: unexpected exit 0'):
+                        G.check_health(types.SimpleNamespace(service=healthy),healthy,zone)
+                self.assertEqual(events[-1],('control-zone-exit',{'return_code':0}))
+            finally:zone.stop(timeout=1)
 
     def test_connection_loss_fails_health_check(self):
         service=types.SimpleNamespace(live=lambda:None,pid=123,flags=set())

@@ -12,8 +12,8 @@ import tempfile
 
 SOURCE=Path(__file__).resolve().parent;REPO=SOURCE.parents[2]
 LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof')
-PREVIOUS=LOCAL/'build-handoff-inputs-01';OUTPUT=LOCAL/'runtime-reuse-inputs-03'
-LAUNCHER=LOCAL/'offline-runtime-reuse-03.py';ROOT=Path('/var/lib/eqemu-vm-proof/runtime-reuse-03')
+PREVIOUS=LOCAL/'build-handoff-inputs-01';OUTPUT=LOCAL/'runtime-reuse-inputs-04'
+LAUNCHER=LOCAL/'offline-runtime-reuse-04.py';ROOT=Path('/var/lib/eqemu-vm-proof/runtime-reuse-04')
 HANDOFF=REPO/'investigations/build-handoff/2026-09-27'
 ARTIFACT=REPO/'investigations/artifact-handoff/2026-09-26'
 ARCHIVE=REPO/'investigations/runtime-proof/2026-09-26/runtime-proof-inputs-03/guest-runtime.py'
@@ -78,6 +78,7 @@ BUILD_USED=0;LAST_CHECK=0;SERVICES=[];SECRET_VALUES=[]
 ANSI=re.compile(r'\\x1b\\[[0-?]*[ -/]*[@-~]')
 '''
     guest=header+(ARTIFACT/'diagnostics.py').read_text()+'\n'+(SOURCE/'services.py').read_text()+'\n'+fixture_helpers()+'\n'+(SOURCE/'scenario.py').read_text().replace('@RECIPE@',recipe)
+    guest=replace_once(guest,'STOP_ZONE_AFTER_HEALTH=False','STOP_ZONE_AFTER_HEALTH=True')
     stage=Path(tempfile.mkdtemp(prefix='.runtime-reuse-',dir=LOCAL))
     try:
         user['write_files']=[{'path':'/opt/eqemu-proof/guest-build.py','permissions':'0700','content':build},
@@ -86,9 +87,9 @@ ANSI=re.compile(r'\\x1b\\[[0-?]*[ -/]*[@-~]')
             {'path':'/etc/cloud/cloud.cfg.d/99-offline.cfg','content':'network: {config: disabled}\n'}]
         user['runcmd'][-1]=['python3','-I','/opt/eqemu-proof/guest-runtime.py']
         (stage/'user-data').write_text('#cloud-config\n'+json.dumps(user,indent=2)+'\n')
-        (stage/'meta-data').write_text('instance-id: eqemu-runtime-reuse-03\nlocal-hostname: eqemu-runtime\n')
+        (stage/'meta-data').write_text('instance-id: eqemu-runtime-reuse-04\nlocal-hostname: eqemu-runtime\n')
         seed=stage/'seed.iso';subprocess.run(['cloud-localds',str(seed),str(stage/'user-data'),str(stage/'meta-data')],check=True)
-        worker=worker_base.replace(prior['recipe_sha256'],recipe).replace('build-handoff-01','runtime-reuse-03').replace('bh-cons01','rreuse03').replace('buildhandoffcons01worker','rreuse03worker').replace('buildhandoff01ctl','rreuse03ctl')
+        worker=worker_base.replace(prior['recipe_sha256'],recipe).replace('build-handoff-01','runtime-reuse-04').replace('bh-cons01','rreuse04').replace('buildhandoffcons01worker','rreuse04worker').replace('buildhandoff01ctl','rreuse04ctl')
         worker=worker.replace('offline EQEmu build experiment; guest evidence remains untrusted','diagnostic-only reused-build service scenario; guest evidence remains untrusted')
         # The prior producer/custody is immutable input. Only this worker's copy is writable state.
         worker=replace_once(worker,"STORE = ROOT.parent / 'retained'", "ARTIFACT_OWNER=BASE/'build-handoff-01'\nSTORE=ARTIFACT_OWNER/'retained'")
@@ -96,7 +97,7 @@ ANSI=re.compile(r'\\x1b\\[[0-?]*[ -/]*[@-~]')
         worker=replace_once(worker,"path = ROOT.parent/'producer/evidence/report.json'", "path = ARTIFACT_OWNER/'producer/evidence/report.json'")
         worker=replace_once(worker,'    safe_dir(ROOT.parent)\n    facts = CUSTODY.lstat()', '    safe_dir(ARTIFACT_OWNER)\n    facts = CUSTODY.lstat()')
         worker=replace_once(worker,"    safe_dir(STORE)\n    return value", "    if value.get('consumer_verified') is not True:raise RuntimeError('Unqualified retained artifact')\n    safe_dir(STORE)\n    return value")
-        files['seed.iso']=('runtime-reuse-inputs-03/seed.iso',seed.stat().st_size,sha(seed))
+        files['seed.iso']=('runtime-reuse-inputs-04/seed.iso',seed.stat().st_size,sha(seed))
         files['runtime.iso']=('runtime-inputs-20260926/runtime-inputs.iso',171806720,'5fa2a4822e03ee7693c566e8670ddab5ee35c7a5d25d4671ac57c53ddf82c767')
         worker=re.sub(r'FILES=\{.*?\n\}', 'FILES='+repr(files),worker,count=1,flags=re.S)
         worker=replace_once(worker,'  {DATA}/fixture.iso rk,','  {DATA}/fixture.iso rk,\n  {DATA}/runtime.iso rk,')
@@ -124,7 +125,7 @@ ANSI=re.compile(r'\\x1b\\[[0-?]*[ -/]*[@-~]')
         previous_suite=LOCAL/'corrected-build-inputs-01/launcher.py'
         expected=json.loads((REPO/'investigations/corrected-build/2026-09-26/receipts/preparation.json').read_text())['launcher_sha256']
         if sha(previous_suite)!=expected:raise RuntimeError('Single-worker suite template changed')
-        suite=previous_suite.read_text().replace('corrected-build-01','runtime-reuse-03').replace('corrected-build-inputs-01','runtime-reuse-inputs-03').replace('correctedbuild01','rreuse03').replace('build-worker.py','consumer-worker.py').replace("'build'","'consumer'")
+        suite=previous_suite.read_text().replace('corrected-build-01','runtime-reuse-04').replace('corrected-build-inputs-01','runtime-reuse-inputs-04').replace('correctedbuild01','rreuse04').replace('build-worker.py','consumer-worker.py').replace("'build'","'consumer'")
         suite=suite.replace('build/evidence/report.json','consumer/evidence/report.json')
         suite=suite.replace('RuntimeMaxSec=18000','RuntimeMaxSec=3000').replace('time.monotonic()+17700','time.monotonic()+2700')
         suite=re.sub(r'HASHES=\{[^\n]+\}', 'HASHES='+repr({'consumer-worker.py':sha(stage/'consumer-worker.py')}),suite,count=1)
@@ -144,7 +145,7 @@ ANSI=re.compile(r'\\x1b\\[[0-?]*[ -/]*[@-~]')
         suite=replace_once(suite,"if __name__=='__main__':", 'PRIOR_HASHES='+repr(identities)+"\nif __name__=='__main__':")
         for name,code in [('guest-build.py',build),('guest-runtime.py',guest),('consumer-worker.py',worker),('launcher.py',suite)]:
             compile(code,name,'exec');(stage/name).write_text(code)
-        (stage/'preparation.json').write_text(json.dumps({'scope':'diagnostic-only startup replay; no accepted runtime validation or new compilation',
+        (stage/'preparation.json').write_text(json.dumps({'scope':'deliberate zone exit after first health probe; expected non-pass, no new compilation',
             'recipe_sha256':recipe,'build_id':prior['build_id'],'artifact':retained,'sources':sources,
             'worker_sha256':sha(stage/'consumer-worker.py'),'launcher_sha256':sha(stage/'launcher.py'),'seed_sha256':sha(seed)},indent=2)+'\n')
         stage.rename(OUTPUT);LAUNCHER.write_text(suite)

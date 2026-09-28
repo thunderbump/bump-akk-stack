@@ -5,13 +5,15 @@ Central-t0e1.37 remains open. Build-handoff-01 passed producer compilation,
 compilation, and owned cleanup in 37.04 minutes. Preserved receipts are under
 `../../build-handoff/2026-09-27/receipts/attempt-01`.
 
-This next experiment uses that qualified artifact to investigate the MariaDB
-connection warning which stopped runtime-proof-03. It does not compile EQEmu.
-No runtime acceptance is claimed until that warning is explained. Even when
-all scenario checks finish, the worker and suite deliberately remain non-pass:
-`diagnostic_only=true`, `accepted=false`, `suite_passed=false`.
-Check `diagnostic_complete`, the guest result, service evidence and cleanup
-separately. An expected non-pass is not evidence that cleanup succeeded.
+The current experiment deliberately stops the zone after startup and one healthy
+sample. The unchanged health checker must fail even when that exit code is zero.
+It uses the qualified retained artifact and does not compile EQEmu. Attempt 03
+already supplies the successful diagnostic comparison, detailed below.
+
+This remains diagnostic-only. Worker and suite outcomes stay non-pass; an
+operator checks the intended failure and cleanup separately. There is no new
+control-result classifier or actor implementation. Successful failure detection
+does not promote the candidate to accepted runtime validation.
 
 ## First result and listener correction
 
@@ -33,9 +35,9 @@ controller pool had memory-limit pressure but no OOM. Receipts are preserved in
 `receipts/attempt-01`; diagnostic contents remain private at the original host
 path, with their digest recorded. The failed outcome is unchanged.
 
-The current commands target fresh attempt 03. Original attempt 01 preparation,
+The current commands target fresh attempt 04. Original attempt 01 preparation,
 launcher and retained receipts are not regenerated. `receipts/preparation.json`
-remains the first attempt's identity; `receipts/preparation-03.json` identifies
+remains the first attempt's identity; `receipts/preparation-04.json` identifies
 the new preparation. No new C++ build or host dependency is required.
 
 ## Second result and MVP retry
@@ -54,6 +56,38 @@ against the old predicate and passes with the correction; one additional check
 rejects an incorrect instance ID. No new runtime gate, abstraction, dependency
 or resource allowance is introduced. Original attempt 01/02 inputs and results
 remain unchanged. The retained artifact is reused without compilation.
+
+## Successful diagnostic and deliberate exit control
+
+Attempt 03 completed all diagnostic checks in 5.23 minutes: 79 actual utility
+functions, startup/registration/time exchange, owned world connection, 60.396
+seconds of health observations, protected schema/empty player state and clean
+service shutdown. Diagnostic export and owned cleanup completed. Aborted client
+and connection counters stayed zero before shared data, after it, at readiness,
+before shutdown and after shutdown. The earlier warning remains historically
+unexplained. Receipts are preserved in `receipts/attempt-03`.
+
+Attempt 04 takes the same path until one successful health/DB sample. Its fixed
+guest setting then records `health-before-control`, requests SIGTERM for the
+owned zone, waits at most fifteen seconds and records `control-zone-exit`.
+The normal health checker should report `zone: unexpected exit 0`. The control
+never raises a substitute scenario failure. Existing cleanup records the zone's
+early exit, closes remaining services and tears down owned VM resources.
+
+For this control to supply useful failure evidence, inspect all of:
+
+- Normal ready evidence and a successful health sample before the stop.
+- The stop request and actual zero exit, followed by first failure
+  `zone: unexpected exit 0`, with no completed positive scenario.
+- Complete bounded diagnostics. The zone's expected early-exit cleanup note
+  may appear among later errors; unrelated errors require investigation.
+- Normal remaining-service shutdown, complete worker/suite cleanup without
+  rescue, released ownership and unchanged artifact/input hashes.
+
+`suite_passed=false`, `diagnostic_complete=false` and `accepted=false` are
+expected. A timeout, unrelated error or cleanup failure is not a successful
+control. No actor code is needed. Repeat/cancellation evidence and general AFK
+integration remain separate work; do not close the broader investigation.
 
 ## One guest scenario
 
@@ -92,28 +126,28 @@ remain visible as a failure. Independent host cleanup is the outer safeguard.
 Preparation reads pinned previous inputs and archived fixture helpers as data.
 It excludes the archived warning scanner, old scenario and data checksums.
 Source hashes, artifact identity, worker, launcher and seed are recorded in
-`receipts/preparation-03.json`. Preparation refuses existing attempt/output paths.
+`receipts/preparation-04.json`. Preparation refuses existing attempt/output paths.
 No VM starts during preparation or local checks.
 
 ```sh
 python3 investigations/runtime-reuse/2026-09-27/prepare.py
 timeout 60s python3 -m unittest discover -s investigations/runtime-reuse/2026-09-27 -v
-python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-03.py --check
-sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-03.py
+python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-04.py --check
+sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-04.py
 ```
 
-The nineteen local checks exercise synthetic processes, actual warning capture,
+The twenty local checks exercise synthetic processes, actual warning capture,
 early exits, forced shutdown, descendants, output limits, failed event export,
 cleanup retry, deadline allowance, readiness/connection failure, redaction and
 bounded protocol rejection. They do not establish real service behavior.
 
 Progress and retained evidence are under
-`/var/lib/eqemu-vm-proof/runtime-reuse-03/consumer/evidence/`:
+`/var/lib/eqemu-vm-proof/runtime-reuse-04/consumer/evidence/`:
 `report.json`, `diagnostics.jsonl`, `serial.log`, and `cleanup.json`.
 The attempt root contains `suite-result.json` and `suite-cleanup.json`.
 
 ```sh
-sudo systemctl stop eqemu-vm-runtime-reuse-03-suite.service
+sudo systemctl stop eqemu-vm-runtime-reuse-04-suite.service
 ```
 
 Cancellation retains a non-pass outcome and runs owned cleanup. Do not

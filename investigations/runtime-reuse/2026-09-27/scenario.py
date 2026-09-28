@@ -1,6 +1,7 @@
 # Guest adapter appended to selected archived fixture helpers. No legacy scenario/checksum gate.
 START=time.monotonic(); FIRST_FAILURE=None; LATER_ERRORS=[]; EVENTS=[]; DIAGNOSTIC_BYTES=0
 READINESS={'registration','zone_boot','instance','world_time'}
+STOP_ZONE_AFTER_HEALTH=False
 
 
 def event(name,value):
@@ -55,6 +56,14 @@ def check_health(db,world,zone):
     if not connection(zone.pid):raise RuntimeError('Zone-owned world connection absent')
 
 
+def stop_zone_control(zone):
+    # Deliberately unexpected to the normal health checker, even if exit code is zero.
+    event('control-stop-zone',{'pid':zone.pid,'signal':int(signal.SIGTERM)})
+    zone.proc.terminate()
+    code=zone.proc.wait(timeout=15)
+    event('control-zone-exit',{'return_code':code})
+
+
 def world_listener_ready(tcp_table):
     # EQEmu binds its IPv4 server listener to all interfaces in this offline VM.
     for line in tcp_table.splitlines()[1:]:
@@ -97,7 +106,12 @@ def scenario():
     while time.monotonic()-start<60:
         check_health(db,world,zone)
         if db.query('health-'+str(samples),'SELECT 1;').strip()!='1':raise RuntimeError('DB health probe failed')
-        samples+=1;time.sleep(5)
+        samples+=1
+        if STOP_ZONE_AFTER_HEALTH and samples==1:
+            event('health-before-control',{'samples':samples,'zone_connection':True,'database_probe':True})
+            stop_zone_control(zone)
+            check_health(db,world,zone)
+        time.sleep(5)
     check_health(db,world,zone);event('health',{'duration':round(time.monotonic()-start,3),'samples':samples})
     database_observation(db,'before-shutdown')
     for service in [zone,world]:
