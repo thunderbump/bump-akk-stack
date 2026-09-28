@@ -1,0 +1,9 @@
+{
+  "scope": "cancel suite after readiness, verify cleanup, then fresh diagnostic repeat; no candidate acceptance",
+  "launchers": {
+    "05": "5534c5c3e431ca2a6edf9e45a9f84e23b09349a09f323f7687ef38401d1debd5",
+    "06": "6ee6b2f5657bfb60d2d0696cf771642a29307e7103eca5aefd8e114613036c00"
+  },
+  "driver_sha256": "4d7624cb90f0ab5188fdc7794110c9a71dff4ebefe6ad4e5650a8f14b228368f",
+  "driver_source_sha256": "9a889142f1bf8c70d823cac340803125295d3d7c4c768b6f655d7cb33b20a102"
+}

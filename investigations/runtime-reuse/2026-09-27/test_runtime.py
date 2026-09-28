@@ -13,7 +13,7 @@ import unittest
 from unittest.mock import patch
 
 SOURCE=Path(__file__).resolve().parent
-LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-04')
+LOCAL=Path('/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-05')
 
 def load(name,path):
     spec=importlib.util.spec_from_file_location(name,path);module=importlib.util.module_from_spec(spec);spec.loader.exec_module(module);return module

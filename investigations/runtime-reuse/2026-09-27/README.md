@@ -1,166 +1,97 @@
-# Diagnostic service replay using the retained build
+# Startup scenario: cancellation and fresh repeat
 
-Central-t0e1.37 remains open. Build-handoff-01 passed producer compilation,
-79 actual utility functions, all five runner controls, a fresh consumer without
-compilation, and owned cleanup in 37.04 minutes. Preserved receipts are under
-`../../build-handoff/2026-09-27/receipts/attempt-01`.
+Current work is central-t0e1.37. The fixed lifecycle command runs two fresh,
+sequential workers using the same qualified build and public database fixture.
+It adds no C++ compilation, host dependency, actor code or general test framework.
 
-The current experiment deliberately stops the zone after startup and one healthy
-sample. The unchanged health checker must fail even when that exit code is zero.
-It uses the qualified retained artifact and does not compile EQEmu. Attempt 03
-already supplies the successful diagnostic comparison, detailed below.
+## Existing evidence
 
-This remains diagnostic-only. Worker and suite outcomes stay non-pass; an
-operator checks the intended failure and cleanup separately. There is no new
-control-result classifier or actor implementation. Successful failure detection
-does not promote the candidate to accepted runtime validation.
+- Build-handoff-01 passed producer compilation and a fresh consumer, including
+  79 utility functions and five producer runner controls. One qualified 4 GiB
+  artifact remains under build-handoff-01 with its original reuse expiry.
+- Runtime attempts 01/02 failed on listener/instance-log predicates. Their inputs
+  and outcomes remain unchanged; source-backed corrections are regression-tested.
+- Attempt 03 completed startup/registration/world-time exchange, a zone-owned
+  world connection, 60.396 seconds of service/database health, protected schema
+  and empty player/login state, normal service shutdown and owned cleanup.
+- Attempt 04 stopped the zone after a healthy sample. The normal checker
+  detected exactly `zone: unexpected exit 0`; diagnostics and cleanup completed.
 
-## First result and listener correction
+Preserved results are under `receipts/attempt-01` through `attempt-04`. The full
+private diagnostic contents stay on the host; their hashes are recorded.
+The historical MariaDB warning remains unexplained and did not recur in these
+recent runs. None of these diagnostic experiments grants deployment acceptance.
 
-Attempt 01 stopped after 6.30 minutes at the world listener check. Reuse and all
-79 utility functions passed, as did runtime packages, public database imports
-and shared data. World reported listening on port 9000 and stayed alive, but
-the readiness predicate required 127.0.0.1. The server's IPv4 TCP implementation
-binds 0.0.0.0. The retry accepts either wildcard or loopback in LISTEN state on
-port 9000; authenticated zone registration and world-time exchange remain the
-later readiness checks. It rejects wrong ports, unrelated addresses and
-non-listening states.
+## Current two-step experiment
 
-World and MariaDB exited zero during failure cleanup, without forced termination.
-Bounded diagnostics exported completely; the earlier Aborted connection warning
-did not recur in the retained database tail. This does not explain that earlier
-warning or prove zone behavior: no zone was started. Worker/suite cleanup passed
-without rescue, released ownership and removed the disposable disk/copy. The
-controller pool had memory-limit pressure but no OOM. Receipts are preserved in
-`receipts/attempt-01`; diagnostic contents remain private at the original host
-path, with their digest recorded. The failed outcome is unchanged.
+Attempt 05 runs the normal guest, with the earlier zone-exit injection disabled.
+Its supervisor waits for host-recorded zone readiness, validates worker ownership,
+writes `cancel-request.json`, then calls `systemctl stop --no-block` for its own
+suite. SIGTERM interrupts the supervisor; the existing ExecStopPost cleanup stops
+the worker, destroys owned VM resources and releases the lease. This exercises
+suite cancellation, not just a guest-process stop. Guest terminal diagnostics
+are not required after cancellation; retained host progress/serial evidence and
+cancellation/cleanup receipts establish what happened.
 
-The current commands target fresh attempt 04. Original attempt 01 preparation,
-launcher and retained receipts are not regenerated. `receipts/preparation.json`
-remains the first attempt's identity; `receipts/preparation-04.json` identifies
-the new preparation. No new C++ build or host dependency is required.
+The foreground lifecycle driver verifies pinned launcher copies, ownership,
+actual resource absence, worker/suite cleanup without rescue, released reservation
+and the exact `Supervisor interrupted` / `Controller interrupted` outcomes.
+It refuses a completed guest result or a cancellation without the ready marker.
+Only then may it start attempt 06, a fresh normal sixty-second diagnostic repeat.
+It checks complete positive guest evidence and clean teardown before reporting
+`lifecycle_checks_passed=true`. Both child suites keep their original non-pass
+statuses; the driver reports `accepted=false`. Its success means only that these
+two lifecycle checks completed.
 
-## Second result and MVP retry
+The driver is a fixed foreground script, with 256 MiB address-space and 60 CPU-second
+limits. It waits at most 3,300 seconds per child. Existing child suite/worker/guest
+limits and admission/reserve checks remain unchanged. Workers do not overlap.
+Ctrl-C, SIGTERM or terminal hangup stops the active child and prevents the next
+one from launching. SIGKILL cannot run the driver's cleanup handler; child suites
+still have their independent lifetime and cleanup controls. Keep the terminal
+open for the normal run, expected to take roughly ten minutes, not its upper bound.
 
-Attempt 02 reached static poknowledge boot, instance 0, world registration and
-world-time exchange, then timed out waiting for a different instance log phrase.
-It never reached the sixty-second health check. All 79 utility functions passed;
-zone, world and database exited zero during cleanup, with no forced kills.
-Diagnostic export and owned cleanup completed. The earlier MariaDB warning did
-not recur, but remains unexplained. Receipts are under `receipts/attempt-02`.
+## Prepare and launch
 
-Attempt 03 changes one scenario predicate to recognize the actual boot-completion
-record. `startup-lines.json` holds four selected readiness lines from attempt 02,
-without credentials or player data. The existing readiness regression failed
-against the old predicate and passes with the correction; one additional check
-rejects an incorrect instance ID. No new runtime gate, abstraction, dependency
-or resource allowance is introduced. Original attempt 01/02 inputs and results
-remain unchanged. The retained artifact is reused without compilation.
-
-## Successful diagnostic and deliberate exit control
-
-Attempt 03 completed all diagnostic checks in 5.23 minutes: 79 actual utility
-functions, startup/registration/time exchange, owned world connection, 60.396
-seconds of health observations, protected schema/empty player state and clean
-service shutdown. Diagnostic export and owned cleanup completed. Aborted client
-and connection counters stayed zero before shared data, after it, at readiness,
-before shutdown and after shutdown. The earlier warning remains historically
-unexplained. Receipts are preserved in `receipts/attempt-03`.
-
-Attempt 04 takes the same path until one successful health/DB sample. Its fixed
-guest setting then records `health-before-control`, requests SIGTERM for the
-owned zone, waits at most fifteen seconds and records `control-zone-exit`.
-The normal health checker should report `zone: unexpected exit 0`. The control
-never raises a substitute scenario failure. Existing cleanup records the zone's
-early exit, closes remaining services and tears down owned VM resources.
-
-For this control to supply useful failure evidence, inspect all of:
-
-- Normal ready evidence and a successful health sample before the stop.
-- The stop request and actual zero exit, followed by first failure
-  `zone: unexpected exit 0`, with no completed positive scenario.
-- Complete bounded diagnostics. The zone's expected early-exit cleanup note
-  may appear among later errors; unrelated errors require investigation.
-- Normal remaining-service shutdown, complete worker/suite cleanup without
-  rescue, released ownership and unchanged artifact/input hashes.
-
-`suite_passed=false`, `diagnostic_complete=false` and `accepted=false` are
-expected. A timeout, unrelated error or cleanup failure is not a successful
-control. No actor code is needed. Repeat/cancellation evidence and general AFK
-integration remain separate work; do not close the broader investigation.
-
-## One guest scenario
-
-The fresh offline VM consumes its own read-only artifact copy. It checks the
-prior manifest, binaries, package state, system libraries and loader behavior,
-and reruns actual utility tests. It then installs the sealed runtime packages,
-checks that libraries/binaries remain unchanged and imports the public fixture.
-No production or NAS data or credentials are inputs.
-
-The guest adapter checks shared data, world/zone registration for poknowledge
-202:0, world-time exchange, a zone-owned world connection, sixty seconds of
-service and database health, normal world/zone shutdown, and unchanged protected
-schema plus empty player/login state. Readiness phrases remain local to this
-source-version adapter. There is no whole-database data-checksum gate or fixed
-sample-count invariant. The collector never kills a service because a log line
-contains a warning or the word Aborted.
-
-Database connection counters and eqemu connection IDs are sampled around shared
-data generation, readiness and shutdown. Query text is excluded. Service exits,
-signals, forced termination and the first failure are recorded. Log tails have
-32 KiB per-stream limits, at most eight streams and 512 KiB encoded diagnostic
-frames within the existing 1 MiB serial budget. Export scrubs generated guest
-secrets and control characters. Host output paths are fixed; no guest path can
-select where host evidence is written. `diagnostics.jsonl` and `serial.log` are
-root:bump mode 0640. Treat retained evidence as private diagnostic material.
-
-The workload gets 1,800 seconds after ready. The host collector allows 2,040,
-leaving time for guest shutdown and a separate fifteen-second diagnostic grace,
-including two seconds reserved for the terminal frame. Worker and suite caps
-remain 2,700 and 3,000 seconds. Existing memory, CPU, disk, admission and reserve
-limits are unchanged. Guest service shutdown can force termination, which must
-remain visible as a failure. Independent host cleanup is the outer safeguard.
-
-## Preparation and operator commands
-
-Preparation reads pinned previous inputs and archived fixture helpers as data.
-It excludes the archived warning scanner, old scenario and data checksums.
-Source hashes, artifact identity, worker, launcher and seed are recorded in
-`receipts/preparation-04.json`. Preparation refuses existing attempt/output paths.
-No VM starts during preparation or local checks.
+Preparation refuses existing attempts and outputs. Never regenerate launched
+inputs. The one preparation command creates fresh 05/06 identities and the driver:
 
 ```sh
-python3 investigations/runtime-reuse/2026-09-27/prepare.py
+python3 investigations/runtime-reuse/2026-09-27/prepare_lifecycle.py
 timeout 60s python3 -m unittest discover -s investigations/runtime-reuse/2026-09-27 -v
-python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-04.py --check
-sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-04.py
+python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-05.py --check
+python3 ~/.local/state/eqemu-vm-proof/offline-runtime-reuse-06.py --check
+sudo python3 ~/.local/state/eqemu-vm-proof/offline-runtime-lifecycle-01.py
 ```
 
-The twenty local checks exercise synthetic processes, actual warning capture,
-early exits, forced shutdown, descendants, output limits, failed event export,
-cleanup retry, deadline allowance, readiness/connection failure, redaction and
-bounded protocol rejection. They do not establish real service behavior.
+The lifecycle result is
+`/var/lib/eqemu-vm-proof/runtime-lifecycle-01/result.json`.
+Individual results/progress remain in `runtime-reuse-05` and `runtime-reuse-06`
+beside that directory, each with `suite-result.json`, `suite-cleanup.json` and
+`consumer/evidence/`. In another terminal, the active child can also be stopped
+with `sudo systemctl stop eqemu-vm-runtime-reuse-05-suite.service` or the equivalent
+06 command. The driver will reject an unintended outcome and halt.
 
-Progress and retained evidence are under
-`/var/lib/eqemu-vm-proof/runtime-reuse-04/consumer/evidence/`:
-`report.json`, `diagnostics.jsonl`, `serial.log`, and `cleanup.json`.
-The attempt root contains `suite-result.json` and `suite-cleanup.json`.
+Twenty-seven local checks cover the existing service/diagnostic behavior plus the
+suite-stop target, exact cancellation evidence, incomplete cleanup rejection,
+the barrier preventing repeat after a failed check, and complete repeat evidence.
+Both generated controller input/XML/AppArmor checks pass. No VM was started by
+preparation or these tests. Prepared hashes are in `receipts/preparation-05.json`,
+`preparation-06.json` and `lifecycle-preparation-01.json`.
 
-```sh
-sudo systemctl stop eqemu-vm-runtime-reuse-04-suite.service
-```
+## Data and retention
 
-Cancellation retains a non-pass outcome and runs owned cleanup. Do not
-regenerate a launched attempt. The original qualified artifact and custody
-remain read-only inputs owned by build-handoff-01; this replay removes only its
-own copy and VM resources. Original reuse expiry is October 4, 2026 at 11:15:28
-Pacific. Expiry refuses reuse but does not automatically delete the artifact.
-
-After all consumers are quiescent and the retained build is no longer needed:
+Guests use sealed public fixtures, not production/NAS data or credentials. The
+host never mounts guest filesystems or runs acquired candidate executables.
+Artifact consumption is read-only; each child removes its own copy and VM disk.
+The original build-handoff-01 artifact/custody stay unchanged. Reuse expires on
+October 4, 2026 at 11:15:28 Pacific; expiry refuses reuse but does not delete it.
+After all consumers are quiescent and the build is no longer needed, its existing
+explicit discard command remains:
 
 ```sh
 sudo python3 /var/lib/eqemu-vm-proof/build-handoff-01/suite.py --discard-artifact
 ```
 
-Do not discard it merely to inspect results. No new artifact registry, cache,
-scheduled eviction, gameplay implementation or AFK interface is added here.
+Do not discard merely to inspect results. Whole-AFK integration and actor behavior
+remain separate investigations; completing this pair does not close them.

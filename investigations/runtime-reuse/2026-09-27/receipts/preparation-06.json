@@ -1,0 +1,26 @@
+{
+  "scope": "fresh positive diagnostic repeat; no new compilation",
+  "recipe_sha256": "7efdce21c0efe6eccef7380524d897bfb8eae7f8ff4121b9a3cd725d0b9d9910",
+  "build_id": "3b021c4816aec69c5cb54f18e83f11741faed5b31d2c9bf213a050ede5261000",
+  "artifact": {
+    "bytes": 4294967296,
+    "sha256": "bdbca5fa1755d2286694d5ea0e9cc8e93c20b4d6f289c729c6ae5cb0146e91b3",
+    "manifest_sha256": "0450955cbac44b100dfbb29bf30dd190160c1167f4cd2bd99279235b7e2e3e62",
+    "expires_at": 1791137728.05155
+  },
+  "sources": {
+    "investigations/runtime-reuse/2026-09-27/lifecycle.py": "9a889142f1bf8c70d823cac340803125295d3d7c4c768b6f655d7cb33b20a102",
+    "investigations/runtime-reuse/2026-09-27/prepare.py": "ae5d3da0c7de4ea53aca0e8529af132b2838cc331ff915422acbd53a8e36bd6b",
+    "investigations/runtime-reuse/2026-09-27/prepare_lifecycle.py": "68d7c0e1a0661836119d0e5ebaa4dabd4bdc6e24735e58e7088d7ea1a45b9f1d",
+    "investigations/runtime-reuse/2026-09-27/protocol.py": "a78ce06067b7f30042b4894da84d851be5d337bf8db4bd9be1e213c924c76868",
+    "investigations/runtime-reuse/2026-09-27/scenario.py": "48fb32502b9e54c51f8a9ba551ed7eb0a29edb7c86f8182cb3c9dc3ded900755",
+    "investigations/runtime-reuse/2026-09-27/services.py": "36053a3047a69dc0f5f2b27bca4b68ff41ce27aa6996913f93c1e7cecf369f6b",
+    "investigations/runtime-reuse/2026-09-27/test_lifecycle.py": "aafeef08b1775ec41bafa82e6d088009479b68e66b2e05bab0e3d3755ff79725",
+    "investigations/runtime-reuse/2026-09-27/test_runtime.py": "87617b82e18e6b233725453af4fe64de83ef4db43f488a069844c41c749f9634",
+    "investigations/runtime-proof/2026-09-26/runtime-proof-inputs-03/guest-runtime.py": "69de3ef7224f5e0e110c8d922a7f5a38ada67369204f94c4308bb3ac0143c3a3",
+    "investigations/artifact-handoff/2026-09-26/diagnostics.py": "47157b5a874950534c5338ee982b1c2060d7ee0ad75bc0d1f41ad39f23f50438"
+  },
+  "worker_sha256": "c88a1de7fbd98952c3f0e0bd85da760eaef629785de6505f6f7869c93fdad835",
+  "launcher_sha256": "6ee6b2f5657bfb60d2d0696cf771642a29307e7103eca5aefd8e114613036c00",
+  "seed_sha256": "16da351b50b6ec623e444905b15aa77bccf9830be304741cb7b70ca6804060bd"
+}
