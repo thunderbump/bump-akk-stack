@@ -1,0 +1,451 @@
+{
+  "synthetic": true,
+  "accepted": false,
+  "checks_passed": true,
+  "afk_commit": "efd979cd482258d8dba8a044a85f88063d694bb7",
+  "script_sha256": "2ab83857aaf2ff0aff48f88a9a98def6ea07854d38f53f5a945c675f44a63498",
+  "template_sha256": "d3c4700c42ed8df70fbe510f95dbb1786bd53bd08b1853729f32bd7b4008fed0",
+  "cases": [
+    {
+      "case": "diagnostic",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "failed",
+      "process": {
+        "exit_code": 2,
+        "signal": null
+      },
+      "repairable": true,
+      "final_summary_present": true,
+      "worker_alive_at_validator_exit": false,
+      "duration_seconds": 0.061,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "failed",
+        "started_at": "2026-09-28T23:48:13.572083Z",
+        "finished_at": "2026-09-28T23:48:13.606477Z",
+        "duration_seconds": 0.034,
+        "process": {
+          "exit_code": 2,
+          "signal": null
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"5a695eea5b\", \"accepted\": false, \"event\": \"submitted\"}\n{\"synthetic\": true, \"event\": \"final\", \"version\": 1, \"run_id\": \"5a695eea5b\", \"owner_uid\": 997, \"terminal\": true, \"accepted\": false, \"diagnostic_only\": true, \"diagnostic_complete\": true, \"cleanup_complete\": true, \"error\": \"Build attempt failed; inspect worker evidence\", \"report_directory\": \"/tmp/eqemu-afk-command-hv05_h2f/diagnostic\"}\n",
+      "command_stderr": ""
+    },
+    {
+      "case": "candidate_failure",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "failed",
+      "process": {
+        "exit_code": 1,
+        "signal": null
+      },
+      "repairable": true,
+      "final_summary_present": true,
+      "worker_alive_at_validator_exit": false,
+      "duration_seconds": 0.061,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "failed",
+        "started_at": "2026-09-28T23:48:13.634243Z",
+        "finished_at": "2026-09-28T23:48:13.668597Z",
+        "duration_seconds": 0.034,
+        "process": {
+          "exit_code": 1,
+          "signal": null
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"47e2d5a7c4\", \"accepted\": false, \"event\": \"submitted\"}\n{\"synthetic\": true, \"event\": \"final\", \"version\": 1, \"run_id\": \"47e2d5a7c4\", \"owner_uid\": 997, \"terminal\": true, \"accepted\": false, \"diagnostic_only\": false, \"diagnostic_complete\": false, \"cleanup_complete\": true, \"error\": \"Synthetic candidate assertion: expected 2, observed 1\", \"report_directory\": \"/tmp/eqemu-afk-command-hv05_h2f/candidate_failure\"}\n",
+      "command_stderr": ""
+    },
+    {
+      "case": "refusal",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "failed",
+      "process": {
+        "exit_code": 2,
+        "signal": null
+      },
+      "repairable": true,
+      "final_summary_present": true,
+      "worker_alive_at_validator_exit": false,
+      "duration_seconds": 0.061,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "failed",
+        "started_at": "2026-09-28T23:48:13.696217Z",
+        "finished_at": "2026-09-28T23:48:13.731537Z",
+        "duration_seconds": 0.035,
+        "process": {
+          "exit_code": 2,
+          "signal": null
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"424fb07946\", \"accepted\": false, \"event\": \"submitted\"}\n{\"synthetic\": true, \"event\": \"final\", \"run_id\": \"424fb07946\", \"accepted\": false, \"cleanup_complete\": null, \"error\": \"Synthetic admission refused: insufficient disk\"}\n",
+      "command_stderr": ""
+    },
+    {
+      "case": "missing_report",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "failed",
+      "process": {
+        "exit_code": 2,
+        "signal": null
+      },
+      "repairable": true,
+      "final_summary_present": true,
+      "worker_alive_at_validator_exit": false,
+      "duration_seconds": 0.061,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "failed",
+        "started_at": "2026-09-28T23:48:13.756071Z",
+        "finished_at": "2026-09-28T23:48:13.790187Z",
+        "duration_seconds": 0.034,
+        "process": {
+          "exit_code": 2,
+          "signal": null
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"a10cf3b510\", \"accepted\": false, \"event\": \"submitted\"}\n{\"synthetic\": true, \"event\": \"final\", \"run_id\": \"a10cf3b510\", \"accepted\": false, \"cleanup_complete\": null, \"error\": \"[Errno 2] No such file or directory: '/tmp/eqemu-afk-command-hv05_h2f/missing_report/report.json'\"}\n",
+      "command_stderr": ""
+    },
+    {
+      "case": "invalid_report",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "failed",
+      "process": {
+        "exit_code": 2,
+        "signal": null
+      },
+      "repairable": true,
+      "final_summary_present": true,
+      "worker_alive_at_validator_exit": false,
+      "duration_seconds": 0.061,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "failed",
+        "started_at": "2026-09-28T23:48:13.817515Z",
+        "finished_at": "2026-09-28T23:48:13.851808Z",
+        "duration_seconds": 0.034,
+        "process": {
+          "exit_code": 2,
+          "signal": null
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"4d41b40a48\", \"accepted\": false, \"event\": \"submitted\"}\n{\"synthetic\": true, \"event\": \"final\", \"run_id\": \"4d41b40a48\", \"accepted\": false, \"cleanup_complete\": null, \"error\": \"Invalid synthetic report identity or flags\"}\n",
+      "command_stderr": ""
+    },
+    {
+      "case": "cleanup_incomplete",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "failed",
+      "process": {
+        "exit_code": 2,
+        "signal": null
+      },
+      "repairable": true,
+      "final_summary_present": true,
+      "worker_alive_at_validator_exit": false,
+      "duration_seconds": 0.061,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "failed",
+        "started_at": "2026-09-28T23:48:13.879707Z",
+        "finished_at": "2026-09-28T23:48:13.915349Z",
+        "duration_seconds": 0.036,
+        "process": {
+          "exit_code": 2,
+          "signal": null
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"921911c379\", \"accepted\": false, \"event\": \"submitted\"}\n{\"synthetic\": true, \"event\": \"final\", \"version\": 1, \"run_id\": \"921911c379\", \"owner_uid\": 997, \"terminal\": true, \"accepted\": false, \"diagnostic_only\": true, \"diagnostic_complete\": true, \"cleanup_complete\": false, \"error\": \"Synthetic cleanup incomplete\", \"report_directory\": \"/tmp/eqemu-afk-command-hv05_h2f/cleanup_incomplete\"}\n",
+      "command_stderr": ""
+    },
+    {
+      "case": "timeout",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "timed_out",
+      "process": {
+        "exit_code": null,
+        "signal": "SIGKILL"
+      },
+      "repairable": false,
+      "final_summary_present": false,
+      "worker_alive_at_validator_exit": true,
+      "worker_final": {
+        "reason": "cancelled",
+        "time": 6995993.594685092
+      },
+      "independent_cleanup_complete": true,
+      "duration_seconds": 5.607,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "timed_out",
+        "started_at": "2026-09-28T23:48:13.970815Z",
+        "finished_at": "2026-09-28T23:48:17.977521Z",
+        "duration_seconds": 4.007,
+        "process": {
+          "exit_code": null,
+          "signal": "SIGKILL"
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"f77d1bb58d\", \"accepted\": false, \"event\": \"submitted\"}\n",
+      "command_stderr": ""
+    },
+    {
+      "case": "interrupt",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "interrupted",
+      "process": {
+        "exit_code": null,
+        "signal": "SIGKILL"
+      },
+      "repairable": false,
+      "final_summary_present": false,
+      "worker_alive_at_validator_exit": true,
+      "worker_final": {
+        "reason": "cancelled",
+        "time": 6995997.492687158
+      },
+      "independent_cleanup_complete": true,
+      "duration_seconds": 3.876,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "interrupted",
+        "started_at": "2026-09-28T23:48:19.581849Z",
+        "finished_at": "2026-09-28T23:48:21.881910Z",
+        "duration_seconds": 2.3,
+        "process": {
+          "exit_code": null,
+          "signal": "SIGKILL"
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"a2090fd637\", \"accepted\": false, \"event\": \"submitted\"}\n",
+      "command_stderr": ""
+    },
+    {
+      "case": "client_killed",
+      "synthetic": true,
+      "accepted": false,
+      "validator_exit": 1,
+      "outcome": "failed",
+      "process": {
+        "exit_code": null,
+        "signal": "SIGKILL"
+      },
+      "repairable": false,
+      "final_summary_present": false,
+      "worker_alive_at_validator_exit": true,
+      "worker_final": {
+        "reason": "independent_deadline",
+        "time": 6996009.064098365
+      },
+      "independent_cleanup_complete": true,
+      "duration_seconds": 11.595,
+      "afk_output": {
+        "schema_version": 1,
+        "outcome": "failed",
+        "started_at": "2026-09-28T23:48:23.464062Z",
+        "finished_at": "2026-09-28T23:48:23.532769Z",
+        "duration_seconds": 0.069,
+        "process": {
+          "exit_code": null,
+          "signal": "SIGKILL"
+        },
+        "repository": {
+          "before": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "after": {
+            "head": "6418d86b0f7b8e9874ddf64c5f6fd3eb3818e2e3",
+            "branch": "main",
+            "dirty": false,
+            "status": []
+          },
+          "head_changed": false
+        },
+        "artifacts": {
+          "stdout": "stdout.log",
+          "stderr": "stderr.log"
+        }
+      },
+      "command_stdout": "{\"synthetic\": true, \"run_id\": \"5a15551b97\", \"accepted\": false, \"event\": \"submitted\"}\n",
+      "command_stderr": ""
+    }
+  ],
+  "temporary_bytes": 51471,
+  "temporary_directory_removed": true,
+  "duration_seconds": 21.457
+}
