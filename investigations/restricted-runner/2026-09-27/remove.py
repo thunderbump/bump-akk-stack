@@ -31,6 +31,9 @@ def main():
     control.safe_path(lock_path)
     with lock_path.open('r+') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        record = control.read_json(BASE / 'installation.json')
+        record['enabled'] = False
+        control.write_json(BASE / 'installation.json', record)
         if POLICY.exists() or POLICY.is_symlink():
             control.safe_path(POLICY)
             if POLICY.read_bytes() != RULE:

@@ -89,14 +89,30 @@ def controller_budget():
 def stop(m):run(['systemctl','stop',m.UNIT],timeout=150)
 
 def admit():
-    m=module('consumer')
-    with (ROOT/'admission.lock').open('r+') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX);ledger=read(ROOT/'leases.json')
-        if ledger['active']:raise RuntimeError('Build worker already reserved')
-        if any(n.startswith('eqemu-') for n in m.virsh('list','--all','--name').stdout.splitlines()):raise RuntimeError('Another proof domain exists')
-        facts=m.admission();ledger['active']['consumer']={'state':'starting','name':m.NAME,'worker_sha256':HASHES['consumer-worker.py'],'admission':facts};write(ROOT/'leases.json',ledger)
-        m.setup();s=m.state();ledger['active']['consumer'].update(state='active',uuid=s['uuid']);write(ROOT/'leases.json',ledger)
-    return m
+    # Finish the short ownership handoff before handling cancellation. Expensive
+    # disk preparation runs later in the independent bounded worker controller.
+    previous=signal.pthread_sigmask(signal.SIG_BLOCK,{signal.SIGTERM,signal.SIGINT})
+    try:
+        m=module('consumer')
+        with (ROOT/'admission.lock').open('r+') as lock:
+            fcntl.flock(lock,fcntl.LOCK_EX);ledger=read(ROOT/'leases.json')
+            if ledger['active']:raise RuntimeError('Build worker already reserved')
+            if any(n.startswith('eqemu-') for n in m.virsh('list','--all','--name').stdout.splitlines()):raise RuntimeError('Another proof domain exists')
+            facts=m.admission();ledger['active']['consumer']={'state':'starting','name':m.NAME,'worker_sha256':HASHES['consumer-worker.py'],'admission':facts};write(ROOT/'leases.json',ledger)
+            m.setup();s=m.state();ledger['active']['consumer'].update(state='active',uuid=s['uuid']);write(ROOT/'leases.json',ledger)
+        return m
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK,previous)
+
+
+def unstarted_absent(m):
+    # Setup cannot start a worker before creating its root/state. Refuse ambiguous state.
+    return (not m.ROOT.exists() and not m.ROOT.is_symlink()
+      and properties(m.UNIT).get('LoadState')=='not-found'
+      and m.NAME not in m.virsh('list','--all','--name').stdout.splitlines()
+      and not m.SLICEFILE.exists() and not m.SLICEFILE.is_symlink()
+      and not P('/sys/fs/cgroup',m.SLICE).exists())
+
 
 def acceptance(r,c,props,s,resources_absent):
     checks={'identity':r.get('uuid')==s['uuid']==c.get('uuid'),
@@ -145,6 +161,15 @@ def cleanup():
                 if m.cleanup(preserve_failed_outcome=True):raise RuntimeError('Rescue failed')
             if not absent(m,s):raise RuntimeError('Owned resources remain')
             if 'consumer' in read(ROOT/'leases.json')['active']:release(m)
+        ledger=read(ROOT/'leases.json')
+        if not m.ROOT.exists() and ledger['active']:
+            lease=ledger['active'].get('consumer')
+            if (set(ledger['active'])!={'consumer'} or not lease or lease.get('state')!='starting'
+                    or lease.get('name')!=m.NAME or lease.get('worker_sha256')!=HASHES['consumer-worker.py']
+                    or not unstarted_absent(m)):
+                raise RuntimeError('Ambiguous starting reservation')
+            ledger.setdefault('abandoned_starts',[]).append(ledger['active'].pop('consumer'))
+            write(ROOT/'leases.json',ledger)
         if read(ROOT/'leases.json')['active']:raise RuntimeError('Unreleased reservation')
         try:receipt['controller_budget']=controller_budget()
         except Exception as error:receipt['controller_budget_error']=str(error)[:2000]

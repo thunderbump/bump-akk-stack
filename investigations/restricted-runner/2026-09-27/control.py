@@ -198,7 +198,8 @@ def publish_locked(run_id):
     absent = False
     if stopped and cleanup.get('complete') is True:
         worker = suite.module('consumer')
-        absent = suite.absent(worker, worker.state())
+        absent = (suite.absent(worker, worker.state()) if worker.ROOT.exists()
+                  else suite.unstarted_absent(worker) and not suite.read(root / 'leases.json')['active'])
     result = {'version': 1, 'run_id': run_id, 'owner_uid': owner['uid'],
               'terminal': stopped, 'accepted': False, 'diagnostic_only': True,
               'diagnostic_complete': summary.get('diagnostic_complete') is True,
@@ -239,7 +240,21 @@ def publish(run_id):
         return publish_locked(run_id)
 
 
+def admission_preflight():
+    # Reject expired inputs or unavailable capacity before creating a reservation.
+    import types
+    modules = {}
+    for name, text in render('0000000000').items():
+        module = types.ModuleType(name)
+        module.__file__ = str(VERSION / name)
+        exec(compile(text, module.__file__, 'exec'), module.__dict__)
+        modules[name] = module
+    modules['suite.py'].prerequisites()
+    modules['consumer-worker.py'].admission()
+
+
 def start(uid):
+    admission_preflight()
     # The request lock serializes requests; active.json reserves the worker across processes.
     active_path = BASE / 'active.json'
     if active_path.exists():
@@ -277,6 +292,22 @@ def start(uid):
     except Exception as error:
         owner['setup_error'] = str(error)[:2000]
         write_json(root / 'owner.json', owner)
+        try:
+            worker = suite.module('consumer')
+            if suite.quiescent(suite.properties(suite.UNIT)) and suite.unstarted_absent(worker):
+                if suite.CTLFILE.exists():
+                    safe_path(suite.CTLFILE)
+                    if suite.CTLFILE.read_text() != suite.CTLTEXT:
+                        raise ValueError('Controller slice changed')
+                    suite.CTLFILE.unlink()
+                    suite.run(['/usr/bin/systemctl', 'daemon-reload'])
+                write_json(root / 'leases.json', {'active': {}, 'released': []})
+                cleanup = {'complete': True, 'unstarted': True, 'rescued': []}
+                write_json(root / 'suite-result.json', {'suite_passed': False, 'error': owner['setup_error'], 'cleanup': cleanup})
+                write_json(root / 'suite-cleanup.json', cleanup)
+                active_path.unlink()
+        except Exception:
+            pass  # Unknown ownership stays reserved for administrator inspection.
         raise RuntimeError('Setup failed; retained for exact recovery: ' + run_id) from error
     return {'started': True, 'run_id': run_id, 'accepted': False}
 
@@ -286,6 +317,9 @@ def dispatch(request, uid):
     with (BASE / 'request.lock').open('r+') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if request['op'] == 'run':
+            installation = read_json(BASE / 'installation.json')
+            if installation.get('enabled') is not True or installation.get('version') != str(VERSION):
+                raise RuntimeError('Admission disabled')
             return start(uid)
         root = run_root(request['run_id'], uid)
         if request['op'] == 'cancel':
@@ -299,6 +333,10 @@ def main():
     if os.geteuid() != 0:
         raise ValueError('Privileged helper requires sudo')
     os.umask(0o077)
+    # Complete the bounded request handoff even if its client loses the terminal.
+    # Explicit cancel and the worker deadline own cancellation after admission.
+    for signum in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(signum, signal.SIG_IGN)
     resource.setrlimit(resource.RLIMIT_AS, (256 * 1024**2, 256 * 1024**2))
     resource.setrlimit(resource.RLIMIT_CPU, (60, 60))
     verify_installation()
