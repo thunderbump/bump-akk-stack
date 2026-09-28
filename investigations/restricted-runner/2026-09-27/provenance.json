@@ -1,0 +1,6 @@
+{
+  "baseline_commit": "cf4520980d6a303e99c5613ff082ef46f4648c71",
+  "worker_sha256": "c88a1de7fbd98952c3f0e0bd85da760eaef629785de6505f6f7869c93fdad835",
+  "suite_sha256": "6ee6b2f5657bfb60d2d0696cf771642a29307e7103eca5aefd8e114613036c00",
+  "scope": "Frozen diagnostic worker; installed inputs, allocated run identity and private evidence. No historical generator used at install or request time."
+}

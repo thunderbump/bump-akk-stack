@@ -1,0 +1,22 @@
+{
+  "base.qcow2": {
+    "source": "/home/bump/.local/state/eqemu-vm-proof/inputs/ubuntu-noble-20260911/ubuntu-24.04-server-cloudimg-amd64.img",
+    "bytes": 625256960,
+    "sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354"
+  },
+  "seed.iso": {
+    "source": "/home/bump/.local/state/eqemu-vm-proof/runtime-reuse-inputs-06/seed.iso",
+    "bytes": 442368,
+    "sha256": "16da351b50b6ec623e444905b15aa77bccf9830be304741cb7b70ca6804060bd"
+  },
+  "fixture.iso": {
+    "source": "/home/bump/.local/state/eqemu-vm-proof/build-inputs-20260925-v3/build-inputs.iso",
+    "bytes": 469000192,
+    "sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4"
+  },
+  "runtime.iso": {
+    "source": "/home/bump/.local/state/eqemu-vm-proof/runtime-inputs-20260926/runtime-inputs.iso",
+    "bytes": 171806720,
+    "sha256": "5fa2a4822e03ee7693c566e8670ddab5ee35c7a5d25d4671ac57c53ddf82c767"
+  }
+}
