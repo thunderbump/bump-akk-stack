@@ -1,0 +1,749 @@
+{
+  "schema": 1,
+  "ok": false,
+  "workload_ok": false,
+  "scope": "diagnostic-only reused-build service scenario; guest evidence remains untrusted",
+  "uuid": "0c1230c2-6292-4b59-8303-f2747a1154a0",
+  "checks": {
+    "host_pre_resume": true
+  },
+  "inputs": {
+    "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "seed.iso": "16da351b50b6ec623e444905b15aa77bccf9830be304741cb7b70ca6804060bd",
+    "fixture.iso": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4",
+    "runtime.iso": "5fa2a4822e03ee7693c566e8670ddab5ee35c7a5d25d4671ac57c53ddf82c767"
+  },
+  "started_at": 1790568479.5659664,
+  "virtlogd": {
+    "max_size": 2097152,
+    "max_backups": 3
+  },
+  "inputs_verified_at": 1790568485.05941,
+  "allocated_disk_bytes": 34359750656,
+  "io_device": {
+    "filesystem": "259:2",
+    "backing_disk": "259:0"
+  },
+  "limits": {
+    "memory.max": "6442450944",
+    "memory.swap.max": "0",
+    "pids.max": "256",
+    "cpu.max": "200000 100000",
+    "io.max": "259:0 rbps=104857600 wbps=52428800 riops=max wiops=max"
+  },
+  "qemu": {
+    "pid": 3620363,
+    "uid": "64055\t64055\t64055\t64055",
+    "gid": "993\t993\t993\t993",
+    "groups": "993 64055",
+    "cap_eff": "0000000000000000",
+    "seccomp": "2",
+    "apparmor": "libvirt-0c1230c2-6292-4b59-8303-f2747a1154a0 (enforce)",
+    "cgroup": "0::/eqemuvmrtc4d96a00b4worker.slice/machine-qemu\\x2d1\\x2deqemu\\x2drtc4d96a00b4.scope/libvirt/emulator",
+    "cmdline": [
+      "/usr/bin/qemu-system-x86_64",
+      "-name",
+      "guest=eqemu-rtc4d96a00b4,debug-threads=on",
+      "-S",
+      "-object",
+      "{\"qom-type\":\"secret\",\"id\":\"masterKey0\",\"format\":\"raw\",\"file\":\"/var/lib/libvirt/qemu/domain-1-eqemu-rtc4d96a00b4/master-key.aes\"}",
+      "-machine",
+      "pc-q35-8.2,usb=off,dump-guest-core=off,memory-backend=pc.ram,acpi=on",
+      "-accel",
+      "kvm",
+      "-cpu",
+      "host,migratable=on,svm=off,vmx=off",
+      "-m",
+      "size=4194304k",
+      "-object",
+      "{\"qom-type\":\"memory-backend-ram\",\"id\":\"pc.ram\",\"size\":4294967296}",
+      "-overcommit",
+      "mem-lock=off",
+      "-smp",
+      "2,sockets=2,cores=1,threads=1",
+      "-uuid",
+      "0c1230c2-6292-4b59-8303-f2747a1154a0",
+      "-display",
+      "none",
+      "-no-user-config",
+      "-nodefaults",
+      "-chardev",
+      "socket,id=charmonitor,fd=32,server=on,wait=off",
+      "-mon",
+      "chardev=charmonitor,id=monitor,mode=control",
+      "-rtc",
+      "base=utc",
+      "-no-shutdown",
+      "-boot",
+      "strict=on",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":8,\"chassis\":1,\"id\":\"pci.1\",\"bus\":\"pcie.0\",\"multifunction\":true,\"addr\":\"0x1\"}",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":9,\"chassis\":2,\"id\":\"pci.2\",\"bus\":\"pcie.0\",\"addr\":\"0x1.0x1\"}",
+      "-device",
+      "{\"driver\":\"pcie-root-port\",\"port\":10,\"chassis\":3,\"id\":\"pci.3\",\"bus\":\"pcie.0\",\"addr\":\"0x1.0x2\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/root.raw\",\"node-name\":\"libvirt-5-storage\",\"auto-read-only\":true,\"discard\":\"unmap\",\"cache\":{\"direct\":true,\"no-flush\":false}}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-5-format\",\"read-only\":false,\"cache\":{\"direct\":true,\"no-flush\":false},\"driver\":\"raw\",\"file\":\"libvirt-5-storage\"}",
+      "-device",
+      "{\"driver\":\"virtio-blk-pci\",\"bus\":\"pci.1\",\"addr\":\"0x0\",\"drive\":\"libvirt-5-format\",\"id\":\"virtio-disk0\",\"bootindex\":1,\"write-cache\":\"on\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/artifact.raw\",\"node-name\":\"libvirt-4-storage\",\"auto-read-only\":true,\"discard\":\"unmap\",\"cache\":{\"direct\":true,\"no-flush\":false}}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-4-format\",\"read-only\":true,\"discard\":\"ignore\",\"cache\":{\"direct\":true,\"no-flush\":false},\"driver\":\"raw\",\"file\":\"libvirt-4-storage\"}",
+      "-device",
+      "{\"driver\":\"virtio-blk-pci\",\"bus\":\"pci.2\",\"addr\":\"0x0\",\"drive\":\"libvirt-4-format\",\"id\":\"virtio-disk1\",\"write-cache\":\"on\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/seed.iso\",\"node-name\":\"libvirt-3-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-3-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-3-storage\"}",
+      "-device",
+      "{\"driver\":\"ide-cd\",\"bus\":\"ide.0\",\"drive\":\"libvirt-3-format\",\"id\":\"sata0-0-0\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/fixture.iso\",\"node-name\":\"libvirt-2-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-2-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-2-storage\"}",
+      "-device",
+      "{\"driver\":\"ide-cd\",\"bus\":\"ide.1\",\"drive\":\"libvirt-2-format\",\"id\":\"sata0-0-1\"}",
+      "-blockdev",
+      "{\"driver\":\"file\",\"filename\":\"/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/runtime.iso\",\"node-name\":\"libvirt-1-storage\",\"auto-read-only\":true,\"discard\":\"unmap\"}",
+      "-blockdev",
+      "{\"node-name\":\"libvirt-1-format\",\"read-only\":true,\"driver\":\"raw\",\"file\":\"libvirt-1-storage\"}",
+      "-device",
+      "{\"driver\":\"ide-cd\",\"bus\":\"ide.2\",\"drive\":\"libvirt-1-format\",\"id\":\"sata0-0-2\"}",
+      "-chardev",
+      "socket,id=charserial0,fd=31,server=on,wait=off",
+      "-device",
+      "{\"driver\":\"isa-serial\",\"chardev\":\"charserial0\",\"id\":\"serial0\",\"index\":0}",
+      "-audiodev",
+      "{\"id\":\"audio1\",\"driver\":\"none\"}",
+      "-global",
+      "ICH9-LPC.noreboot=off",
+      "-watchdog-action",
+      "reset",
+      "-sandbox",
+      "on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny",
+      "-msg",
+      "timestamp=on"
+    ],
+    "fds": [
+      "/dev/null",
+      "pipe:[727596407]",
+      "pipe:[727596407]",
+      "anon_inode:[eventfd]",
+      "/run/libvirt/qemu/eqemu-rtc4d96a00b4.pid",
+      "anon_inode:[signalfd]",
+      "anon_inode:[eventfd]",
+      "anon_inode:[eventfd]",
+      "/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/artifact.raw",
+      "/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/seed.iso",
+      "/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/fixture.iso",
+      "/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/runtime.iso",
+      "/dev/kvm",
+      "anon_inode:kvm-vm",
+      "socket:[727544474]",
+      "anon_inode:[eventfd]",
+      "anon_inode:[eventfd]",
+      "anon_inode:kvm-vcpu:0",
+      "anon_inode:kvm-vcpu-stats:0",
+      "anon_inode:kvm-vcpu:1",
+      "anon_inode:kvm-vcpu-stats:1",
+      "/var/lib/eqemu-test/runs/c4d96a00b4/consumer/data/root.raw",
+      "socket:[727604630]",
+      "socket:[727604631]"
+    ]
+  },
+  "resumed_at": 1790568486.7274215,
+  "stages": {
+    "mount-input": {
+      "state": "passed",
+      "at": 1790568616.4574256
+    },
+    "mount-runtime": {
+      "state": "passed",
+      "at": 1790568616.4807367
+    },
+    "signature-0": {
+      "state": "passed",
+      "at": 1790568622.173173
+    },
+    "signature-1": {
+      "state": "passed",
+      "at": 1790568622.1784003
+    },
+    "signature-2": {
+      "state": "passed",
+      "at": 1790568622.1842113
+    },
+    "apt-plan": {
+      "state": "passed",
+      "at": 1790568624.3423479
+    },
+    "apt-install": {
+      "state": "passed",
+      "at": 1790568636.2859533
+    },
+    "dpkg-audit": {
+      "state": "passed",
+      "at": 1790568636.4977517
+    },
+    "package-identities": {
+      "state": "passed",
+      "at": 1790568636.7041285
+    },
+    "artifact-mount": {
+      "state": "passed",
+      "at": 1790568636.7180653
+    },
+    "artifact-unmount": {
+      "state": "passed",
+      "at": 1790568657.6001928
+    },
+    "consumer-loader-0": {
+      "state": "passed",
+      "at": 1790568657.616463
+    },
+    "consumer-verify-0": {
+      "state": "passed",
+      "at": 1790568657.6222327
+    },
+    "consumer-loader-1": {
+      "state": "passed",
+      "at": 1790568657.6330438
+    },
+    "consumer-verify-1": {
+      "state": "passed",
+      "at": 1790568657.6389344
+    },
+    "consumer-loader-2": {
+      "state": "passed",
+      "at": 1790568657.6511788
+    },
+    "consumer-verify-2": {
+      "state": "passed",
+      "at": 1790568657.6569612
+    },
+    "consumer-loader-3": {
+      "state": "passed",
+      "at": 1790568657.6685355
+    },
+    "consumer-verify-3": {
+      "state": "passed",
+      "at": 1790568657.674139
+    },
+    "upstream-tests": {
+      "state": "passed",
+      "at": 1790568657.7647858
+    },
+    "runtime-package-plan": {
+      "state": "passed",
+      "at": 1790568658.345585
+    },
+    "runtime-service-mask": {
+      "state": "passed",
+      "at": 1790568658.4736922
+    },
+    "runtime-package-install": {
+      "state": "passed",
+      "at": 1790568665.5806582
+    },
+    "runtime-package-audit": {
+      "state": "passed",
+      "at": 1790568665.591272
+    },
+    "runtime-package-identities": {
+      "state": "passed",
+      "at": 1790568665.5990274
+    },
+    "runtime-perl-modules": {
+      "state": "passed",
+      "at": 1790568665.6225102
+    },
+    "startup-db-init": {
+      "state": "passed",
+      "at": 1790568674.892163
+    },
+    "startup-db-create": {
+      "state": "passed",
+      "at": 1790568675.4080765
+    },
+    "startup-import-content": {
+      "state": "passed",
+      "at": 1790568721.142724
+    },
+    "startup-import-login": {
+      "state": "passed",
+      "at": 1790568721.6233613
+    },
+    "startup-import-player": {
+      "state": "passed",
+      "at": 1790568722.0883465
+    },
+    "startup-import-state": {
+      "state": "passed",
+      "at": 1790568722.4273458
+    },
+    "startup-import-system": {
+      "state": "passed",
+      "at": 1790568722.958612
+    },
+    "startup-app-account": {
+      "state": "passed",
+      "at": 1790568723.7133315
+    },
+    "startup-fixture-settings": {
+      "state": "passed",
+      "at": 1790568723.7229195
+    },
+    "startup-fixture-policy": {
+      "state": "passed",
+      "at": 1790568723.7299187
+    },
+    "startup-content": {
+      "state": "passed",
+      "at": 1790568723.7719755
+    },
+    "startup-connections-before-shared": {
+      "state": "passed",
+      "at": 1790568723.7796738
+    },
+    "startup-shared-memory": {
+      "state": "passed",
+      "at": 1790568727.3310301
+    },
+    "startup-connections-after-shared": {
+      "state": "passed",
+      "at": 1790568727.434792
+    },
+    "startup-before-tables": {
+      "state": "passed",
+      "at": 1790568727.4446483
+    },
+    "startup-before-version": {
+      "state": "passed",
+      "at": 1790568727.4515257
+    },
+    "startup-before-bots": {
+      "state": "passed",
+      "at": 1790568727.4577851
+    },
+    "startup-before-players": {
+      "state": "passed",
+      "at": 1790568727.4691098
+    },
+    "startup-before-schema": {
+      "state": "passed",
+      "at": 1790568727.4841156
+    },
+    "startup-connections-ready": {
+      "state": "passed",
+      "at": 1790568728.7588608
+    },
+    "startup-health-0": {
+      "state": "passed",
+      "at": 1790568728.7688763
+    },
+    "startup-health-1": {
+      "state": "passed",
+      "at": 1790568733.786469
+    },
+    "startup-health-2": {
+      "state": "passed",
+      "at": 1790568738.8032837
+    },
+    "startup-health-3": {
+      "state": "passed",
+      "at": 1790568743.818761
+    },
+    "startup-health-4": {
+      "state": "passed",
+      "at": 1790568748.8350794
+    },
+    "startup-health-5": {
+      "state": "passed",
+      "at": 1790568753.8517423
+    },
+    "startup-health-6": {
+      "state": "passed",
+      "at": 1790568758.868774
+    },
+    "startup-health-7": {
+      "state": "passed",
+      "at": 1790568763.884552
+    },
+    "startup-health-8": {
+      "state": "passed",
+      "at": 1790568768.9004672
+    },
+    "startup-health-9": {
+      "state": "passed",
+      "at": 1790568773.915162
+    },
+    "startup-health-10": {
+      "state": "passed",
+      "at": 1790568778.9315414
+    },
+    "startup-health-11": {
+      "state": "passed",
+      "at": 1790568783.9490333
+    },
+    "startup-connections-before-shutdown": {
+      "state": "passed",
+      "at": 1790568788.9693344
+    },
+    "startup-after-tables": {
+      "state": "passed",
+      "at": 1790568789.1638389
+    },
+    "startup-after-version": {
+      "state": "passed",
+      "at": 1790568789.173432
+    },
+    "startup-after-bots": {
+      "state": "passed",
+      "at": 1790568789.1827927
+    },
+    "startup-after-players": {
+      "state": "passed",
+      "at": 1790568789.1941712
+    },
+    "startup-after-schema": {
+      "state": "passed",
+      "at": 1790568789.2111447
+    },
+    "startup-connections-after-shutdown": {
+      "state": "passed",
+      "at": 1790568789.2212625
+    }
+  },
+  "ready_at": 1790568616.4290097,
+  "serial_bytes": 177707,
+  "observations_untrusted": {
+    "utility": {
+      "version": 1,
+      "selected": 79,
+      "started": 79,
+      "completed": 79,
+      "failed": 0,
+      "finalized": true,
+      "passed": true
+    }
+  },
+  "reuse_untrusted": {
+    "kind": "reuse",
+    "ok": true,
+    "consumer": {
+      "identity": "3b021c4816aec69c5cb54f18e83f11741faed5b31d2c9bf213a050ede5261000",
+      "manifest_sha256": "0450955cbac44b100dfbb29bf30dd190160c1167f4cd2bd99279235b7e2e3e62",
+      "utility": {
+        "version": 1,
+        "selected": 79,
+        "started": 79,
+        "completed": 79,
+        "failed": 0,
+        "finalized": true,
+        "passed": true
+      },
+      "binaries": {
+        "shared_memory": "fb538841057c7d302d9e53409dcff2bf5877c11b009622d5fca43f10e7ae7649",
+        "tests": "aa2498d49b8c0154026300dc9a8d061d877dc679922cd3359390edd49a9d8dc9",
+        "world": "1e4f3b0badb934b01a720c8a70617de523f6bcfbfd4b77a8f751841752daac6d",
+        "zone": "28d9daf7b2e2b108f6a9c98a8167e457f6b600ea013a3f29258ccec7ddc14bc2"
+      },
+      "libraries": {
+        "/usr/lib/x86_64-linux-gnu/ld-linux-x86-64.so.2": "c20a2dc8917c755f02b94049356320fe1f62ac7d9f8994731f807d9df39302da",
+        "/usr/lib/x86_64-linux-gnu/libc.so.6": "3a15d66867d83762c7f2f1e37359cb8f6c5743edb369c65285cb0b1c4f7498bf",
+        "/usr/lib/x86_64-linux-gnu/libcrypt.so.1.1.0": "1502636e3be8232c9cf801dfb533694aea985d449904f3e1295db26d7b348946",
+        "/usr/lib/x86_64-linux-gnu/libgcc_s.so.1": "d93224d2b0dab4247598be683adca02f5cf00586f99c187579cd7e92058fb7cb",
+        "/usr/lib/x86_64-linux-gnu/libm.so.6": "fce00b6f25f459cf4ae0b7fae4257909a1a8a86f9149e7c029a5d617baf1ccd0",
+        "/usr/lib/x86_64-linux-gnu/libperl.so.5.38.2": "0b96743f48736a5d3558a2c08185447c568372b4542bcbb1006237b48f352cc4",
+        "/usr/lib/x86_64-linux-gnu/libstdc++.so.6.0.33": "1fd75fe70354a416d75aef22bcae68c47bd25d20e2d0568c30b1a9838cf62f11",
+        "/usr/lib/x86_64-linux-gnu/libuuid.so.1.3.0": "78d7f4d6f27b7dffc1c84dfe2f83e84aefa6f6ceeffc6ac4bc41f9fbc61cb84e"
+      },
+      "before_status": "eb4fcbb8f264b0e601ef4f79c92195d6dfb7b3a4cd07f25425fed92affae48d5",
+      "after_status": "3efc38e1a9fca07cb6324493b2f3062d186cd207e8fa10135abd5ee876b13ef1",
+      "readonly": true,
+      "unmounted": true,
+      "compiled": false
+    },
+    "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd"
+  },
+  "scenario_events_untrusted": [
+    {
+      "kind": "scenario-event",
+      "name": "setup",
+      "value": {
+        "fixture": "b51d4751fe2a31689dd906b392da1e24d9510e26418067b09788f43b78403b28",
+        "elapsed": 57.135
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568673.555209
+    },
+    {
+      "kind": "scenario-event",
+      "name": "service-start",
+      "value": {
+        "service": "database",
+        "pid": 2417,
+        "elapsed": 58.475
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568674.894621
+    },
+    {
+      "kind": "scenario-event",
+      "name": "database-connections",
+      "value": {
+        "phase": "before-shared",
+        "observation": "Aborted_clients\t0\nAborted_connects\t0\nThreads_connected\t1\n",
+        "elapsed": 107.361
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568723.782198
+    },
+    {
+      "kind": "scenario-event",
+      "name": "database-connections",
+      "value": {
+        "phase": "after-shared",
+        "observation": "Aborted_clients\t0\nAborted_connects\t0\nThreads_connected\t1\n",
+        "elapsed": 111.016
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568727.4373
+    },
+    {
+      "kind": "scenario-event",
+      "name": "service-start",
+      "value": {
+        "service": "world",
+        "pid": 2607,
+        "elapsed": 111.067
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568727.4864147
+    },
+    {
+      "kind": "scenario-event",
+      "name": "service-start",
+      "value": {
+        "service": "zone",
+        "pid": 2610,
+        "elapsed": 111.323
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568727.7422113
+    },
+    {
+      "kind": "scenario-event",
+      "name": "ready",
+      "value": {
+        "observed": [
+          "instance",
+          "registration",
+          "world_time",
+          "zone_boot"
+        ],
+        "zone_connection": true,
+        "elapsed": 112.329
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568728.7496202
+    },
+    {
+      "kind": "scenario-event",
+      "name": "database-connections",
+      "value": {
+        "phase": "ready",
+        "observation": "Aborted_clients\t0\nAborted_connects\t0\nThreads_connected\t4\n21\teqemu\t127.0.0.1:35466\tSleep\t\n22\teqemu\t127.0.0.1:35482\tSleep\t\n23\teqemu\t127.0.0.1:35488\tSleep\t\n",
+        "elapsed": 112.34
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568728.7623897
+    },
+    {
+      "kind": "scenario-event",
+      "name": "health",
+      "value": {
+        "duration": 60.196,
+        "samples": 12,
+        "elapsed": 172.537
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568788.957066
+    },
+    {
+      "kind": "scenario-event",
+      "name": "database-connections",
+      "value": {
+        "phase": "before-shutdown",
+        "observation": "Aborted_clients\t0\nAborted_connects\t0\nThreads_connected\t4\n21\teqemu\t127.0.0.1:35466\tSleep\t\n22\teqemu\t127.0.0.1:35482\tSleep\t\n23\teqemu\t127.0.0.1:35488\tSleep\t\n",
+        "elapsed": 172.55
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568788.9745047
+    },
+    {
+      "kind": "scenario-event",
+      "name": "service-stop",
+      "value": {
+        "service": "zone",
+        "return_code": 0,
+        "early_exit": false,
+        "forced": false,
+        "reason": "requested shutdown",
+        "capture_error": null,
+        "capture_complete": true,
+        "elapsed": 172.715
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568789.1368248
+    },
+    {
+      "kind": "scenario-event",
+      "name": "service-stop",
+      "value": {
+        "service": "world",
+        "return_code": 0,
+        "early_exit": false,
+        "forced": false,
+        "reason": "requested shutdown",
+        "capture_error": null,
+        "capture_complete": true,
+        "elapsed": 172.73
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568789.1516852
+    },
+    {
+      "kind": "scenario-event",
+      "name": "database-connections",
+      "value": {
+        "phase": "after-shutdown",
+        "observation": "Aborted_clients\t0\nAborted_connects\t0\nThreads_connected\t1\n",
+        "elapsed": 172.804
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568789.225179
+    },
+    {
+      "kind": "scenario-event",
+      "name": "checks-complete",
+      "value": {
+        "schema_unchanged": true,
+        "player_state_empty": true,
+        "shared": {
+          "items": {
+            "bytes": 156747856,
+            "sha256": "e0e68a0f5a4d232c62c90265590406d5962c68c2fd5ecb133b433dac2782d3eb"
+          },
+          "spells": {
+            "bytes": 46352076,
+            "sha256": "1fb22b3006bd905db33f8af97c9b2b9db7ae6e428bcd03346c7356fcd5703faa"
+          }
+        },
+        "elapsed": 172.808
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568789.2313511
+    },
+    {
+      "kind": "scenario-event",
+      "name": "service-stop",
+      "value": {
+        "service": "database",
+        "return_code": 0,
+        "early_exit": false,
+        "forced": false,
+        "reason": "requested shutdown",
+        "capture_error": null,
+        "capture_complete": true,
+        "elapsed": 174.266
+      },
+      "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd",
+      "host_received_at": 1790568790.6866858
+    }
+  ],
+  "diagnostic_streams_untrusted": {
+    "database": {
+      "next": 3,
+      "chunks": 3,
+      "meta": {
+        "input_bytes": 2807,
+        "retained_bytes": 2807,
+        "truncated": false
+      },
+      "bytes": 2807
+    },
+    "world": {
+      "next": 11,
+      "chunks": 11,
+      "meta": {
+        "input_bytes": 11104,
+        "retained_bytes": 11104,
+        "truncated": false
+      },
+      "bytes": 11104
+    },
+    "zone": {
+      "next": 32,
+      "chunks": 32,
+      "meta": {
+        "input_bytes": 37067,
+        "retained_bytes": 32768,
+        "truncated": true
+      },
+      "bytes": 32768
+    },
+    "last-command": {
+      "next": 1,
+      "chunks": 1,
+      "meta": {
+        "input_bytes": 57,
+        "retained_bytes": 57,
+        "truncated": false
+      },
+      "bytes": 57
+    }
+  },
+  "guest_report_untrusted": {
+    "kind": "result",
+    "version": 1,
+    "ok": true,
+    "diagnostic_only": true,
+    "accepted": false,
+    "scenario": {
+      "checks_completed": true,
+      "health_samples": 12,
+      "schema_sha256": "62aef1380c503e24ef3855405e440210a664730ecb9755493d4eb8ceebb9065d"
+    },
+    "first_failure": null,
+    "later_errors": [],
+    "evidence_complete": true,
+    "nonce": "a1dd4adc623a46f98f0bb8fcf5209cdd"
+  },
+  "diagnostic_complete": true,
+  "error": "Diagnostic-only replay is not accepted validation; inspect service evidence and database warning",
+  "finished_at": 1790568792.572028,
+  "resource_observations": {
+    "memory.peak": "4784861184",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0",
+    "cpu.stat": "usage_usec 94327287\nuser_usec 62515905\nsystem_usec 31811382\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 2621\nnr_throttled 24\nthrottled_usec 215925\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "cleanup": {
+    "complete": true,
+    "uuid": "0c1230c2-6292-4b59-8303-f2747a1154a0",
+    "started_at": 1790568792.622671,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "cgroup_absent": true,
+    "readonly_inputs_unchanged": true,
+    "artifact_input_unchanged": true,
+    "data_absent": true,
+    "finished_at": 1790568795.914746
+  },
+  "service_result": "exit-code"
+}

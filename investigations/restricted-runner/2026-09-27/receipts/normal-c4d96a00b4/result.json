@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "run_id": "c4d96a00b4",
+  "owner_uid": 997,
+  "terminal": true,
+  "accepted": false,
+  "diagnostic_only": true,
+  "diagnostic_complete": true,
+  "cleanup_complete": true,
+  "error": "Build attempt failed; inspect worker evidence",
+  "report_directory": "/var/lib/eqemu-test/reports/c4d96a00b4"
+}
