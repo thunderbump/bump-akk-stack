@@ -1,0 +1,39 @@
+{
+  "scope": "complete-source build and fresh consumer; unexecuted",
+  "accepted": false,
+  "input_id": "d981148767bab889d8390a6ef7b417aa11342c4c3197643cf12c73d6c46a086d",
+  "manifest_sha256": "dd5429fb1e07a22f6937752b369eb52d441a0d33cfe7c0dc4a6edbe4b73ca36d",
+  "build_id": "1499707f727a4a8af16c47a569b00a49612670ef17283a95261e0010bead44b6",
+  "sources": {
+    "investigations/artifact-handoff/2026-09-26/prepare.py": "16365176b7a4a1402cdf4323f5a78f79c2be943d1024337ec5db73c583c6111d",
+    "investigations/candidate-build/2026-09-28/guest_source.py": "1577a2414dcea2577b9b4142b8e37546224bbe10c5c3aae2d5127ebe0e7384ff",
+    "investigations/candidate-build/2026-09-28/prepare.py": "9782b2c2a717a3b8d7b4023fc3298b301425c45d48f2a6e0ddca64663edc2e56",
+    "investigations/candidate-build/2026-09-28/test_build.py": "265314d124384502f85f1d64835f4923cbbad69329f484d5dd6957351427deab",
+    "investigations/candidate-inputs/2026-09-28/inputs.py": "b70db6077289e1483b75fa2f5437514b6403e93dab982c275004c9fbe40d0310",
+    "investigations/candidate-inputs/2026-09-28/profile.json": "5e100ba572201ec9bf9bbbc8e57ec7468fce8b9f45e9bc1b0325d8ac0f98cdd3"
+  },
+  "worker_files": {
+    "producer-worker.py": "c198624cb718521d587fd0b4b2e81d2db19aedaeed73327219632f1ae23fb14f",
+    "consumer-worker.py": "9d15380adffaa9422dbfd7100219a17bcc4241fe294be6f6cecab98fe1e2d3a3"
+  },
+  "launcher_sha256": "29302f73e89d5514262f4c66db48775e626fb8ec7dee918169371af4dc6dd5ff",
+  "candidate_iso_bytes": 86743040,
+  "candidate_iso_sha256": "c9655e13db944900a047b8461a0eacd448eba3fa726bbf7cd77dba9d59a64b80",
+  "retention_bytes": 4294967296,
+  "retention_days": 7,
+  "vm_started": false,
+  "validation": {
+    "tests_passed": 20,
+    "static_check": {
+      "inputs_and_worker_verified": true,
+      "vm_started": false
+    },
+    "standards_remaining_findings": 0,
+    "spec_remaining_findings": 0,
+    "reviewed_commit": "94a33b08c4ffc7e9359762a7eb44fd4fbe300feb",
+    "root_attempt_exists": false,
+    "scratch_remaining": [],
+    "preparation_bytes": 87873186,
+    "free_disk_bytes": 253230661632
+  }
+}
