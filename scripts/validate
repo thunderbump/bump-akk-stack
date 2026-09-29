@@ -1,0 +1,155 @@
+#!/usr/bin/python3 -I
+"""Foreground diagnostic replay. Exact-candidate validation is not available yet."""
+import argparse
+import json
+import os
+from pathlib import Path
+import re
+import signal
+import stat
+import subprocess
+import time
+
+CLIENT = ('/usr/local/bin/eqemu-test',)
+REPORTS = Path('/var/lib/eqemu-test/reports')
+REQUEST_SECONDS = 370  # Installed client bounds its helper call at 360 seconds.
+WORK_SECONDS = 3300
+POLL_SECONDS = 3
+
+
+def emit(**value):
+    print(json.dumps(value, ensure_ascii=True), flush=True)
+
+
+def request(*args):
+    # Keep a helper handoff alive when AFK signals the validation process group.
+    # The installed helper and worker retain their own independent deadlines.
+    result = subprocess.run([*CLIENT, *args], capture_output=True, text=True,
+                            timeout=REQUEST_SECONDS, start_new_session=True)
+    if result.returncode:
+        raise RuntimeError(result.stderr[-2000:] or 'Runner request failed')
+    value = json.loads(result.stdout)
+    if not isinstance(value, dict):
+        raise ValueError('Runner response must be an object')
+    return value
+
+
+def checked_report(value, run_id):
+    if (value.get('run_id') != run_id or value.get('version') != 1
+            or value.get('accepted') is not False
+            or value.get('diagnostic_only') is not True
+            or value.get('report_directory') != str(REPORTS / run_id)
+            or any(type(value.get(key)) is not bool for key in
+                   ('terminal', 'diagnostic_complete', 'cleanup_complete'))):
+        raise ValueError('Runner report identity or diagnostic flags are invalid')
+    return value
+
+
+def read_report(path, tail=False):
+    # Fixed names only. Reject FIFOs and links without blocking on open.
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 1024 * 1024:
+            raise ValueError('Report is not a bounded regular file')
+        if tail:
+            stream.seek(max(0, info.st_size - 8192))
+        data = stream.read(1024 * 1024 + 1)
+        if len(data) > 1024 * 1024:
+            raise ValueError('Report grew beyond its size limit')
+    return data.decode('utf-8', errors='replace')
+
+
+def diagnostics(run_id):
+    directory = REPORTS / run_id
+    worker = json.loads(read_report(directory / 'worker.json'))
+    guest = worker.get('guest_report_untrusted', {})
+    emit(event='diagnostics', run_id=run_id,
+         worker_error=str(worker.get('error'))[:2000],
+         guest_first_failure=str(guest.get('first_failure'))[:2000],
+         excerpt=read_report(directory / 'diagnostics.jsonl', tail=True),
+         excerpt_is_untrusted=True, excerpt_is_tail=True)
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--diagnostic', action='store_true',
+                        help='replay the retained build; always exits nonzero')
+    args = parser.parse_args(argv)
+    if not args.diagnostic:
+        emit(event='final', accepted=False, cleanup_complete=None,
+             candidate_revision=None, build_identity=None, run_id=None,
+             reason='Exact-candidate validation is unavailable; use --diagnostic for replay')
+        return 2
+
+    interrupted = None
+
+    def stop(signum, _frame):
+        nonlocal interrupted
+        if interrupted is None:
+            interrupted = signum
+
+    previous = {s: signal.signal(s, stop) for s in
+                (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)}
+    run_id = None
+    report = None
+    error = None
+    cleanup_error = None
+    cancel_attempted = False
+    deadline = time.monotonic() + WORK_SECONDS
+    try:
+        if interrupted is not None:
+            raise RuntimeError('Interrupted before submission')
+        admission = request('run', 'startup-diagnostic', '--detach')
+        candidate_id = admission.get('run_id')
+        if not isinstance(candidate_id, str) or not re.fullmatch('[0-9a-f]{10}', candidate_id):
+            raise ValueError('Admission did not return a valid run ID; cleanup is unknown')
+        run_id = candidate_id
+        emit(event='submitted', run_id=run_id, accepted=False)
+        if admission.get('started') is not True or admission.get('accepted') is not False:
+            raise ValueError('Invalid diagnostic admission response')
+        while True:
+            if interrupted is not None or time.monotonic() >= deadline:
+                error = 'Interrupted' if interrupted is not None else 'Diagnostic work deadline reached'
+                cancel_attempted = True
+                report = checked_report(request('cancel', run_id), run_id)
+                break
+            report = checked_report(request('status', run_id), run_id)
+            if report['terminal']:
+                break
+            time.sleep(POLL_SECONDS)
+    except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+        error = str(exc)[:2000]
+    finally:
+        # On report/request failure, cancel only the admitted run. Do not retry
+        # cancellation indefinitely or infer cleanup from a dead client.
+        if run_id and not cancel_attempted and (report is None or not report['terminal']):
+            cancel_attempted = True
+            try:
+                report = checked_report(request('cancel', run_id), run_id)
+            except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
+                cleanup_error = str(exc)[:2000]
+                report = None
+        try:
+            if run_id and report is not None and report['terminal']:
+                try:
+                    diagnostics(run_id)
+                except (OSError, ValueError, AttributeError) as exc:
+                    error = error or str(report.get('error') or 'Diagnostic report incomplete')[:2000]
+                    cleanup_error = cleanup_error or 'Diagnostic capture failed: ' + str(exc)[:2000]
+            emit(event='final', run_id=run_id, accepted=False, diagnostic_only=True,
+                 candidate_revision=None, build_identity=None,
+                 terminal=report['terminal'] if report else None,
+                 diagnostic_complete=report['diagnostic_complete'] if report else None,
+                 cleanup_complete=report['cleanup_complete'] if report else None,
+                 reason=error or str((report or {}).get('error') or 'Diagnostic replay cannot accept a candidate')[:2000],
+                 secondary_error=cleanup_error,
+                 report_directory=str(REPORTS / run_id) if run_id else None)
+        finally:
+            for signum, handler in previous.items():
+                signal.signal(signum, handler)
+    return 128 + interrupted if interrupted is not None else 2
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

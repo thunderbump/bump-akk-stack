@@ -1,0 +1,6 @@
+{
+  "command": ["./scripts/validate", "--diagnostic"],
+  "timeout_seconds": 4200,
+  "termination_grace_seconds": 780,
+  "repairable_exit_codes": [1]
+}
