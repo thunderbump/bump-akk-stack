@@ -41,7 +41,10 @@ class Contract(unittest.TestCase):
                 'guest_report_untrusted':{
             'ok':False,'error':'server-build: exit 1\ncompiler error'}}
         self.assertEqual(common.outcome({}, {'producer':worker},True),1)
-        for error in ('server-build: deadline exceeded','No completion','server-build: exit 1\nNo space left on device',
+        for crash in (-4,-6,-7,-8,-11):
+            worker['guest_report_untrusted']['error']='upstream-tests: exit '+str(crash)+'\ncrashed'
+            self.assertEqual(common.outcome({}, {'producer':worker},True),1)
+        for error in ('upstream-tests: exit -9\nkilled','server-build: deadline exceeded','No completion','server-build: exit 1\nNo space left on device',
                       'server-build: exit 1\nKilled signal terminated program cc1plus'):
             worker['guest_report_untrusted']['error']=error
             self.assertEqual(common.outcome({}, {'producer':worker},True),2)

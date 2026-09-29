@@ -187,8 +187,9 @@ def dispatch(request,uid):
     with (BASE/'request.lock').open('r+') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         if request['op']=='run':
-            if S.read_json(BASE/'installation.json').get('enabled') is not True:
-                raise ValueError('Build admission disabled')
+            installation=S.read_json(BASE/'installation.json')
+            if installation.get('enabled') is not True or installation.get('version')!=str(HERE):
+                raise ValueError('Build admission disabled or installation changed')
             return start(request,uid)
         root,record = owner(request['run_id'],uid)
         if request['op']=='cancel' and 'recipe' in record:

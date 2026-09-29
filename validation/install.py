@@ -9,6 +9,8 @@ from pathlib import Path
 import pwd
 import re
 import shutil
+import stat
+import types
 import subprocess
 import sys
 
@@ -21,21 +23,36 @@ POLICY=Path('/etc/sudoers.d/eqemu-build')
 RULE='%eqemu-test ALL=(root) NOPASSWD: NOSETENV: /usr/local/sbin/eqemu-build-request ""\n'
 
 
+def verified_package(directory):
+    # Bootstrap without importing any code from the mutable preparation directory.
+    def read(path,limit):
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        with os.fdopen(fd,'rb') as stream:
+            info=os.fstat(stream.fileno())
+            if not stat.S_ISREG(info.st_mode) or info.st_size>limit:raise ValueError('Invalid package file')
+            data=stream.read(limit+1)
+            if len(data)>limit:raise ValueError('Package file grew')
+            return data
+    raw=read(directory/'manifest.json',16384)
+    manifest=json.loads(raw);package={}
+    for name,digest in manifest['files'].items():
+        if not re.fullmatch('[a-zA-Z0-9_.-]+',name):raise ValueError('Invalid package name')
+        data=read(directory/name,256*1024)
+        if hashlib.sha256(data).hexdigest()!=digest:raise ValueError('Package changed: '+name)
+        package[name]=data
+    return raw,package
+
+
 def install():
     if os.geteuid()!=0 or len(sys.argv)!=1:
         raise ValueError('Run this reviewed installer once with sudo; no arguments')
     os.umask(0o077)
     # This package is explicitly reviewed by the administrator. Its hashes detect
     # changes after preparation; they are not a substitute for that review.
-    spec=importlib.util.spec_from_file_location('installer_support',HERE/'installer_support.py')
-    support=importlib.util.module_from_spec(spec);spec.loader.exec_module(support)
-    raw=support.regular_bytes(HERE/'manifest.json',16384)
-    manifest=json.loads(raw);package={}
-    for name,digest in manifest['files'].items():
-        if not re.fullmatch('[a-zA-Z0-9_.-]+',name):raise ValueError('Invalid package name')
-        data=support.regular_bytes(HERE/name,256*1024)
-        if hashlib.sha256(data).hexdigest()!=digest:raise ValueError('Package changed: '+name)
-        package[name]=data
+    raw,package=verified_package(HERE)
+    support=types.ModuleType('installer_support')
+    support.__file__=str(HERE/'installer_support.py')
+    exec(compile(package['installer_support.py'],support.__file__,'exec'),support.__dict__)
     account=pwd.getpwnam('bump');group=grp.getgrnam('eqemu-test')
     if account.pw_name not in group.gr_mem and account.pw_gid!=group.gr_gid:
         raise ValueError('Existing diagnostic submitter group is required')

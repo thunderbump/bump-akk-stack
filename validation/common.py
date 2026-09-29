@@ -80,7 +80,8 @@ def outcome(summary, workers, clean):
     error = guest.get('error', '')
     if (guest.get('ok') is False and producer.get('checks', {}).get('host_pre_resume') is True
             and isinstance(error, str)
-            and re.match(r'^(configure|server-build|runner-control-build|upstream-tests): exit [1-9][0-9]*\n', error)
+            and (re.match(r'^(configure|server-build|runner-control-build|upstream-tests): exit [1-9][0-9]*\n', error)
+                 or re.match(r'^upstream-tests: exit -(4|6|7|8|11)\n', error))
             and not re.search(r'(?i)out of memory|cannot allocate memory|no space left|killed signal', error)):
         return 1
     return 2
