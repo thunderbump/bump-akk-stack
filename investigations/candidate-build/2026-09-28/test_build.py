@@ -92,6 +92,18 @@ class CompleteSource(unittest.TestCase):
 
 
 class Binding(unittest.TestCase):
+    def test_publication_preserves_concurrently_created_destinations(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp); stage=root/'stage'; stage.mkdir(); (stage/'input').write_text('new')
+            output=root/'output'; output.mkdir(); launcher=root/'launcher'; launcher.write_text('operator')
+            with self.assertRaises(FileExistsError): P.publish(stage,output,launcher,'new launcher')
+            self.assertEqual(launcher.read_text(),'operator')
+            self.assertEqual((stage/'input').read_text(),'new')
+            output.rmdir()
+            with self.assertRaises(FileExistsError): P.publish(stage,output,launcher,'new launcher')
+            self.assertEqual(launcher.read_text(),'operator')
+            self.assertEqual((output/'input').read_text(),'new')
+
     def test_identity_changes_with_source_dependency_recipe_or_options(self):
         receipt={'input_id':'a','manifest_sha256':'b'}; profile={'jobs':1,'base':'c'}; sources={'adapter':'d'}; template={'worker':'e'}
         original=P.build_identity(receipt,profile,sources,template)

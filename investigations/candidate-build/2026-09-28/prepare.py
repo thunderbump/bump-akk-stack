@@ -58,6 +58,15 @@ def build_identity(receipt, profile, sources, template):
         'adapter_sources': sources, 'template': template})
 
 
+def publish(stage, output, launcher, suite):
+    """Claim destinations exclusively; retain the package if launcher publication refuses."""
+    output.mkdir(mode=0o700)
+    for path in stage.iterdir():
+        path.rename(output/path.name)
+    with launcher.open('x') as stream:
+        stream.write(suite)
+
+
 def prepare():
     if any(p.exists() or p.is_symlink() for p in [OUTPUT, LAUNCHER, ROOT]):
         raise RuntimeError('Preserve existing preparation/attempt')
@@ -148,8 +157,7 @@ def prepare():
         (stage/'preparation.json').write_text(json.dumps(proof, indent=2)+'\n')
         # Destination is claimed only after every generated file and input check passes.
         inputs.check_dependencies(profile, LOCAL)
-        stage.rename(OUTPUT)
-        LAUNCHER.write_text(suite)
+        publish(stage, OUTPUT, LAUNCHER, suite)
     print(json.dumps({'prepared': str(OUTPUT), 'launcher': str(LAUNCHER), 'vm_started': False}))
 
 
