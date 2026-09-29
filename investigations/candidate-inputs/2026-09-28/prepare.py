@@ -10,6 +10,7 @@ import signal
 import sys
 import time
 
+sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('candidate_inputs', HERE / 'inputs.py')
 inputs = importlib.util.module_from_spec(spec)

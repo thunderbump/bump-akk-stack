@@ -73,10 +73,10 @@ class GitTree:
         return subprocess.run(argv, env=self.env, check=True, stderr=subprocess.PIPE,
                               stdout=kwargs.pop('stdout', subprocess.PIPE), timeout=60, **kwargs).stdout
 
-    def location(self, argument):
+    def location(self, *arguments):
         # rev-parse reads repository metadata; it does not run hooks or filters.
         return self.run(['/usr/bin/git', '-C', str(self.repo), 'rev-parse',
-                         '--path-format=absolute', argument]).decode().strip()
+                         '--path-format=absolute', *arguments]).decode().strip()
 
     def git(self, *args, **kwargs):
         return self.run(['/usr/bin/git', '--git-dir=' + str(self.gitdir), *args], **kwargs)
@@ -110,6 +110,34 @@ class GitTree:
         if self.location('HEAD') != commit:
             raise ValueError('Source HEAD mismatch')
         expected = {e['path']: e for e in entries}
+        # Inspect a bounded index snapshot through the isolated Git view. Reading
+        # raw checkout bytes alone misses staged edits whose worktree was restored.
+        index = Path(self.location('--git-path', 'index'))
+        snapshot = self.gitdir / 'candidate-index'
+        with regular(index, 16 * 1024**2) as (stream, _):
+            data = stream.read(16 * 1024**2 + 1)
+        if len(data) > 16 * 1024**2:
+            raise ValueError('Index exceeds budget')
+        snapshot.write_bytes(data)
+        self.env['GIT_INDEX_FILE'] = str(snapshot)
+        try:
+            staged = {}
+            for record in self.git('ls-files', '--stage', '-z').split(b'\0'):
+                if not record:
+                    continue
+                meta, path = record.split(b'\t', 1)
+                mode, blob, stage = meta.decode().split()
+                name = path.decode()
+                if stage != '0' or name in staged:
+                    raise ValueError('Unmerged source index')
+                staged[name] = (mode, blob)
+        finally:
+            del self.env['GIT_INDEX_FILE']
+            snapshot.unlink()
+        expected_index = {e['path']: (e['mode'], e['blob']) for e in entries}
+        expected_index.update({path: ('160000', commit) for path, commit in links.items()})
+        if staged != expected_index:
+            raise ValueError('Dirty source index')
         found = set()
         for parent, dirs, files in os.walk(self.repo, followlinks=False):
             rel = Path(parent).relative_to(self.repo)

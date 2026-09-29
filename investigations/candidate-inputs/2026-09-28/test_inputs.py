@@ -117,6 +117,24 @@ class InputProofTest(unittest.TestCase):
                 path.chmod(0o644)
                 (eq / 'ignored').unlink(missing_ok=True)
 
+    def test_staged_only_edits_gitlinks_and_unmerged_index_refuse(self):
+        eq = self.repositories['eqemu']
+        path = eq / 'code.cpp'
+        original = path.read_bytes()
+        path.write_text('staged edit')
+        self.git(eq, 'add', 'code.cpp')
+        path.write_bytes(original)
+        self.assert_refuses()
+        self.git(eq, 'read-tree', 'HEAD')
+        self.git(eq, 'update-index', '--cacheinfo', '160000,' + '1' * 40 + ',submodules/vcpkg')
+        self.assert_refuses()
+        self.git(eq, 'read-tree', 'HEAD')
+        blob = self.git(eq, 'rev-parse', 'HEAD:code.cpp').strip()
+        subprocess.run(['git', '-C', str(eq), 'update-index', '--index-info'],
+                       input='0 ' + '0' * 40 + '\tcode.cpp\n100644 ' + blob + ' 1\tcode.cpp\n',
+                       text=True, check=True, capture_output=True)
+        self.assert_refuses()
+
     def test_archive_attributes_cannot_omit_or_rewrite_tracked_bytes(self):
         eq = self.repositories['eqemu']
         for attribute in ('export-ignore', 'export-subst'):
@@ -149,6 +167,12 @@ class InputProofTest(unittest.TestCase):
         receipt = self.prepare()
         self.verify(receipt)
         shutil.rmtree(self.output)
+        original = (path / 'code.cpp').read_bytes()
+        (path / 'code.cpp').write_text('staged submodule change')
+        self.git(path, 'add', 'code.cpp')
+        (path / 'code.cpp').write_bytes(original)
+        self.assert_refuses()
+        self.git(path, 'read-tree', 'HEAD')
         (path / 'code.cpp').write_text('dirty')
         self.assert_refuses()
         self.commit(path)
