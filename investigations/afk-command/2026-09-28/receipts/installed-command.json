@@ -1,0 +1,130 @@
+{
+  "scope": "One installed diagnostic through standalone AFK, never candidate acceptance",
+  "command_revision": "c67bb2f681416a6e4035832154cf25bcfab5ad32",
+  "afk_revision": "eb5b2c231cce3b35e9d6fefd57fe1f3d889633c8",
+  "invocation": [
+    "python3",
+    "-B",
+    "-m",
+    "afk_validate",
+    "/tmp/eqemu-afk-installed-zr4glpic/input.json",
+    "/tmp/eqemu-afk-installed-zr4glpic/afk"
+  ],
+  "caller_uid": 1000,
+  "validation_input": {
+    "command": [
+      "./scripts/validate",
+      "--diagnostic"
+    ],
+    "timeout_seconds": 4200,
+    "termination_grace_seconds": 780,
+    "repairable_exit_codes": [
+      1
+    ],
+    "schema_version": 1,
+    "workspace": "/home/bump/Projects/bump-eqemu/diagnostic-validation"
+  },
+  "afk_output": {
+    "schema_version": 1,
+    "outcome": "failed",
+    "started_at": "2026-09-29T00:39:03.633928Z",
+    "finished_at": "2026-09-29T00:44:52.549386Z",
+    "duration_seconds": 348.915,
+    "process": {
+      "exit_code": 2,
+      "signal": null
+    },
+    "repository": {
+      "before": {
+        "head": "c67bb2f681416a6e4035832154cf25bcfab5ad32",
+        "branch": "investigations/diagnostic-validation-20260928",
+        "dirty": false,
+        "status": []
+      },
+      "after": {
+        "head": "c67bb2f681416a6e4035832154cf25bcfab5ad32",
+        "branch": "investigations/diagnostic-validation-20260928",
+        "dirty": false,
+        "status": []
+      },
+      "head_changed": false
+    },
+    "artifacts": {
+      "stdout": "stdout.log",
+      "stderr": "stderr.log"
+    }
+  },
+  "command_final": {
+    "event": "final",
+    "run_id": "3e46afb9e0",
+    "accepted": false,
+    "diagnostic_only": true,
+    "candidate_revision": null,
+    "build_identity": null,
+    "terminal": true,
+    "diagnostic_complete": true,
+    "cleanup_complete": true,
+    "reason": "Build attempt failed; inspect worker evidence",
+    "secondary_error": null,
+    "report_directory": "/var/lib/eqemu-test/reports/3e46afb9e0"
+  },
+  "runner_result": {
+    "version": 1,
+    "run_id": "3e46afb9e0",
+    "owner_uid": 1000,
+    "terminal": true,
+    "accepted": false,
+    "diagnostic_only": true,
+    "diagnostic_complete": true,
+    "cleanup_complete": true,
+    "error": "Build attempt failed; inspect worker evidence",
+    "report_directory": "/var/lib/eqemu-test/reports/3e46afb9e0"
+  },
+  "worker_cleanup": {
+    "complete": true,
+    "uuid": "c5bcd884-ec5b-43c6-aea7-0fd9809977ef",
+    "started_at": 1790642685.9774115,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "cgroup_absent": true,
+    "readonly_inputs_unchanged": true,
+    "artifact_input_unchanged": true,
+    "data_absent": true,
+    "finished_at": 1790642689.2523646
+  },
+  "diagnostic_worker_error": "Diagnostic-only replay is not accepted validation; inspect service evidence and database warning",
+  "guest_report_untrusted": {
+    "kind": "result",
+    "version": 1,
+    "ok": true,
+    "diagnostic_only": true,
+    "accepted": false,
+    "scenario": {
+      "checks_completed": true,
+      "health_samples": 12,
+      "schema_sha256": "62aef1380c503e24ef3855405e440210a664730ecb9755493d4eb8ceebb9065d"
+    },
+    "first_failure": null,
+    "later_errors": [],
+    "evidence_complete": true,
+    "nonce": "ff80a0c9f3194168b2cd2fb283d8464b"
+  },
+  "repairable": false,
+  "repair_rejection": "Validation exit code is not eligible for repair",
+  "command_output_bytes": 9166,
+  "stdout_sha256": "a9fe6000f284c6fe64f6e1f454f70e0335651aff66ddeb86d5c585e9e39f84f8",
+  "stderr_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "actionable_worker_error_captured": true,
+  "synthetic_tests": {
+    "passed": 11,
+    "seconds": 4.769,
+    "log_sha256": "cc6d2c4950ce01248fcb302f8a03430685cceb1058feb32d6a1d86a307a24b32"
+  },
+  "reviews": {
+    "standards_findings": 0,
+    "spec_findings": 0
+  },
+  "checks_passed": true,
+  "validator_exit_code": 1
+}
