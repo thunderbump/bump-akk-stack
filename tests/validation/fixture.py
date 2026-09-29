@@ -19,7 +19,7 @@ def client(root, op):
     if op == 'run':
         print(json.dumps(dict(started=True, run_id=RUN_ID, accepted=False)))
         return 0
-    if case == 'interrupt' and op == 'status':
+    if case.startswith('interrupt') and op == 'status':
         (root / 'in-request').touch()
         time.sleep(0.5)
     if case == 'request-error' and op == 'status':
@@ -28,8 +28,11 @@ def client(root, op):
     if case == 'cancel-error' and op in ('status', 'cancel'):
         print('Synthetic ' + op + ' unavailable', file=sys.stderr)
         return 1
+    if case in ('deadline-cancel-error', 'interrupt-cancel-error') and op == 'cancel':
+        print('Synthetic cancel unavailable', file=sys.stderr)
+        return 1
     report = dict(version=1, run_id=RUN_ID, accepted=False, diagnostic_only=True,
-                  terminal=op == 'cancel' or case not in ('interrupt', 'deadline'),
+                  terminal=op == 'cancel' or not case.startswith(('interrupt', 'deadline')),
                   diagnostic_complete=case != 'interrupt', cleanup_complete=True,
                   error='Synthetic database warning', report_directory=str(root / RUN_ID))
     if not report['terminal'] or case == 'cleanup-incomplete':
@@ -51,7 +54,7 @@ def launch(root):
     module.CLIENT = (sys.executable, '-B', str(Path(__file__).resolve()), 'client', str(root))
     module.REPORTS = root
     module.POLL_SECONDS = 0.02
-    module.WORK_SECONDS = 0.15 if (root / 'case').read_text() == 'deadline' else 10
+    module.WORK_SECONDS = 0.15 if (root / 'case').read_text().startswith('deadline') else 10
     module.REQUEST_SECONDS = 3
     return module.main(['--diagnostic'])
 

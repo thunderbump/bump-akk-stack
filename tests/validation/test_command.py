@@ -95,12 +95,19 @@ class CommandTest(unittest.TestCase):
         self.assertIn('deadline', final['reason'])
         self.assertTrue(final['cleanup_complete'])
 
+    def test_deadline_cancel_failure_preserves_reason_and_unknown_cleanup(self):
+        final = self.check_result(self.run_case('deadline-cancel-error'))
+        self.assertIn('deadline', final['reason'])
+        self.assertIn('cancel unavailable', final['secondary_error'])
+        self.assertIsNone(final['cleanup_complete'])
+
     def test_process_group_interruption_preserves_inflight_request_and_cancels(self):
-        for sig in (signal.SIGINT, signal.SIGTERM):
-            with self.subTest(signal=sig):
+        for sig, case in ((signal.SIGINT, 'interrupt'), (signal.SIGTERM, 'interrupt'),
+                          (signal.SIGTERM, 'interrupt-cancel-error')):
+            with self.subTest(signal=sig, case=case):
                 marker = self.root / 'in-request'
                 marker.unlink(missing_ok=True)
-                process = subprocess.Popen(self.argv('interrupt'), stdout=subprocess.PIPE,
+                process = subprocess.Popen(self.argv(case), stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE, text=True, start_new_session=True)
                 try:
                     deadline = time.monotonic() + 3
@@ -111,7 +118,12 @@ class CommandTest(unittest.TestCase):
                     stdout, stderr = process.communicate(timeout=5)
                     result = subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
                     final = self.check_result(result, 128 + sig)
-                    self.assertTrue(final['cleanup_complete'])
+                    if case == 'interrupt-cancel-error':
+                        self.assertEqual(final['reason'], 'Interrupted')
+                        self.assertIn('cancel unavailable', final['secondary_error'])
+                        self.assertIsNone(final['cleanup_complete'])
+                    else:
+                        self.assertTrue(final['cleanup_complete'])
                 finally:
                     if process.poll() is None:
                         process.kill()

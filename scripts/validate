@@ -95,7 +95,6 @@ def main(argv=None):
     report = None
     error = None
     cleanup_error = None
-    cancel_attempted = False
     deadline = time.monotonic() + WORK_SECONDS
     try:
         if interrupted is not None:
@@ -111,8 +110,6 @@ def main(argv=None):
         while True:
             if interrupted is not None or time.monotonic() >= deadline:
                 error = 'Interrupted' if interrupted is not None else 'Diagnostic work deadline reached'
-                cancel_attempted = True
-                report = checked_report(request('cancel', run_id), run_id)
                 break
             report = checked_report(request('status', run_id), run_id)
             if report['terminal']:
@@ -123,8 +120,7 @@ def main(argv=None):
     finally:
         # On report/request failure, cancel only the admitted run. Do not retry
         # cancellation indefinitely or infer cleanup from a dead client.
-        if run_id and not cancel_attempted and (report is None or not report['terminal']):
-            cancel_attempted = True
+        if run_id and (report is None or not report['terminal']):
             try:
                 report = checked_report(request('cancel', run_id), run_id)
             except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as exc:
