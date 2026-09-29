@@ -1,0 +1,14 @@
+{
+  "observed_at": "2026-09-29T03:04:24.704417+00:00",
+  "report_hashes_match_suite": true,
+  "systemd": "MainPID=0\nResult=success\nId=eqemu-vm-candidate-build-01-suite.service\nActiveState=inactive\nSubState=dead\n\nMainPID=0\nResult=success\nId=eqemu-vm-cb-prod01-worker.service\nActiveState=inactive\nSubState=dead\n\nMainPID=0\nResult=success\nId=eqemu-vm-cb-cons01-worker.service\nActiveState=inactive\nSubState=dead\n",
+  "absent_paths": [
+    "/var/lib/eqemu-vm-proof/candidate-build-01/producer/data",
+    "/run/systemd/system/eqemuvmcandidatebuildprod01worker.slice",
+    "/sys/fs/cgroup/eqemuvmcandidatebuildprod01worker.slice",
+    "/var/lib/eqemu-vm-proof/candidate-build-01/consumer/data",
+    "/run/systemd/system/eqemuvmcandidatebuildcons01worker.slice",
+    "/sys/fs/cgroup/eqemuvmcandidatebuildcons01worker.slice"
+  ],
+  "privileged_reinspection": "Direct libvirt and retained-artifact access unavailable to this user. Root-owned suite and worker receipts provide domain/profile absence, input integrity and retention evidence; no new privileged check or artifact rehash was performed."
+}

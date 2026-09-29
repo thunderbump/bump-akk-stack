@@ -1,0 +1,27 @@
+{
+  "active": {},
+  "released": [
+    {
+      "state": "active",
+      "name": "eqemu-cb-prod01",
+      "worker_sha256": "c198624cb718521d587fd0b4b2e81d2db19aedaeed73327219632f1ae23fb14f",
+      "admission": {
+        "free_bytes": 253232439296,
+        "free_inodes": 49716705,
+        "mem_available": 25445236736
+      },
+      "uuid": "495008de-5111-4b1b-bc17-7cd76032a2eb"
+    },
+    {
+      "state": "active",
+      "name": "eqemu-cb-cons01",
+      "worker_sha256": "9d15380adffaa9422dbfd7100219a17bcc4241fe294be6f6cecab98fe1e2d3a3",
+      "admission": {
+        "free_bytes": 248940556288,
+        "free_inodes": 49716687,
+        "mem_available": 25632452608
+      },
+      "uuid": "bdc443b8-f358-4230-a6e4-cc14bb36aa4a"
+    }
+  ]
+}

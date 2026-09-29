@@ -1,0 +1,64 @@
+{
+  "accepted": false,
+  "input_id": "d981148767bab889d8390a6ef7b417aa11342c4c3197643cf12c73d6c46a086d",
+  "build_id": "1499707f727a4a8af16c47a569b00a49612670ef17283a95261e0010bead44b6",
+  "suite_passed": true,
+  "cases_passed": true,
+  "cases": {
+    "producer": {
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "host_pre_resume": true,
+        "workload": true,
+        "service": true,
+        "cleanup": true,
+        "cleanup_time": true,
+        "absence": true,
+        "quiescent": true,
+        "artifact_eligible": true
+      },
+      "report_sha256": "fe3fd7155e98b9276158daeade6a63da0160a7ec97679f2ff293ba8f34487a44",
+      "cleanup_sha256": "533a57bbf99fbe75d4a9d9eb8fb747754385ce429444913375579c3c957e25c2"
+    },
+    "consumer": {
+      "case_passed": true,
+      "checks": {
+        "identity": true,
+        "host_pre_resume": true,
+        "workload": true,
+        "service": true,
+        "cleanup": true,
+        "cleanup_time": true,
+        "absence": true,
+        "quiescent": true,
+        "artifact_input_unchanged": true
+      },
+      "report_sha256": "abab50187788e669d7b536aaf437b6a96ec2a634baeb502273c9088f41f6b98a",
+      "cleanup_sha256": "069eadd821d642129cae3ffb13ac8c991e8f36feb147144833e717125c92f6bd"
+    }
+  },
+  "started_at": 1790647131.9374988,
+  "finished_at": 1790649334.4226372,
+  "cleanup": {
+    "complete": true,
+    "rescued": [],
+    "started_at": 1790649334.4925437,
+    "controller_budget": {
+      "memory.max": "1073741824",
+      "memory.swap.max": "0",
+      "memory.current": "26996736",
+      "memory.peak": "1073627136",
+      "memory.events": "low 0\nhigh 0\nmax 28589\noom 0\noom_kill 0\noom_group_kill 0"
+    },
+    "controller_slice_file_absent": true,
+    "artifact_retained": {
+      "bytes": 4294967296,
+      "sha256": "187b0119f6bc51a281522acffee13a482b7a436d0af6d4c589e2e3a663b4bfae",
+      "manifest_sha256": "6527d1046996747a7b556ec5afb390354fa17ae34e6c043012c3bd1c572ab005",
+      "expires_at": 1791254134.7990267
+    },
+    "finished_at": 1790649334.7992218
+  },
+  "service_result": "success"
+}
