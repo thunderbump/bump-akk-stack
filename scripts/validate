@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""Foreground diagnostic replay. Exact-candidate validation is not available yet."""
+"""Foreground VM validation, with an explicit non-accepting diagnostic replay."""
 import argparse
 import json
 import os
@@ -75,12 +75,16 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--diagnostic', action='store_true',
                         help='replay the retained build; always exits nonzero')
+    parser.add_argument('--source', type=Path, default=Path.cwd(), help='clean EQEmu checkout for build/unit validation')
     args = parser.parse_args(argv)
     if not args.diagnostic:
-        emit(event='final', accepted=False, cleanup_complete=None,
-             candidate_revision=None, build_identity=None, run_id=None,
-             reason='Exact-candidate validation is unavailable; use --diagnostic for replay')
-        return 2
+        command = Path('/usr/local/bin/eqemu-validate')
+        if not command.is_file():
+            emit(event='final', accepted=False, cleanup_complete=None,
+                 candidate_revision=None, build_identity=None, run_id=None,
+                 reason='Current-candidate build helper is not installed')
+            return 2
+        os.execv(str(command), [str(command), '--source', str(args.source.resolve())])
 
     interrupted = None
 

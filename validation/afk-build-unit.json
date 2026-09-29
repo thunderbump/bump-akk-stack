@@ -1,0 +1,6 @@
+{
+  "command": ["/usr/local/bin/eqemu-validate"],
+  "timeout_seconds": 20400,
+  "termination_grace_seconds": 780,
+  "repairable_exit_codes": [1]
+}
