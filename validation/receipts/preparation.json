@@ -1,0 +1,52 @@
+{
+  "scope": "prepared current-candidate build/unit adapter; installation and real VM run pending",
+  "candidate": {
+    "candidate": "1c561d442638b3da8d20e93ac105f98a227d37f2",
+    "tree": "6dce3fcc9a67242a7839d8ba5dd1ee9217c189a8",
+    "input_id": "d981148767bab889d8390a6ef7b417aa11342c4c3197643cf12c73d6c46a086d",
+    "manifest_sha256": "dd5429fb1e07a22f6937752b369eb52d441a0d33cfe7c0dc4a6edbe4b73ca36d",
+    "iso_bytes": 86743040,
+    "iso_sha256": "28b66c2cac9b10227a30268dcbb7c7e98911d00c22551950793967ca22083ac0"
+  },
+  "recipe": {
+    "build_id": "919b9df43bfaba203520b64d4ab50cfbd86ddb21f80025a519b529db96335ba6",
+    "workers": {
+      "producer-worker.py": "7acbda5733f4cdd2961d29276cf1adea92ba8368020cee7658b92abd1d4f2a66",
+      "consumer-worker.py": "bfadc5522d67697ef7b1cf9298f32bc24a2a247cd271d8fd16c09bd119cf3d67"
+    },
+    "launcher_sha256": "ae4753ddcf4c1c352034f8c10e98fcdd315e311f3d63eac9082d114a33a08f27"
+  },
+  "static_workers": {
+    "producer": {
+      "schema": true,
+      "apparmor_syntax": true,
+      "candidate_binding": true,
+      "owned_root": "/var/lib/eqemu-build/runs/0123456789/work/producer"
+    },
+    "consumer": {
+      "schema": true,
+      "apparmor_syntax": true,
+      "candidate_binding": true,
+      "owned_root": "/var/lib/eqemu-build/runs/0123456789/work/consumer"
+    }
+  },
+  "package_sha256": "b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a",
+  "package_bytes": 300449,
+  "duration_seconds": 2.712,
+  "command_tests_passed": 24,
+  "afk_revision": "eb5b2c231cce3b35e9d6fefd57fe1f3d889633c8",
+  "afk_cases": [
+    "pass",
+    "candidate failure",
+    "infrastructure failure",
+    "wrong identity",
+    "incomplete cleanup",
+    "timeout cancellation"
+  ],
+  "review": {
+    "standards_remaining": 0,
+    "spec_remaining": 0
+  },
+  "vm_started": false,
+  "installed": false
+}
