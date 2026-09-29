@@ -1,0 +1,12 @@
+{
+  "accepted": false,
+  "duration_seconds": 2.368,
+  "files": 2788,
+  "input_id": "c5d4f2cb7d0e7482d3eb4a486bc129e497edac78f50389d5017d0f89bf21883f",
+  "manifest_sha256": "6aa2ce121181d0413838c3cb0469a0c161f64e54b1b1473ae7c77f8624bec115",
+  "package_bytes": 86371029,
+  "source_bytes": 83559746,
+  "superseded": true,
+  "reason": "Regenerated after staged-index rejection correction",
+  "owned_output_verified_before_removal": true
+}

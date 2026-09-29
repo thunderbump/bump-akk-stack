@@ -1,0 +1,42 @@
+{
+  "accepted": false,
+  "duration_seconds": 2.081,
+  "files": 2788,
+  "input_id": "d981148767bab889d8390a6ef7b417aa11342c4c3197643cf12c73d6c46a086d",
+  "manifest_sha256": "dd5429fb1e07a22f6937752b369eb52d441a0d33cfe7c0dc4a6edbe4b73ca36d",
+  "package_bytes": 86371029,
+  "source_bytes": 83559746,
+  "schema": 1,
+  "bead": "central-t0e1.48",
+  "code_commit": "245b3da8109c361ee112622e104ff583b210cef4",
+  "profile_sha256": "5e100ba572201ec9bf9bbbc8e57ec7468fce8b9f45e9bc1b0325d8ac0f98cdd3",
+  "candidate_commit": "1c561d442638b3da8d20e93ac105f98a227d37f2",
+  "candidate_tree": "6dce3fcc9a67242a7839d8ba5dd1ee9217c189a8",
+  "retained_directory": "sealed-candidate-inputs-01",
+  "uid": 1000,
+  "verification": {
+    "verified": true,
+    "accepted": false,
+    "duration_seconds": 0.795,
+    "exit_code": 0
+  },
+  "stale_identity_control": {
+    "expected_input_id": "3b021c4816aec69c5cb54f18e83f11741faed5b31d2c9bf213a050ede5261000",
+    "exit_code": 2,
+    "error": "Input binding mismatch; stale build/artifact input identity"
+  },
+  "tests": {
+    "passed": 13,
+    "duration_seconds": 0.59
+  },
+  "review": {
+    "standards_remaining_findings": 0,
+    "spec_remaining_findings": 0,
+    "fixed_finding": "Reject staged-only changes, gitlink edits and conflicted index entries through a sanitized index snapshot"
+  },
+  "temporary_staging_remaining": [],
+  "vm_started": false,
+  "compiler_started": false,
+  "privileged_install_changed": false,
+  "acceptance_scope": "Input integrity and identity only; user-owned files require verification against the external seal during later trusted staging."
+}
