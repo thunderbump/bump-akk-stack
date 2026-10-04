@@ -18,7 +18,12 @@ def main(root,mode):
         iso=directory/'fake.iso';iso.write_bytes(b'x');return iso,FACTS
     def request(value):
         with (root/'calls').open('a') as f:f.write(value['op']+'\n')
-        if value['op']=='run':return dict(started=True,run_id=value['run_id'],candidate=FACTS,build_id='f'*64)
+        if value['op']=='run':
+            if mode in ('malformed-admission','malformed-both'):return []
+            if mode=='malformed-cancel':raise RuntimeError('Lost admission response')
+            return dict(started=True,run_id=value['run_id'],candidate=FACTS,build_id='f'*64)
+        if value['op']=='status' and mode=='malformed-status':return []
+        if value['op']=='cancel' and mode in ('malformed-cancel','malformed-both'):return []
         terminal=mode!='timeout' or value['op']=='cancel'
         code=0 if mode=='pass' else 1 if mode=='candidate' else 2
         return dict(version=1,run_id=value['run_id'],profile=PROFILE,candidate=FACTS,

@@ -247,7 +247,10 @@ def prepare(profile, repositories, store, output):
     output = Path(output).absolute()
     if output.exists() or output.is_symlink():
         raise ValueError('Output already exists; preserve the prepared input')
-    if any(output.is_relative_to(Path(r).resolve()) for r in repositories.values()):
+    # Resolve ancestor symlinks before checking protected roots or publishing.
+    output = output.resolve()
+    protected = [Path(r).resolve() for r in repositories.values()] + [Path(store).resolve()]
+    if any(output.is_relative_to(root) for root in protected):
         raise ValueError('Output must be outside source repositories')
     if shutil.disk_usage(output.parent).free < 2 * 1024**3:
         raise ValueError('Preparation needs 2 GiB free scratch space')

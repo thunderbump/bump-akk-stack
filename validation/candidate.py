@@ -100,7 +100,8 @@ def execute(source):
                     dst.write(block)
             submitted = True  # Caller knows the run ID even if admission response is lost.
             admission = request(dict(version=1,op='run',run_id=identifier,profile=PROFILE,candidate=facts))
-            if admission.get('run_id')!=identifier or admission.get('candidate')!=facts:
+            if (not isinstance(admission,dict) or admission.get('run_id')!=identifier
+                    or admission.get('candidate')!=facts):
                 raise ValueError('Build admission identity mismatch')
             build_id = admission.get('build_id')
             if admission.get('started') is True and (not isinstance(build_id,str) or not re.fullmatch('[a-f0-9]{64}',build_id)):
@@ -125,7 +126,7 @@ def execute(source):
         if submitted and (result is None or not result['terminal']):
             try:
                 cancelled = request(dict(version=1,op='cancel',run_id=identifier))
-                if build_id is None:
+                if build_id is None and isinstance(cancelled,dict):
                     build_id = cancelled.get('build_id')
                 result = checked(cancelled,identifier,facts,build_id)
             except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as exc:

@@ -91,6 +91,31 @@ class PackagePreparation(unittest.TestCase):
             prepare.prepare(self.websocketpp/'output',self.store,self.websocketpp,self.package)
         self.assertFalse((self.websocketpp/'output').exists())
 
+    def test_symlinked_output_parent_cannot_write_to_protected_roots(self):
+        for target in (self.websocketpp,self.store,self.package):
+            with self.subTest(target=target):
+                alias=self.root/'alias';alias.symlink_to(target,target_is_directory=True)
+                try:
+                    with self.assertRaisesRegex(ValueError,'outside'):
+                        prepare.prepare(alias/'output',self.store,self.websocketpp,self.package)
+                    self.assertFalse((target/'output').exists())
+                finally:alias.unlink()
+
+    def test_candidate_input_preparation_canonicalizes_source_and_output(self):
+        inputs=common.load('input_containment',ROOT/'validation/inputs.py')
+        alias=self.root/'source-alias';alias.symlink_to(self.websocketpp,target_is_directory=True)
+        for destination,repository in ((alias/'output',self.websocketpp),
+                                       (self.websocketpp/'output',alias),
+                                       (alias/'child/../output',self.websocketpp)):
+            with self.subTest(destination=destination):
+                with self.assertRaisesRegex(ValueError,'outside source'):
+                    inputs.prepare({}, {'eqemu':repository},self.store,destination)
+                self.assertFalse((self.websocketpp/'output').exists())
+        store_alias=self.root/'store-alias';store_alias.symlink_to(self.store,target_is_directory=True)
+        with self.assertRaisesRegex(ValueError,'outside source'):
+            inputs.prepare({}, {'eqemu':self.websocketpp},self.store,store_alias/'output')
+        self.assertFalse((self.store/'output').exists())
+
     def test_rendered_workers_use_owned_inputs_without_history(self):
         self.prepare(); output=self.root/'output'; destination=self.root/'rendered'; destination.mkdir()
         def seed(argv, **kwargs):

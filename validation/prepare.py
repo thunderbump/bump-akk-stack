@@ -51,6 +51,8 @@ def prepare(output, input_store, websocketpp, package=HERE):
     output = Path(output).absolute()
     if output.exists() or output.is_symlink():
         raise ValueError('Output already exists')
+    # Resolve ancestor symlinks before checking protected roots or publishing.
+    output = output.resolve()
     store = Path(input_store).resolve(strict=True)
     websocketpp = Path(websocketpp).resolve(strict=True)
     if any(output.is_relative_to(path) for path in (store, websocketpp, package.resolve())):

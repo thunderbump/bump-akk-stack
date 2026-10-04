@@ -1,5 +1,6 @@
 """Candidate admission, deterministic outcomes and rendered recipe checks."""
 import json
+import copy
 import io
 import contextlib
 import signal
@@ -55,6 +56,49 @@ class Contract(unittest.TestCase):
             self.assertEqual(common.outcome({}, {'producer':worker},True),2)
         self.assertEqual(common.outcome({'cleanup':{'rescued':['producer']}},{'producer':worker},True),2)
 
+    def test_consumer_candidate_failure_requires_successful_producer_and_safe_evidence(self):
+        producer={'checks':{'host_pre_resume':True},'service_result':'success',
+                  'cleanup':{'readonly_inputs_unchanged':True},
+                  'resource_observations':{'memory.events':'oom 0\noom_kill 0','pids.events':'max 0'},
+                  'guest_report_untrusted':{'ok':True}}
+        consumer=copy.deepcopy(producer)
+        consumer['cleanup']['artifact_input_unchanged']=True
+        consumer['guest_report_untrusted']={'ok':False,'error':'upstream-tests: exit 1\nassertion failed'}
+        summary={'cleanup':{'complete':True},'cases':{'producer':{'case_passed':True}}}
+        workers={'producer':producer,'consumer':consumer}
+        self.assertEqual(common.outcome(summary,workers,True),1)
+        for error in ('upstream-tests: exit -11\ncrashed','upstream-tests: exit 255\nfailure'):
+            candidate=copy.deepcopy(workers);candidate['consumer']['guest_report_untrusted']['error']=error
+            self.assertEqual(common.outcome(summary,candidate,True),1)
+        unsafe=[
+            lambda s,w:s['cases']['producer'].update(case_passed=False),
+            lambda s,w:s.pop('cases'),
+            lambda s,w:s['cleanup'].update(rescued=['consumer']),
+            lambda s,w:s['cleanup'].update(controller_budget_error='OOM'),
+            lambda s,w:w.pop('producer'),
+            lambda s,w:w.pop('consumer'),
+            lambda s,w:w['producer'].update(guest_report_untrusted=[]),
+            lambda s,w:w['producer']['guest_report_untrusted'].update(ok=False),
+            lambda s,w:w['consumer'].update(guest_report_untrusted=None),
+            lambda s,w:w['consumer'].pop('resource_observations'),
+            lambda s,w:w['consumer']['resource_observations'].update(**{'memory.events':'oom 1\noom_kill 1'}),
+            lambda s,w:w['consumer']['resource_observations'].update(**{'pids.events':'max 1'}),
+            lambda s,w:w['consumer'].update(service_result='timeout'),
+            lambda s,w:w['consumer']['checks'].update(host_pre_resume=False),
+            lambda s,w:w['consumer']['cleanup'].update(readonly_inputs_unchanged=False),
+            lambda s,w:w['consumer']['cleanup'].update(artifact_input_unchanged=False),
+            lambda s,w:w['consumer']['guest_report_untrusted'].update(error='upstream-tests: deadline exceeded'),
+            lambda s,w:w['consumer']['guest_report_untrusted'].update(error='upstream-tests: exit -9\nkilled'),
+            lambda s,w:w['consumer']['guest_report_untrusted'].update(error='upstream-tests: exit 1\nNo space left'),
+            lambda s,w:w['consumer']['guest_report_untrusted'].update(error='server-build: exit 1\nunexpected consumer stage'),
+        ]
+        for index,mutate in enumerate(unsafe):
+            with self.subTest(control=index):
+                changed_summary=copy.deepcopy(summary);changed_workers=copy.deepcopy(workers)
+                mutate(changed_summary,changed_workers)
+                self.assertEqual(common.outcome(changed_summary,changed_workers,True),2)
+        self.assertEqual(common.outcome(summary,workers,False),2)
+
     def test_candidate_can_change_without_changing_dependency_policy(self):
         baseline={'sources':{'eqemu':{'commit':'old','tree':'old','gitlinks':{'p':'fixed'}}},'dependencies':{'dep':'fixed'}}
         changed=common.candidate_profile(baseline,'a'*40,'b'*40)
@@ -104,7 +148,7 @@ class Foreground(unittest.TestCase):
 
 class ForegroundProcess(unittest.TestCase):
     def test_public_command_classifications_and_interruption_without_old_afk(self):
-        for mode,expected in [('pass',0),('candidate',1),('infra',2),('wrong',2),('cleanup',2),('timeout',143)]:
+        for mode,expected in [('pass',0),('candidate',1),('infra',2),('wrong',2),('cleanup',2),('timeout',143),('malformed-admission',2),('malformed-status',2),('malformed-cancel',2),('malformed-both',2)]:
             with self.subTest(mode=mode),tempfile.TemporaryDirectory() as directory:
                 root=Path(directory)
                 process=subprocess.Popen([sys.executable,'-B',str(ROOT/'tests/validation/build_fixture.py'),str(root),mode],
@@ -124,7 +168,10 @@ class ForegroundProcess(unittest.TestCase):
                     self.assertEqual(final['exit_code'],expected)
                     self.assertEqual(final['accepted'],mode=='pass')
                     self.assertFalse(list((root/'uploads'/str(os.getuid())).iterdir()))
-                    if mode=='timeout':self.assertEqual((root/'calls').read_text().splitlines()[-1],'cancel')
+                    if mode=='timeout' or mode.startswith('malformed'):
+                        self.assertEqual((root/'calls').read_text().splitlines()[-1],'cancel')
+                    if mode in ('malformed-cancel','malformed-both'):
+                        self.assertIn('mismatch',final['secondary_error'])
                 finally:
                     if process.poll() is None:process.kill();process.wait()
 
