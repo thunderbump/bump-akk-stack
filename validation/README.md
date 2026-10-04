@@ -19,6 +19,10 @@ The recipes originate from the [prepared package receipt](https://github.com/thu
 
 Run the prepared `install.py` once with sudo after administrator review and separate host activation authorization. Preparation starts no VM. Installation retains the existing `eqemu-test` submitter group and fixed no-argument helper policy. It refuses existing destinations. Its output names `disable.py` for rollback; disabling revokes admission and stops exact-owned runs while preserving receipts.
 
+Each request verifies the current user's existing NSS membership in `eqemu-test`. If the process inherited stale supplementary groups, only the fixed no-argument sudo helper runs through `sg eqemu-test`; its JSON input remains on stdin. Nonmembers refuse without a prompt or membership/policy change.
+
+Admission can inspect retained terminal receipts from the exact prior package manifest `b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a`. The administrator-owned prior release must remain installed with all original files and profile seals intact. The helper verifies candidate/build identity, sealed generated recipes, saved completion and live resource absence without rewriting receipts, removing media or stopping old units. Active, unknown or unverifiable prior releases block admission. Public status and cancel remain bound to the current release.
+
 The fixed profile retains a 180 GiB admission / 100 GiB emergency reserve, 32 GiB guest root, 4 GiB transfer artifact, one compile job and 18,000-second supervisor. Eight retained runs block admission pending exact-owned archival. Source uploads and generated media are bounded. No saved-world or NAS data is involved.
 
 Run the cheap package and foreground-command checks without an AFK checkout:

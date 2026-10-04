@@ -1,11 +1,13 @@
 #!/usr/bin/python3 -I
 """Foreground current-candidate build/unit validation; no inference or review logic."""
 import argparse
+import grp
 import json
 import os
 from pathlib import Path
 import resource
 import re
+import pwd
 import secrets
 import signal
 import subprocess
@@ -22,8 +24,23 @@ REQUEST_SECONDS = 370
 POLL_SECONDS = 3
 
 
+def request_command():
+    """Refresh only this fixed helper's group when an existing member is stale."""
+    try:
+        account = pwd.getpwuid(os.getuid())
+        group = grp.getgrnam('eqemu-test')
+    except KeyError as error:
+        raise ValueError('Submitter account or group unavailable') from error
+    if account.pw_gid != group.gr_gid and account.pw_name not in group.gr_mem:
+        raise ValueError('Caller is not a submitter')
+    if group.gr_gid in {os.getgid(), *os.getgroups()}:
+        return ['/usr/bin/sudo', '-n', HELPER]
+    return ['/usr/bin/sg', 'eqemu-test', '-c',
+            'exec /usr/bin/sudo -n /usr/local/sbin/eqemu-build-request']
+
+
 def request(value):
-    result = subprocess.run(['/usr/bin/sudo','-n',HELPER], input=json.dumps(value),
+    result = subprocess.run(request_command(), input=json.dumps(value),
                             text=True,capture_output=True,timeout=REQUEST_SECONDS,start_new_session=True)
     if result.returncode:
         raise RuntimeError(result.stderr[-2000:] or 'Build request failed')
