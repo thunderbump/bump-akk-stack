@@ -11,6 +11,10 @@ import tarfile
 import tempfile
 
 SOURCE_LIMIT = 256 * 1024**2
+SOURCE_FILES = 10000
+# Approved initialized vcpkg has 13,083 files. This inventory proves local
+# cleanliness only; it is not transferred or added to the source manifest.
+INITIALIZED_FILES = 20000
 MANIFEST_LIMIT = 1024**2
 ARCHIVE_LIMIT = SOURCE_LIMIT + 16 * 1024**2
 
@@ -81,7 +85,7 @@ class GitTree:
     def git(self, *args, **kwargs):
         return self.run(['/usr/bin/git', '--git-dir=' + str(self.gitdir), *args], **kwargs)
 
-    def inventory(self, commit, tree):
+    def inventory(self, commit, tree, max_files=SOURCE_FILES):
         if self.git('rev-parse', commit + '^{tree}').decode().strip() != tree:
             raise ValueError('Candidate tree mismatch')
         entries, links = [], {}
@@ -97,7 +101,7 @@ class GitTree:
                 entries.append(dict(path=name, mode=mode, blob=blob, bytes=int(size)))
             else:
                 raise ValueError('Unsupported Git entry: ' + name)
-        if len(entries) > 10000 or sum(e['bytes'] for e in entries) > SOURCE_LIMIT:
+        if len(entries) > max_files or sum(e['bytes'] for e in entries) > SOURCE_LIMIT:
             raise ValueError('Source inventory exceeds budget')
         return entries, links
 
@@ -291,7 +295,7 @@ def prepare(profile, repositories, store, output):
                 scratch.mkdir()
                 view = GitTree(module, scratch)
                 wanted = profile['submodules'][name]
-                entries, links = view.inventory(wanted['commit'], wanted['tree'])
+                entries, links = view.inventory(wanted['commit'], wanted['tree'], max_files=INITIALIZED_FILES)
                 view.clean(wanted['commit'], entries, links)
                 views['checkout-' + name] = (view, entries, links)
         for name, (view, entries, links) in views.items():
