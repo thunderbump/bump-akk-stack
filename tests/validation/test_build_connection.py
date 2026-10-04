@@ -11,6 +11,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
+from types import SimpleNamespace
 from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[2]
@@ -144,6 +145,48 @@ class Foreground(unittest.TestCase):
                     self.assertEqual(candidate.execute(base),expected)
                 self.assertFalse(list(upload.iterdir()))
                 if mode in ('wrong','lost'):self.assertEqual(calls[-1],'cancel')
+
+
+class RequestGroup(unittest.TestCase):
+    def test_existing_members_use_direct_or_fixed_group_refresh(self):
+        account=SimpleNamespace(pw_name='member',pw_gid=1000)
+        for primary,members,gid,groups,expected in [
+            (983,[],983,[],['/usr/bin/sudo','-n',candidate.HELPER]),
+            (1000,['member'],1000,[983],['/usr/bin/sudo','-n',candidate.HELPER]),
+            (1000,['member'],1000,[],['/usr/bin/sg','eqemu-test','-c',
+                'exec /usr/bin/sudo -n /usr/local/sbin/eqemu-build-request'])]:
+            with self.subTest(groups=groups,primary=primary):
+                account.pw_gid=primary
+                group=SimpleNamespace(gr_gid=983,gr_mem=members)
+                with patch.object(candidate.pwd,'getpwuid',return_value=account),\
+                     patch.object(candidate.grp,'getgrnam',return_value=group),\
+                     patch.object(candidate.os,'getgid',return_value=gid),\
+                     patch.object(candidate.os,'getgroups',return_value=groups):
+                    self.assertEqual(candidate.request_command(),expected)
+
+    def test_nonmembers_refuse_even_with_inherited_group_without_spawning(self):
+        with patch.object(candidate.pwd,'getpwuid',return_value=SimpleNamespace(pw_name='outsider',pw_gid=1000)),\
+             patch.object(candidate.grp,'getgrnam',return_value=SimpleNamespace(gr_gid=983,gr_mem=[])),\
+             patch.object(candidate.os,'getgroups',return_value=[983]),patch.object(candidate.subprocess,'run') as run:
+            with self.assertRaisesRegex(ValueError,'submitter'):candidate.request({'op':'status'})
+        run.assert_not_called()
+
+    def test_missing_nss_group_is_an_infrastructure_refusal(self):
+        with patch.object(candidate.grp,'getgrnam',side_effect=KeyError('missing')),patch.object(candidate.subprocess,'run') as run:
+            with self.assertRaisesRegex(ValueError,'unavailable'):candidate.request({'op':'run'})
+        run.assert_not_called()
+
+    def test_group_adapter_keeps_stdin_timeout_and_response_contract(self):
+        command=['/usr/bin/sg','eqemu-test','-c','exec /usr/bin/sudo -n /usr/local/sbin/eqemu-build-request']
+        value={'op':'cancel','run_id':'0123456789','untrusted':'$(touch /tmp/never); `false`'}
+        with patch.object(candidate,'request_command',return_value=command),\
+             patch.object(candidate.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout='{"ok":true}',stderr='')) as run:
+            self.assertEqual(candidate.request(value),{'ok':True})
+        run.assert_called_once_with(command,input=json.dumps(value),text=True,capture_output=True,
+                                   timeout=candidate.REQUEST_SECONDS,start_new_session=True)
+        with patch.object(candidate,'request_command',return_value=command),\
+             patch.object(candidate.subprocess,'run',side_effect=subprocess.TimeoutExpired(command,candidate.REQUEST_SECONDS)):
+            with self.assertRaises(subprocess.TimeoutExpired):candidate.request(value)
 
 
 class ForegroundProcess(unittest.TestCase):

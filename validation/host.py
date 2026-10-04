@@ -8,17 +8,23 @@ import json
 import os
 from pathlib import Path
 import resource
+import re
 import signal
 import stat
 import sys
 import time
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from common import BASE, HERE, MAX_ISO, PROFILE, identity, load, outcome, run_id, sha
+from common import BASE, HERE, MAX_ISO, PROFILE, candidate_profile, identity, load, outcome, run_id, seal, sha
 from render import render
 S = load('host_support', HERE/'host_support.py')
 S.VERSION = HERE
 S.BASE = BASE
+
+# One administrator-reviewed installed release predates maintained packaging.
+# This is an admission-only trust pin, not a general historical record reader.
+PRIOR_MANIFEST = 'b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a'
+LIB = Path('/usr/local/lib/eqemu-build')
 
 
 def parse(raw):
@@ -105,8 +111,7 @@ def unstarted_absent(suite, worker):
             and not Path('/sys/fs/cgroup',worker.SLICE).exists())
 
 
-def report(identifier, uid):
-    root, record = owner(identifier, uid)
+def report_record(root, record, identifier, persist=True):
     result = dict(version=1, run_id=identifier, profile=PROFILE, candidate=record['candidate'],
                   build_id=record.get('recipe',{}).get('build_id'), terminal=False,
                   cleanup_complete=False, exit_code=2, accepted=False, error=record.get('error'))
@@ -114,6 +119,13 @@ def report(identifier, uid):
         result.update(terminal=True,cleanup_complete=True)
     elif 'recipe' in record:
         suite = suite_for(root,record)
+        if not persist:
+            if suite.ROOT != root/'work' or suite.LOCAL != root/'prepared' or tuple(suite.CASES) != ('producer','consumer'):
+                raise ValueError('Prior recipe roots or cases changed')
+            S.safe_path(suite.ROOT, directory=True)
+            S.safe_path(suite.SCRIPT)
+            if sha(suite.SCRIPT) != record['recipe']['launcher_sha256']:
+                raise ValueError('Prior owned launcher changed')
         stopped = suite.quiescent(suite.properties(suite.UNIT))
         result['terminal'] = stopped
         if stopped and (suite.ROOT/'suite-result.json').exists():
@@ -121,31 +133,94 @@ def report(identifier, uid):
             clean = summary.get('cleanup',{}).get('complete') is True
             workers = {}
             for role in suite.CASES:
+                if not persist:
+                    copied = suite.ROOT/(role+'-worker.py')
+                    if copied.exists() or copied.is_symlink():
+                        S.safe_path(copied)
                 worker = suite.module(role, local=not (suite.ROOT/(role+'-worker.py')).exists())
                 if worker.ROOT.exists():
+                    if not persist:
+                        S.safe_path(worker.ROOT, directory=True)
+                        S.safe_path(worker.STATE)
                     clean = clean and suite.quiescent(suite.properties(worker.UNIT)) and suite.absent(worker,worker.state())
                     path = worker.EVIDENCE/'report.json'
                     if path.exists():
                         workers[role] = S.read_json(path)
                 else:
                     clean = clean and unstarted_absent(suite,worker)
-            clean = clean and not S.read_json(suite.ROOT/'leases.json')['active']
+            leases = S.read_json(suite.ROOT/'leases.json')
+            if not persist and (not isinstance(leases, dict) or not isinstance(leases.get('active'), dict)):
+                raise ValueError('Prior active lease state is unknown')
+            clean = clean and not leases['active']
             clean = clean and not suite.module('producer').STORE.exists()
+            if not persist and suite.module('producer').STORE.is_symlink():
+                clean = False
             result.update(cleanup_complete=bool(clean), exit_code=outcome(summary,workers,clean),
                           error=summary.get('error',record.get('error')))
             result['accepted'] = result['exit_code'] == 0
             result['stages'] = summary.get('cases',{})
             result['diagnostics'] = {role: str(value.get('guest_report_untrusted',{}).get('error') or value.get('error') or '')[-4500:]
                                      for role,value in workers.items()}
-    if result['terminal'] and result['cleanup_complete']:
+    if persist and result['terminal'] and result['cleanup_complete']:
         # Only large copied input media owned by this finished run are removed.
         # Keep small recipes and bounded receipts for inspection, capped at 8 runs.
         for name in ('candidate.iso','producer-seed.iso','consumer-seed.iso'):
             path = root/'prepared'/name
             if path.exists():
                 S.safe_path(path); path.unlink()
-    S.write_json(root/'result.json',result)
+    if persist:
+        S.write_json(root/'result.json',result)
     return result
+
+
+def report(identifier, uid):
+    root, record = owner(identifier, uid)
+    return report_record(root, record, identifier)
+
+
+def prior_report(root, record):
+    """Verify the one retired release and query live cleanup without mutation."""
+    identifier = run_id(root.name)
+    S.safe_path(root, directory=True)
+    version = LIB/PRIOR_MANIFEST[:16]
+    if (not isinstance(record, dict) or type(record.get('uid')) is not int
+            or record['uid'] <= 0 or record.get('run_id') != identifier
+            or record.get('version') != str(version)):
+        raise ValueError('Unknown prior build ownership or release')
+    S.safe_path(version, directory=True)
+    manifest = S.read_json(version/'manifest.json')
+    if sha(version/'manifest.json') != PRIOR_MANIFEST:
+        raise ValueError('Prior release manifest changed')
+    # The manifest pin also fixes its complete file set and unchanged profile.
+    for name, expected in manifest['files'].items():
+        if not re.fullmatch('[a-zA-Z0-9_.-]+', name):
+            raise ValueError('Prior release manifest path')
+        if S.safe_path(version/name).st_size > 256*1024 or sha(version/name) != expected:
+            raise ValueError('Prior release file changed: '+name)
+    facts = identity(record.get('candidate'))
+    recipe = record.get('recipe')
+    if (not isinstance(recipe, dict) or set(recipe) != {'build_id','workers','launcher_sha256'}
+            or not isinstance(recipe['workers'], dict)
+            or set(recipe['workers']) != {'producer-worker.py','consumer-worker.py'}
+            or any(not isinstance(value, str) or not re.fullmatch('[a-f0-9]{64}', value)
+                   for value in [recipe['build_id'],recipe['launcher_sha256'],*recipe['workers'].values()])):
+        raise ValueError('Invalid prior recipe seals')
+    profile = candidate_profile(S.read_json(version/'profile.json'), facts['candidate'], facts['tree'])
+    expected = seal(dict(profile=profile,input_id=facts['input_id'],
+                         manifest_sha256=facts['manifest_sha256'],recipe=manifest['files']))
+    if recipe['build_id'] != expected or record.get('setup_failed_clean'):
+        raise ValueError('Prior build profile or recipe mismatch')
+    receipt = S.read_json(root/'result.json')
+    if (not isinstance(receipt, dict) or type(receipt.get('version')) is not int
+            or receipt.get('version') != 1 or receipt.get('run_id') != identifier
+            or receipt.get('profile') != PROFILE or receipt.get('candidate') != facts
+            or receipt.get('build_id') != expected or receipt.get('terminal') is not True
+            or receipt.get('cleanup_complete') is not True
+            or type(receipt.get('exit_code')) is not int or receipt['exit_code'] not in (0,1,2)
+            or type(receipt.get('accepted')) is not bool
+            or receipt['accepted'] != (receipt['exit_code'] == 0)):
+        raise ValueError('Prior build has no matching completed cleanup receipt')
+    return report_record(root, record, identifier, persist=False)
 
 
 def start(request, uid):
@@ -153,7 +228,8 @@ def start(request, uid):
     # One build at a time. Unknown cleanup retains the admission reservation.
     for root in (BASE/'runs').iterdir():
         old = S.read_json(root/'owner.json')
-        prior = report(root.name, old['uid'])
+        prior = (report(root.name, old['uid']) if old.get('version') == str(HERE)
+                 else prior_report(root, old))
         if not prior['terminal'] or not prior['cleanup_complete']:
             raise RuntimeError('Previous build active or cleanup incomplete: '+root.name)
     if len(list((BASE/'runs').iterdir())) >= 8:
