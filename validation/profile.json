@@ -1,0 +1,77 @@
+{
+  "name": "eqemu-complete-source-build-unit-v1",
+  "repository": "thunderbump/bump-EQEmu",
+  "sources": {
+    "eqemu": {
+      "commit": "1c561d442638b3da8d20e93ac105f98a227d37f2",
+      "tree": "6dce3fcc9a67242a7839d8ba5dd1ee9217c189a8",
+      "gitlinks": {
+        "submodules/websocketpp": "b9aeec6eaf3d5610503439b4fae3581d9aff08e8",
+        "submodules/vcpkg": "d1ff36c6520ee43f1a656c03cd6425c2974a449e"
+      }
+    },
+    "websocketpp": {
+      "commit": "b9aeec6eaf3d5610503439b4fae3581d9aff08e8",
+      "tree": "9454c8fcb8d7f0675ce54073d4bc2e4a5db98704",
+      "gitlinks": {}
+    }
+  },
+  "submodules": {
+    "websocketpp": {
+      "commit": "b9aeec6eaf3d5610503439b4fae3581d9aff08e8",
+      "tree": "9454c8fcb8d7f0675ce54073d4bc2e4a5db98704"
+    },
+    "vcpkg": {
+      "commit": "d1ff36c6520ee43f1a656c03cd6425c2974a449e",
+      "tree": "57b96538f3990946bbf562080f5d48ed52a2144a"
+    }
+  },
+  "submodule_sources": {
+    "submodules/websocketpp": "websocketpp",
+    "submodules/vcpkg": "vcpkg"
+  },
+  "dependency_blobs": {
+    ".gitmodules": "b7f3564e59b54a53250731b74b8b12b79f55cc10",
+    "vcpkg.json": "fdd4e296f31d28f40fad06e93860af6a9567c9ff"
+  },
+  "dependencies": {
+    "base": {
+      "path": "inputs/ubuntu-noble-20260911/ubuntu-24.04-server-cloudimg-amd64.img",
+      "bytes": 625256960,
+      "sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354"
+    },
+    "media": {
+      "path": "build-inputs-20260925-v3/build-inputs.iso",
+      "bytes": 469000192,
+      "sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4"
+    },
+    "registry": {
+      "path": "build-inputs-20260925-v3/sources/vcpkg.bundle",
+      "bytes": 95762006,
+      "sha256": "5c33882ba3f588ed39bc9261c1b49f67281eed99e4dab954ea33145163575bfe"
+    }
+  },
+  "build_profile": {
+    "integration": "maintained build-unit-v1",
+    "recipe_baseline": "848d34ce037ba2648f15a54ba40914c6c46f2aad632a9b47bb07d9cdf032ddae",
+    "configuration": "RelWithDebInfo",
+    "triplet": "x64-linux",
+    "jobs": 1,
+    "cmake_options": [
+      "SERVER",
+      "TESTS",
+      "LOGIN",
+      "LUA",
+      "PERL",
+      "CLIENT_FILES"
+    ],
+    "export_compile_commands": true,
+    "binary_cache": "clear",
+    "downloads": false,
+    "suite_seconds": 18000,
+    "guest_memory_bytes": 4294967296,
+    "qemu_memory_bytes": 6442450944,
+    "root_disk_bytes": 34359738368,
+    "artifact_disk_bytes": 4294967296
+  }
+}

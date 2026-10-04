@@ -1,0 +1,332 @@
+#!/usr/bin/python3
+"""Fixed build export and fresh consumer proof. --check starts no VM; default needs sudo."""
+import argparse,fcntl,hashlib,importlib.util,json,os,pathlib,shutil,signal,stat,subprocess,sys,time,uuid
+P=pathlib.Path
+BASE=P('/var/lib/eqemu-vm-proof');ROOT=BASE/'candidate-build-01';SCRIPT=ROOT/'suite.py'
+LOCAL=P('/nonexistent/eqemu-build-recipes')
+UNIT='eqemu-vm-candidate-build-01-suite.service';CHILD='eqemu-vm-recovery-parent.service'
+CTL='eqemuvmcandidatebuild01ctl.slice';CTLFILE=P('/run/systemd/system')/CTL
+CTLTEXT='[Unit]\nDescription=Owned offline build proof controllers\nStopWhenUnneeded=yes\n[Slice]\nMemoryMax=1G\nMemorySwapMax=0\n'
+CASES=('producer','consumer')
+HASHES={'producer-worker.py': 'c198624cb718521d587fd0b4b2e81d2db19aedaeed73327219632f1ae23fb14f', 'consumer-worker.py': '9d15380adffaa9422dbfd7100219a17bcc4241fe294be6f6cecab98fe1e2d3a3'}
+ENV={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8'}
+GIB=1024**3
+
+
+def run(args,timeout=30,check=True):
+    r=subprocess.run(args,text=True,capture_output=True,timeout=timeout,env=ENV,cwd='/')
+    if check and r.returncode:raise RuntimeError(str(args[:3])+': '+r.stderr[-4000:]+r.stdout[-1000:])
+    return r
+
+def write(path,value):
+    tmp=path.with_suffix('.new');tmp.write_text(json.dumps(value,indent=2)+'\n');tmp.chmod(0o644);os.replace(tmp,path)
+
+def read(path):
+    st=path.lstat()
+    if not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or st.st_mode&0o022 or st.st_size>1024**2:raise RuntimeError('Unsafe evidence/control file '+str(path))
+    return json.loads(path.read_text())
+
+def digest(path):return hashlib.sha256(path.read_bytes()).hexdigest()
+
+def properties(unit):
+    keys=['LoadState','ActiveState','SubState','MainPID','ControlPID','Result','ExecMainCode','ExecMainStatus','MemoryMax','MemorySwapMax','RuntimeMaxUSec','Slice','FragmentPath','DropInPaths','Transient']
+    r=run(['systemctl','show',unit,*sum((['-p',k] for k in keys),[])])
+    return dict(line.split('=',1) for line in r.stdout.splitlines() if '=' in line)
+
+def quiescent(props):return props.get('ActiveState') in ['inactive','failed'] and props.get('MainPID')==props.get('ControlPID')=='0'
+
+def wait_until(check,seconds,description):
+    end=time.monotonic()+seconds
+    while time.monotonic()<end:
+        result=check()
+        if result:return result
+        time.sleep(.5)
+    raise RuntimeError('Deadline: '+description)
+
+def module(case,local=False):
+    if case not in CASES:raise RuntimeError('Unknown fixed case')
+    path=(LOCAL if local else ROOT)/(case+'-worker.py')
+    if path.is_symlink() or digest(path)!=HASHES[path.name]:raise RuntimeError('Worker identity mismatch')
+    if not local:
+        s=path.stat()
+        if s.st_uid!=0 or s.st_mode&0o022:raise RuntimeError('Unsafe worker owner/mode')
+    spec=importlib.util.spec_from_file_location('recovery_'+case,path);m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m);return m
+
+def absent(m,s):
+    if s['uuid'] in m.virsh('list','--all','--uuid').stdout.split():return False
+    return (not m.owned_pids(s) and not m.DATA.exists() and not m.DATA.is_symlink()
+      and not m.SLICEFILE.exists() and not m.SLICEFILE.is_symlink()
+      and not P('/sys/fs/cgroup',m.SLICE).exists()
+      and s['profile'] not in P('/sys/kernel/security/apparmor/profiles').read_text())
+
+def validate_identity(s,lease,name,worker_hash,controller_hash):
+    if not isinstance(s,dict) or not isinstance(lease,dict):raise RuntimeError('Ownership metadata missing')
+    try:ident=str(uuid.UUID(s['uuid']))
+    except (ValueError,KeyError,TypeError,AttributeError):raise RuntimeError('Invalid ownership UUID')
+    if ident!=s['uuid'] or s.get('name')!=name or s.get('profile')!='libvirt-'+ident or s.get('controller_sha256')!=worker_hash or controller_hash!=worker_hash or lease.get('uuid')!=ident or lease.get('name')!=name or lease.get('worker_sha256')!=worker_hash or lease.get('state')!='active':raise RuntimeError('Ownership mismatch; retain resources')
+
+def ownership(m):
+    s=m.state();leases=read(ROOT/'leases.json');lease=leases['active'].get(m.CASE)
+    st=m.SCRIPT.lstat()
+    if not stat.S_ISREG(st.st_mode) or st.st_uid!=0 or st.st_mode&0o022:raise RuntimeError('Unsafe owned controller')
+    validate_identity(s,lease,m.NAME,HASHES[m.CASE+'-worker.py'],digest(m.SCRIPT));return s
+
+def release(m):
+    s=ownership(m)
+    if not quiescent(properties(m.UNIT)) or not absent(m,s):raise RuntimeError('Cannot release unclean worker reservation')
+    receipt=read(m.EVIDENCE/'cleanup.json')
+    if receipt.get('complete') is not True or receipt.get('uuid')!=s['uuid']:raise RuntimeError('Missing cleanup proof')
+    with (ROOT/'admission.lock').open('r+') as lock:
+        fcntl.flock(lock,fcntl.LOCK_EX);ledger=read(ROOT/'leases.json');ledger['released'].append(ledger['active'].pop(m.CASE));write(ROOT/'leases.json',ledger)
+
+def controller_budget():
+    cg=P('/sys/fs/cgroup')/CTL
+    limits={name:(cg/name).read_text().strip() for name in ['memory.max','memory.swap.max','memory.current','memory.peak','memory.events']}
+    if limits['memory.max']!=str(GIB) or limits['memory.swap.max']!='0':raise RuntimeError('Shared controller budget mismatch')
+    if int(dict(l.split() for l in limits['memory.events'].splitlines()).get('oom_kill',0)):raise RuntimeError('Controller pool OOM')
+    return limits
+
+def stop(m):run(['systemctl','stop',m.UNIT],timeout=150)
+
+
+
+
+def acceptance(r,c,props,s,resources_absent):
+    checks={'identity':r.get('uuid')==s['uuid']==c.get('uuid'),
+      'host_pre_resume':r.get('checks',{}).get('host_pre_resume') is True,
+      'workload':r.get('workload_ok') is True and r.get('ok') is True,
+      'service':r.get('service_result')=='success' and props.get('Result')=='success',
+      'cleanup':c.get('complete') is True and c.get('readonly_inputs_unchanged') is True,
+      'cleanup_time':0<=c.get('finished_at',0)-c.get('started_at',1)<=120,
+      'absence':resources_absent is True,'quiescent':quiescent(props)}
+    return {'case_passed':all(checks.values()),'checks':checks}
+
+
+
+
+
+
+
+
+
+def setup():
+    if ROOT.exists() or ROOT.is_symlink():raise RuntimeError('Retained attempt exists; inspect rather than overwrite')
+    if properties(UNIT).get('LoadState')!='not-found':raise RuntimeError('Suite unit exists')
+    props=properties(CTL)
+    if CTLFILE.exists() or CTLFILE.is_symlink() or props.get('ActiveState')!='inactive' or props.get('FragmentPath') or props.get('DropInPaths') or props.get('Transient')!='no':raise RuntimeError('Controller slice exists')
+    m=module('producer',local=True);m.safe_dir(BASE);m.admission()
+    ROOT.mkdir(mode=0o755);ROOT.chmod(0o755);SCRIPT.write_bytes(P(__file__).read_bytes());SCRIPT.chmod(0o600)
+    for case in CASES:
+        target=ROOT/(case+'-worker.py');target.write_bytes((LOCAL/target.name).read_bytes());target.chmod(0o600)
+        if digest(target)!=HASHES[target.name]:raise RuntimeError('Worker changed during copy')
+    write(ROOT/'leases.json',{'active':{},'released':[]});(ROOT/'admission.lock').touch(mode=0o600,exist_ok=False)
+    with CTLFILE.open('x') as f:f.write(CTLTEXT)
+    CTLFILE.chmod(0o644);run(['systemctl','daemon-reload'])
+    try:
+        run(['systemd-run','--quiet','--unit='+UNIT,'--service-type=exec','-p','Slice='+CTL,'-p','RuntimeMaxSec=18000','-p','TimeoutStopSec=300','-p','KillMode=control-group','-p','MemoryMax=64M','-p','MemorySwapMax=0','-p','TasksMax=64','-p','StandardOutput=null','-p','StandardError=journal','-p','LogRateLimitIntervalSec=30s','-p','LogRateLimitBurst=20','-p','ExecStopPost=/usr/bin/python3 -I '+str(SCRIPT)+' --cleanup','/usr/bin/python3','-I',str(SCRIPT),'--supervise'])
+    except Exception:
+        if quiescent(properties(UNIT)) and not read(ROOT/'leases.json')['active'] and CTLFILE.read_text()==CTLTEXT:CTLFILE.unlink();run(['systemctl','daemon-reload'])
+        raise
+    print(json.dumps({'started':True,'unit':UNIT,'report':str(ROOT/'suite-result.json'),'progress':str(ROOT/'suite-result.json'),'cancel_command':'sudo systemctl stop '+UNIT}))
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__);group=parser.add_mutually_exclusive_group()
+    for n in ['check','supervise','cleanup','discard-artifact']:group.add_argument('--'+n,action='store_true')
+    a=parser.parse_args()
+    if a.check:
+        for case in CASES:
+            module(case,local=True);run(['/usr/bin/python3','-I',str(LOCAL/(case+'-worker.py')),'--check'],timeout=90)
+        print(json.dumps({'inputs_and_worker_verified':True,'vm_started':False}));return 0
+    if os.geteuid()!=0:raise RuntimeError('sudo required to start the offline VM build')
+    os.umask(0o077)
+    if a.discard_artifact:
+        if P(__file__).resolve()!=SCRIPT:raise RuntimeError('Use the root-owned suite.py for discard')
+        return discard_artifact()
+    if a.supervise or a.cleanup:
+        if P(__file__).resolve()!=SCRIPT:raise RuntimeError('Internal modes require root-owned copied launcher')
+        module('producer').safe_dir(ROOT);return supervise() if a.supervise else cleanup()
+    setup();return 0
+
+
+# Replaces only suite case sequencing and final retained-file cleanup.
+
+def admit(case):
+    m = module(case)
+    with (ROOT / 'admission.lock').open('r+') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        ledger = read(ROOT / 'leases.json')
+        if ledger['active']:
+            raise RuntimeError('A worker remains reserved')
+        if any(name.startswith('eqemu-') for name in m.virsh('list', '--all', '--name').stdout.splitlines()):
+            raise RuntimeError('Another proof domain exists')
+        facts = m.admission()
+        ledger['active'][case] = {'state': 'starting', 'name': m.NAME, 'worker_sha256': HASHES[case+'-worker.py'], 'admission': facts}
+        write(ROOT / 'leases.json', ledger)
+        m.setup()
+        s = m.state()
+        ledger['active'][case].update(state='active', uuid=s['uuid'])
+        write(ROOT / 'leases.json', ledger)
+    return m
+
+
+def supervise():
+    report = {'accepted': False, 'input_id': 'd981148767bab889d8390a6ef7b417aa11342c4c3197643cf12c73d6c46a086d', 'build_id': '1499707f727a4a8af16c47a569b00a49612670ef17283a95261e0010bead44b6', 'suite_passed': False, 'cases_passed': False, 'cases': {}, 'started_at': time.time()}
+    write(ROOT / 'suite-result.json', report)
+    def interrupted(*_): raise RuntimeError('Supervisor interrupted')
+    signal.signal(signal.SIGTERM, interrupted)
+    signal.signal(signal.SIGINT, interrupted)
+    try:
+        controller_budget()
+        deadline = time.monotonic() + 17700
+        for case in CASES:
+            m = admit(case)
+            while time.monotonic() < deadline:
+                props = properties(m.UNIT)
+                if quiescent(props): break
+                if props.get('Slice') != CTL or props.get('MemoryMax') != str(960*1024**2) or props.get('MemorySwapMax') != '0':
+                    raise RuntimeError('Controller budget mismatch')
+                controller_budget()
+                time.sleep(2)
+            else: raise RuntimeError('Worker deadline')
+            s = ownership(m)
+            r = read(m.EVIDENCE / 'report.json')
+            c = read(m.EVIDENCE / 'cleanup.json')
+            result = acceptance(r, c, props, s, absent(m, s))
+            if case == 'producer':
+                result['checks']['artifact_eligible'] = read(ROOT / 'custody.json').get('eligible') is True
+            else:
+                result['checks']['artifact_input_unchanged'] = c.get('artifact_input_unchanged') is True
+            result['case_passed'] = all(result['checks'].values())
+            result.update(report_sha256=digest(m.EVIDENCE/'report.json'), cleanup_sha256=digest(m.EVIDENCE/'cleanup.json'))
+            report['cases'][case] = result
+            write(ROOT / 'suite-result.json', report)
+            if not result['case_passed']: raise RuntimeError('Handoff case failed: ' + case)
+            release(m)
+        report['cases_passed'] = True
+    except Exception as error: report['error'] = str(error)
+    finally:
+        report['finished_at'] = time.time()
+        write(ROOT / 'suite-result.json', report)
+    return 0 if report['cases_passed'] else 1
+
+
+def cleanup():
+    receipt = {'complete': False, 'rescued': [], 'started_at': time.time()}
+    try:
+        for case in CASES:
+            m = module(case)
+            if m.ROOT.exists():
+                if not quiescent(properties(m.UNIT)): stop(m)
+                s = m.state()
+                if not absent(m, s):
+                    ownership(m)
+                    saved = m.EVIDENCE / 'before-suite-rescue'
+                    saved.mkdir(mode=0o755)
+                    saved.chmod(0o755)
+                    for name in ['report.json', 'cleanup.json']:
+                        if (m.EVIDENCE / name).exists():
+                            read(m.EVIDENCE / name)  # Validate type, owner and size before copying.
+                            shutil.copyfile(m.EVIDENCE / name, saved / name)
+                    if (ROOT / 'custody.json').exists():
+                        read(ROOT / 'custody.json')
+                        shutil.copyfile(ROOT / 'custody.json', saved / 'custody.json')
+                    receipt['rescued'].append(case)
+                    if m.cleanup(preserve_failed_outcome=True): raise RuntimeError('Rescue failed')
+                if not absent(m, s): raise RuntimeError('Owned resources remain')
+                if case in read(ROOT / 'leases.json')['active']: release(m)
+        if read(ROOT / 'leases.json')['active']: raise RuntimeError('Reservation remains')
+        try:
+            receipt['controller_budget'] = controller_budget()
+        except Exception as error:
+            receipt['controller_budget_error'] = str(error)[:2000]
+        if CTLFILE.is_symlink() or CTLFILE.read_text() != CTLTEXT: raise RuntimeError('Controller slice identity changed')
+        CTLFILE.unlink()
+        run(['systemctl', 'daemon-reload'])
+        receipt['controller_slice_file_absent'] = not CTLFILE.exists()
+        retain_or_discard(receipt)
+        receipt['complete'] = True
+    except Exception as error: receipt['error'] = str(error)
+    receipt['finished_at'] = time.time()
+    write(ROOT / 'suite-cleanup.json', receipt)
+    report = read(ROOT / 'suite-result.json') if (ROOT / 'suite-result.json').exists() else {}
+    report.update(cleanup=receipt, service_result=os.environ.get('SERVICE_RESULT', 'unknown'))
+    report['suite_passed'] = (report.get('cases_passed') is True and receipt['complete']
+                            and not receipt['rescued'] and 'controller_budget_error' not in receipt
+                            and report['service_result'] == 'success')
+    write(ROOT / 'suite-result.json', report)
+    return 0 if receipt['complete'] else 1
+
+# Appended to the suite. Retain one qualified artifact; discard uses this fixed owner only.
+
+def retained_file(m):
+    m.safe_dir(m.STORE)
+    path = m.STORE/'artifact.raw'
+    info = path.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o077
+            or info.st_size != 4*GIB or set(p.name for p in m.STORE.iterdir()) != {'artifact.raw'}):
+        raise RuntimeError('Retained artifact ownership/type changed')
+    return path
+
+
+def retain_or_discard(receipt):
+    m = module('producer')
+    result = read(ROOT/'suite-result.json')
+    keep = (result.get('cases_passed') is True and not receipt['rescued']
+            and os.environ.get('SERVICE_RESULT') == 'success'
+            and 'controller_budget_error' not in receipt)
+    if not m.STORE.exists() and not m.STORE.is_symlink():
+        if keep: raise RuntimeError('Successful handoff lost its retained artifact')
+        receipt['retained_artifact_absent'] = True
+        return
+    path = retained_file(m)
+    if keep:
+        record = m.custody()
+        if record['producer_uuid'] != ownership_released(m)['uuid']:
+            raise RuntimeError('Retained producer identity differs')
+        # The fresh consumer checked its complete copy; retain the original sealed bytes.
+        record.update(consumer_verified=True, retained_at=time.time(), expires_at=time.time()+7*86400)
+        m.write_custody(record)
+        receipt['artifact_retained'] = {'bytes':record['bytes'], 'sha256':record['sha256'],
+            'manifest_sha256':record['manifest_sha256'], 'expires_at':record['expires_at']}
+    else:
+        record = read(m.CUSTODY) if m.CUSTODY.exists() else {}
+        if record.get('producer_uuid') != m.state()['uuid']:
+            raise RuntimeError('Refuse deleting an unidentified artifact')
+        path.unlink(); m.STORE.rmdir()
+        record.update(eligible=False, discarded=True); m.write_custody(record)
+        receipt['retained_artifact_absent'] = True
+
+
+def ownership_released(m):
+    s = m.state()
+    leases = read(ROOT/'leases.json')
+    matching = [lease for lease in leases['released'] if lease.get('uuid') == s['uuid']]
+    if leases['active'] or len(matching) != 1:
+        raise RuntimeError('Missing released artifact owner')
+    validate_identity(s, matching[0], m.NAME, HASHES['producer-worker.py'], digest(m.SCRIPT))
+    return s
+
+
+def discard_artifact():
+    # Caller must use the copied root-owned launcher after both workers are quiescent.
+    m = module('producer'); m.safe_dir(ROOT)
+    for case in CASES:
+        worker = module(case)
+        if not quiescent(properties(worker.UNIT)) or not absent(worker, worker.state()):
+            raise RuntimeError('Worker still owns live resources')
+    if not quiescent(properties(UNIT)): raise RuntimeError('Suite still active')
+    state_value = ownership_released(m)
+    record = read(m.CUSTODY)
+    if record.get('producer_uuid') != state_value['uuid']: raise RuntimeError('Artifact owner mismatch')
+    if record.get('discarded') is True and not m.STORE.exists(): return 0
+    path = retained_file(m)
+    if m.hash_file(path, 4*GIB, time.monotonic()+300) != record.get('sha256'):
+        raise RuntimeError('Artifact bytes differ; retain for investigation')
+    path.unlink(); m.STORE.rmdir()
+    record.update(eligible=False, discarded=True, discarded_at=time.time()); m.write_custody(record)
+    write(ROOT/'artifact-discard.json', {'complete':True, 'producer_uuid':state_value['uuid'],
+                                       'sha256':record['sha256'], 'at':time.time()})
+    print(json.dumps({'artifact_discarded':True,'original_suite_result_unchanged':True}))
+    return 0
+
+if __name__=='__main__':sys.exit(main())

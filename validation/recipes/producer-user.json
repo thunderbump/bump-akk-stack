@@ -1,0 +1,54 @@
+{
+  "package_update": false,
+  "package_upgrade": false,
+  "users": [],
+  "ssh_pwauth": false,
+  "disable_root": true,
+  "growpart": {
+    "mode": "auto",
+    "devices": [
+      "/"
+    ],
+    "ignore_growroot_disabled": false
+  },
+  "write_files": [
+    {
+      "path": "/opt/eqemu-proof/guest_build.py",
+      "permissions": "0700",
+      "content_file": "producer-guest.py"
+    },
+    {
+      "path": "/opt/eqemu-proof/BUILD_GUEST_ONLY",
+      "permissions": "0600",
+      "content": "corrected-build-01\n"
+    },
+    {
+      "path": "/etc/cloud/cloud.cfg.d/99-offline.cfg",
+      "content": "network: {config: disabled}\n"
+    },
+    {
+      "path": "/opt/eqemu-proof/candidate_inputs.py",
+      "permissions": "0600",
+      "content_file": "inputs.py"
+    },
+    {
+      "path": "/opt/eqemu-proof/candidate-profile.json",
+      "permissions": "0600",
+      "content": ""
+    }
+  ],
+  "runcmd": [
+    [
+      "systemctl",
+      "mask",
+      "--now",
+      "apt-daily.timer",
+      "apt-daily-upgrade.timer"
+    ],
+    [
+      "python3",
+      "-I",
+      "/opt/eqemu-proof/guest_build.py"
+    ]
+  ]
+}
