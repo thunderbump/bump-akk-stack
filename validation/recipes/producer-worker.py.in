@@ -489,7 +489,7 @@ class BaseBuildProtocol:
                 keys={'kind','nonce','ok','checks','binaries','cache_sha256','guest_disk_used_bytes','effective_cmake'}
                 checks={'inputs','packages','solver','negative_control','perl','system_zlib','build','tests'}
                 if not self.preflight or set(v)!=keys or not isinstance(v['checks'],dict) or set(v['checks'])!=checks or any(x is not True for x in v['checks'].values()):raise RuntimeError('Invalid success result')
-                if not isinstance(v['binaries'],dict) or set(v['binaries'])!={'world','zone','shared_memory','loginserver','ucs','queryserv','eqlaunch','tests'}:raise RuntimeError('Missing binary identity')
+                if not isinstance(v['binaries'],dict) or set(v['binaries'])!={'world','zone','shared_memory','loginserver','ucs','queryserv','eqlaunch','tests','tests_runner_controls','tests_reporting_controls'}:raise RuntimeError('Missing binary identity')
                 if any(not isinstance(x,str) or not re.fullmatch('[a-f0-9]{64}',x) for x in [v['cache_sha256'],*v['binaries'].values()]):raise RuntimeError('Invalid binary hash')
                 if type(v['guest_disk_used_bytes']) is not int or not 0<v['guest_disk_used_bytes']<=32*GIB:raise RuntimeError('Invalid disk observation')
                 if not isinstance(v['effective_cmake'],dict) or len(v['effective_cmake'])>20 or any(not isinstance(x,str) or len(x)>500 for x in v['effective_cmake'].values()):raise RuntimeError('Invalid effective configuration')
@@ -559,7 +559,7 @@ def utility_result(output, exit_code):
         raise ValueError('Utility suite failed or incomplete')
     return result
 
-"""Exact outcomes for the five fixed C++ runner controls; no process execution."""
+"""Exact outcomes for the six fixed C++ runner controls; no process execution."""
 import json
 
 EXPECTED = {
@@ -568,6 +568,7 @@ EXPECTED = {
     'empty': (1, 0, 0, 0, 0, True, False),
     'setup-exception': (1, 1, 1, 0, 0, False, False),
     'body-exception': (1, 1, 1, 1, 1, True, False),
+    'teardown-exception': (1, 1, 1, 0, 0, False, False),
 }
 
 
@@ -621,6 +622,10 @@ class BuildProtocol(BaseBuildProtocol):
                 if mode not in EXPECTED: raise RuntimeError('Unknown runner control')
                 record = dict(item); rc = record.pop('exit_code', None)
                 control_result('EQEMU_TEST_RESULT ' + json.dumps(record), rc, mode)
+            elif name == 'reporting-controls':
+                if (set(item) != {'exit_code', 'passed'} or type(item['exit_code']) is not int
+                        or item['exit_code'] != 0 or item['passed'] is not True):
+                    raise RuntimeError('Reporting control completion missing or failed')
             elif name == 'utility':
                 utility_result('EQEMU_TEST_RESULT ' + json.dumps(item), 0)
             elif name != 'measurement' and not re.fullmatch(r'(elf|loader)-\d{1,3}', name):
@@ -628,11 +633,11 @@ class BuildProtocol(BaseBuildProtocol):
             self.observations[name] = item
             return 'observation'
         if value.get('kind') == 'result' and value.get('ok') is True:
-            required = {'candidate', 'utility', 'measurement', *('runner-' + mode for mode in EXPECTED),
-                        *('loader-' + str(i) for i in range(4))}
+            required = {'candidate', 'utility', 'measurement', 'reporting-controls', *('runner-' + mode for mode in EXPECTED),
+                        *('loader-' + str(i) for i in range(6))}
             if not required <= self.observations.keys(): raise RuntimeError('Incomplete corrected build evidence')
             files = [item for name, item in self.observations.items() if name.startswith('elf-')]
-            if not 4 <= len(files) <= 128: raise RuntimeError('Incomplete ELF inventory')
+            if not 6 <= len(files) <= 128: raise RuntimeError('Incomplete ELF inventory')
             for item in files:
                 if (type(item.get('bytes')) is not int or not 0 < item['bytes'] <= 32*GIB
                         or type(item.get('build_file')) is not bool
@@ -941,7 +946,7 @@ class BuildProtocol(ProducerBuildProtocol):
             if value.get('kind') == 'result' and value.get('ok') is True:
                 artifact = value.get('artifact', {})
                 if (set(artifact) != {'identity', 'manifest_sha256', 'files', 'payload_bytes', 'unmounted'}
-                        or artifact['identity'] != BUILD_ID or artifact['files'] != 4
+                        or artifact['identity'] != BUILD_ID or artifact['files'] != 6
                         or type(artifact['payload_bytes']) is not int or not 0 < artifact['payload_bytes'] <= 3*GIB
                         or not re.fullmatch('[a-f0-9]{64}', artifact.get('manifest_sha256', ''))
                         or artifact['unmounted'] is not True):
@@ -952,7 +957,8 @@ class BuildProtocol(ProducerBuildProtocol):
         kind = value.get('kind')
         if kind == 'ready': return super().accept(value)
         if kind == 'observation':
-            if value.get('name') != 'utility': raise RuntimeError('Unexpected consumer observation')
+            if value.get('name') not in {'utility', 'reporting-controls', *('runner-' + mode for mode in EXPECTED)}:
+                raise RuntimeError('Unexpected consumer observation')
             return super().accept(value)
         if kind == 'result' and value.get('ok') is True:
             self.frames += 1
@@ -966,11 +972,12 @@ class BuildProtocol(ProducerBuildProtocol):
             if (item.get('identity') != BUILD_ID or item.get('manifest_sha256') != custody()['manifest_sha256']
                     or item.get('readonly') is not True or item.get('unmounted') is not True
                     or item.get('compiled') is not False
-                    or item.get('binaries') != {name:binaries[name] for name in ['world','zone','shared_memory','tests']}
+                    or item.get('binaries') != {name:binaries[name] for name in ['world','zone','shared_memory','tests','tests_runner_controls','tests_reporting_controls']}
                     or item.get('libraries') != libraries
                     or item.get('after_status') != prior['preflight_untrusted']['after_status']
                     or item.get('utility') != self.observations.get('utility')
-                    or 'utility' not in self.observations):
+                    or not {'utility', 'reporting-controls', *('runner-' + mode for mode in EXPECTED)} <= self.observations.keys()
+                    or item.get('controls') != {name: self.observations[name] for name in ['reporting-controls', *('runner-' + mode for mode in EXPECTED)]}):
                 raise RuntimeError('Consumer output or environment differs from producer')
             self.result = value
             return kind

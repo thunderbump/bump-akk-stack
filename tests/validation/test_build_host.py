@@ -77,7 +77,7 @@ class HostAdmission(unittest.TestCase):
             self.assertEqual([p.name for p in prepared.iterdir()],['unrelated'])
 
     @contextlib.contextmanager
-    def retired(self):
+    def retired(self, pin_slot=0):
         """Small synthetic administrator trust pin, without an installed host."""
         with tempfile.TemporaryDirectory() as tmp,contextlib.ExitStack() as patches:
             base=Path(tmp);lib=base/'lib';lib.mkdir()
@@ -111,7 +111,7 @@ class HostAdmission(unittest.TestCase):
                  properties=lambda unit:{'stopped':True},quiescent=lambda props:props['stopped'],module=lambda *a,**k:worker)
             patches.enter_context(patch.object(self.host,'LIB',lib))
             patches.enter_context(patch.object(self.host,'BASE',base))
-            patches.enter_context(patch.object(self.host,'PRIOR_MANIFEST',digest))
+            patches.enter_context(patch.object(self.host,'PRIOR_MANIFESTS',(digest,'0'*64) if pin_slot == 0 else ('0'*64,digest)))
             patches.enter_context(patch.object(self.host.S,'safe_path',side_effect=lambda path,**kw:path.lstat()))
             def read(path):
                 self.host.S.safe_path(path)
@@ -120,6 +120,23 @@ class HostAdmission(unittest.TestCase):
             patches.enter_context(patch.object(self.host,'suite_for',return_value=suite))
             patches.enter_context(patch.object(self.host,'unstarted_absent',return_value=True))
             yield root,record,version,suite
+
+    def test_only_two_declared_prior_release_pins_are_supported(self):
+        self.assertEqual(self.host.PRIOR_MANIFESTS, (
+            'b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a',
+            'fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97'))
+        for slot in (0, 1):
+            with self.subTest(slot=slot), self.retired(pin_slot=slot) as (root,record,version,suite):
+                before={str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()}
+                with patch.object(self.host.S,'write_json') as write:
+                    result=self.host.prior_report(root,record)
+                self.assertTrue(result['terminal']);self.assertTrue(result['cleanup_complete'])
+                write.assert_not_called()
+                self.assertEqual(before,{str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()})
+                record['version']=str(self.host.LIB/('f'*16))
+                with patch.object(self.host,'suite_for') as load,self.assertRaisesRegex(ValueError,'Unknown prior'):
+                    self.host.prior_report(root,record)
+                load.assert_not_called()
 
     def test_known_prior_release_live_cleanup_is_read_only(self):
         with self.retired() as (root,record,version,suite):

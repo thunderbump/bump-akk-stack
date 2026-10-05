@@ -24,6 +24,7 @@ S.BASE = BASE
 # One administrator-reviewed installed release predates maintained packaging.
 # This is an admission-only trust pin, not a general historical record reader.
 PRIOR_MANIFEST = 'b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a'
+PRIOR_MANIFESTS = (PRIOR_MANIFEST, 'fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97')
 LIB = Path('/usr/local/lib/eqemu-build')
 
 
@@ -179,17 +180,21 @@ def report(identifier, uid):
 
 
 def prior_report(root, record):
-    """Verify the one retired release and query live cleanup without mutation."""
+    """Verify explicitly pinned retired releases and query live cleanup without mutation."""
     identifier = run_id(root.name)
     S.safe_path(root, directory=True)
-    version = LIB/PRIOR_MANIFEST[:16]
+    pinned = next((digest for digest in PRIOR_MANIFESTS if isinstance(record, dict)
+                   and record.get('version') == str(LIB/digest[:16])), None)
+    if pinned is None:
+        raise ValueError('Unknown prior build ownership or release')
+    version = LIB/pinned[:16]
     if (not isinstance(record, dict) or type(record.get('uid')) is not int
             or record['uid'] <= 0 or record.get('run_id') != identifier
             or record.get('version') != str(version)):
         raise ValueError('Unknown prior build ownership or release')
     S.safe_path(version, directory=True)
     manifest = S.read_json(version/'manifest.json')
-    if sha(version/'manifest.json') != PRIOR_MANIFEST:
+    if sha(version/'manifest.json') != pinned:
         raise ValueError('Prior release manifest changed')
     # The manifest pin also fixes its complete file set and unchanged profile.
     for name, expected in manifest['files'].items():

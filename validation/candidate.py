@@ -3,6 +3,8 @@
 import argparse
 import grp
 import json
+import hashlib
+import stat
 import os
 from pathlib import Path
 import resource
@@ -165,13 +167,100 @@ def execute(source):
     return code
 
 
+def identity_file(path, limit):
+    """Read bounded administrator-owned bytes without following a final symlink."""
+    for parent in reversed(path.parents):
+        info = parent.lstat()
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022:
+            raise ValueError('Unsafe installed identity ancestor')
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(stream.fileno())
+        if (not stat.S_ISREG(info.st_mode) or info.st_uid != 0 or info.st_mode & 0o022
+                or info.st_size > limit):
+            raise ValueError('Unsafe installed identity file')
+        data = stream.read(limit + 1)
+        if len(data) != info.st_size:
+            raise ValueError('Installed identity file changed while reading')
+        return data
+
+
+def installed_identity(package=HERE):
+    """Probe sealed runtime/profile/input declarations; never prepare or submit work."""
+    def unique(pairs):
+        value = {}
+        for key, item in pairs:
+            if key in value:
+                raise ValueError('Duplicate installed identity field')
+            value[key] = item
+        return value
+    raw = identity_file(package/'manifest.json', 16384)
+    manifest = json.loads(raw, object_pairs_hook=unique)
+    digest = hashlib.sha256(raw).hexdigest()
+    if package.name != digest[:16]:
+        raise ValueError('Installed release manifest identity mismatch')
+    names = {'common.py', 'render.py', 'host.py', 'candidate.py', 'install.py',
+             'disable.py', 'host_support.py', 'installer_support.py', 'inputs.py',
+             'profile.json', 'producer-user.json', 'consumer-user.json', 'producer-guest.py',
+             'consumer-guest.py', 'producer-worker.py.in', 'consumer-worker.py.in',
+             'suite.py.in', 'recipe-binding.json', 'host-inputs.json', 'client-config.json'}
+    if (not isinstance(manifest, dict) or set(manifest) != {'version', 'files'}
+            or type(manifest['version']) is not int or manifest['version'] != 1
+            or not isinstance(manifest['files'], dict) or set(manifest['files']) != names):
+        raise ValueError('Installed identity manifest shape')
+    if set(path.name for path in package.iterdir()) != names | {'manifest.json'}:
+        raise ValueError('Installed identity file inventory changed')
+    checked = {}
+    for name, expected in manifest['files'].items():
+        if not isinstance(expected, str) or not re.fullmatch('[a-f0-9]{64}', expected):
+            raise ValueError('Installed identity digest shape')
+        data = identity_file(package/name, 256 * 1024)
+        if hashlib.sha256(data).hexdigest() != expected:
+            raise ValueError('Installed identity file changed: ' + name)
+        checked[name] = data
+    profile = json.loads(checked['profile.json'], object_pairs_hook=unique)
+    host_inputs = json.loads(checked['host-inputs.json'], object_pairs_hook=unique)
+    client = json.loads(checked['client-config.json'], object_pairs_hook=unique)
+    if (not isinstance(profile, dict) or not isinstance(profile.get('dependencies'), dict)
+            or not isinstance(host_inputs, dict) or set(host_inputs) != {'base.qcow2', 'fixture.iso'}
+            or not isinstance(client, dict) or set(client) != {'input_store', 'websocketpp'}
+            or any(not isinstance(v, str) or not Path(v).is_absolute() for v in client.values())):
+        raise ValueError('Installed declared input contract shape')
+    for name, key in [('base.qcow2', 'base'), ('fixture.iso', 'media')]:
+        entry = host_inputs[name]
+        dependency = profile['dependencies'].get(key)
+        if (not isinstance(entry, dict) or set(entry) != {'source', 'bytes', 'sha256'}
+                or not isinstance(dependency, dict)
+                or type(entry['bytes']) is not int or entry['bytes'] <= 0
+                or not isinstance(entry['sha256'], str) or not re.fullmatch('[a-f0-9]{64}', entry['sha256'])
+                or not isinstance(dependency.get('path'), str)
+                or Path(dependency['path']).is_absolute() or '..' in Path(dependency['path']).parts
+                or entry != dict(source=str(Path(client['input_store'])/dependency['path']),
+                                 bytes=dependency.get('bytes'), sha256=dependency.get('sha256'))):
+            raise ValueError('Installed declared input identity mismatch')
+    if identity_file(package/'manifest.json', 16384) != raw:
+        raise ValueError('Installed identity manifest changed while reading')
+    # The manifest binds the profile, all runtime/recipe bytes and both input declarations.
+    # Large dependency bytes are verified by preparation and admission, not this cheap probe.
+    return {'schema_version': 1, 'identity': 'sha256:' + digest}
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--source',type=Path,default=Path.cwd())
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--source', type=Path)
+    group.add_argument('--identity', action='store_true', help='Read sealed validator identity without starting work')
     args=parser.parse_args()
     resource.setrlimit(resource.RLIMIT_AS,(1024**3,1024**3))
     resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024**2,512*1024**2))
-    return execute(args.source)
+    if args.identity:
+        try:
+            print(json.dumps(installed_identity(), separators=(',', ':')))
+            return 0
+        except (OSError, ValueError, TypeError, KeyError, RecursionError) as error:
+            print('Validator identity refused: ' + str(error)[:500], file=sys.stderr)
+            return 2
+    return execute(args.source or Path.cwd())
 
 if __name__=='__main__':
     raise SystemExit(main())

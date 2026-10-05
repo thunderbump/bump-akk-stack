@@ -161,7 +161,7 @@ def build():
  real_utility_suite()
  measure_outputs()
  binaries={}
- for n in ['world','zone','shared_memory','loginserver','ucs','queryserv','eqlaunch','tests']:
+ for n in ['world','zone','shared_memory','loginserver','ucs','queryserv','eqlaunch','tests','tests_runner_controls','tests_reporting_controls']:
   p=WORK/'build/bin'/n
   if not p.is_file():raise RuntimeError('Expected binary absent: '+n)
   binaries[n]=sha(p)
@@ -249,7 +249,7 @@ def utility_result(output, exit_code):
         raise ValueError('Utility suite failed or incomplete')
     return result
 
-"""Exact outcomes for the five fixed C++ runner controls; no process execution."""
+"""Exact outcomes for the six fixed C++ runner controls; no process execution."""
 import json
 
 EXPECTED = {
@@ -258,6 +258,7 @@ EXPECTED = {
     'empty': (1, 0, 0, 0, 0, True, False),
     'setup-exception': (1, 1, 1, 0, 0, False, False),
     'body-exception': (1, 1, 1, 1, 1, True, False),
+    'teardown-exception': (1, 1, 1, 0, 0, False, False),
 }
 
 
@@ -351,15 +352,27 @@ def completed_output(path, parser, *args):
         raise RuntimeError(path.stem + ': ' + str(error)[:500] + '\n' + tail.export()['text']) from error
 
 
-def runner_controls():
-    command('runner-control-build', ['cmake', '--build', str(WORK/'build'),
-            '--target', 'tests_runner_controls', '--parallel', '1'], timeout=600)
-    for mode in ['pass', 'fail', 'empty', 'setup-exception', 'body-exception']:
-        expected_exit = 0 if mode == 'pass' else 1
+def runner_controls(build_controls=True):
+    if build_controls:
+        command('runner-control-build', ['cmake', '--build', str(WORK/'build'),
+                '--target', 'tests_runner_controls', 'tests_reporting_controls',
+                '--parallel', '1'], timeout=600)
+    for mode in EXPECTED:
+        expected_exit = EXPECTED[mode][0]
         path = command('runner-' + mode, [str(WORK/'build/bin/tests_runner_controls'), mode],
                        timeout=30, cwd=WORK/'build', cap=1024**2, expected_exit=expected_exit)
         record = completed_output(path, control_result, expected_exit, mode)
         emit({'kind': 'observation', 'name': 'runner-' + mode, 'value': record})
+    path = command('reporting-controls', [str(WORK/'build/bin/tests_reporting_controls')],
+                   timeout=30, cwd=WORK/'build', cap=1024**2)
+    record = completed_output(path, reporting_result, 0)
+    emit({'kind': 'observation', 'name': 'reporting-controls', 'value': record})
+
+
+def reporting_result(output, exit_code):
+    if exit_code != 0 or output != 'Reporting controls passed\n':
+        raise ValueError('Reporting control completion missing or failed')
+    return {'exit_code': 0, 'passed': True}
 
 
 def real_utility_suite():
@@ -375,7 +388,7 @@ def measure_outputs():
     This does not prove dlopen, Perl/Lua modules, maps, or a reusable runtime image.
     Unstripped binaries retain their embedded debug sections. No export is promoted.
     """
-    paths = {str(WORK/'build/bin'/name) for name in ['world', 'zone', 'shared_memory', 'tests']}
+    paths = {str(WORK/'build/bin'/name) for name in ['world', 'zone', 'shared_memory', 'tests', 'tests_runner_controls', 'tests_reporting_controls']}
     executables = sorted(paths)
     for index, executable in enumerate(executables):
         output = command('loader-' + str(index), ['ldd', executable], timeout=30, cap=1024**2).read_text()
@@ -551,7 +564,7 @@ import hashlib
 import json
 import re
 
-NAMES = {'world', 'zone', 'shared_memory', 'tests'}
+NAMES = {'world', 'zone', 'shared_memory', 'tests', 'tests_runner_controls', 'tests_reporting_controls'}
 
 
 def manifest_bytes(value):
@@ -561,8 +574,8 @@ def manifest_bytes(value):
 def validate_payload(value, identity):
     # validate_inventory is the existing bounded flat-file policy, included by preparation.
     entries = validate_inventory(value, identity)
-    if {entry['path'] for entry in entries} != NAMES or len(entries) != 4:
-        raise ValueError('Expected four executable files')
+    if {entry['path'] for entry in entries} != NAMES or len(entries) != len(NAMES):
+        raise ValueError('Expected six executable files')
     libraries = value.get('libraries')
     if not isinstance(libraries, list) or not 1 <= len(libraries) <= 128:
         raise ValueError('Library inventory size')
@@ -651,7 +664,7 @@ def export_build(result):
     finally:
         command('artifact-unmount', ['umount', str(MOUNT)], timeout=120)
     return {'identity': BUILD_ID, 'manifest_sha256': hashlib.sha256(data).hexdigest(),
-            'files': 4, 'payload_bytes': sum(entry['bytes'] for entry in inventory['files']), 'unmounted': True}
+            'files': len(NAMES), 'payload_bytes': sum(entry['bytes'] for entry in inventory['files']), 'unmounted': True}
 
 
 def consume_build():
@@ -681,7 +694,7 @@ def consume_build():
         else: raise RuntimeError('Read-only artifact accepted a write')
     finally:
         command('artifact-unmount', ['umount', str(MOUNT)], timeout=120)
-    # Resolve all four in the new filesystem, and ask its loader to verify each ELF.
+    # Resolve all six in the new filesystem, and ask its loader to verify each ELF.
     observed = set()
     for index, name in enumerate(sorted(NAMES)):
         path = target/name
@@ -698,9 +711,12 @@ def consume_build():
         observed.update(paths)
         command('consumer-verify-'+str(index), ['/lib64/ld-linux-x86-64.so.2', '--verify', str(path)], timeout=30)
     if observed != set(libraries): raise RuntimeError('Consumer dependency set differs')
+    runner_controls(build_controls=False)
     real_utility_suite()
     return {'identity': BUILD_ID, 'manifest_sha256': EXPECTED_ARTIFACT,
-            'utility': OBSERVATIONS['utility'], 'binaries': {e['path']: e['sha256'] for e in inventory['files']},
+            'utility': OBSERVATIONS['utility'],
+            'controls': {name: OBSERVATIONS[name] for name in ['reporting-controls', *('runner-' + mode for mode in EXPECTED)]},
+            'binaries': {e['path']: e['sha256'] for e in inventory['files']},
             'libraries': libraries, 'before_status': before, 'after_status': after,
             'readonly': True, 'unmounted': True, 'compiled': False}
 
