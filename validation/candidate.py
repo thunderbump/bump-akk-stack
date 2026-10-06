@@ -172,7 +172,8 @@ def execute(source, profile_name=PROFILE, control=None, retain=False, reuse=None
             retained_artifact=(result or {}).get('retained_artifact'),qualification_control=control,reused_from=reuse,
             cleanup_complete=result['cleanup_complete'] if result else None,
             exit_code=code,error=error or (result or {}).get('error'),secondary_error=secondary,
-            diagnostics=(result or {}).get('diagnostics',{}))),flush=True)
+            diagnostics=(result or {}).get('diagnostics',{}),
+            **({'actor_runtime':(result or {}).get('actor_runtime')} if profile_name=='actor-lifecycle-v1' else {}))),flush=True)
         for sig,handler in previous.items():signal.signal(sig,handler)
     return code
 

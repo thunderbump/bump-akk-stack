@@ -404,6 +404,126 @@ class QualificationAdmission(unittest.TestCase):
             self.assertEqual(self.host.parse(json.dumps({'version':1,'op':op,'run_id':'1111111111'}))['op'],op)
 
 
+class PublicEvidence(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        import test_build_host
+        cls.fixture = test_build_host.HostAdmission
+        cls.fixture.setUpClass()
+        cls.host = cls.fixture.host
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.fixture.tearDownClass()
+
+    def public_status(self, root, observed, profile=actor.PROFILE, code=0, producer_failure=False, container=...):
+        work = root/'work'
+        work.mkdir()
+        workers = {'producer': worker(), 'consumer': worker()}
+        if observed is None:
+            workers['consumer']['observations_untrusted'] = {}
+        else:
+            workers['consumer']['observations_untrusted']['actor-runtime'] = observed
+        if container is not ...:
+            workers['consumer']['observations_untrusted'] = container
+        if producer_failure:
+            workers['producer']['guest_report_untrusted'] = {'ok': False, 'error': 'server-build: exit 1\nCandidate compile failed'}
+        if code == 1:
+            workers['consumer']['guest_report_untrusted'] = {'ok': False, 'error': 'actor-lifecycle: exit 1\nNative assertion'}
+            workers['consumer']['stages']['actor-lifecycle']['state'] = 'failed'
+        modules = {}
+        for role, data in workers.items():
+            directory = work/role
+            evidence = directory/'evidence'
+            evidence.mkdir(parents=True)
+            (evidence/'report.json').write_text(json.dumps(data))
+            modules[role] = SimpleNamespace(ROOT=directory, UNIT=role, EVIDENCE=evidence,
+                                            STORE=work/'absent-artifact', state=lambda: {})
+        suite_result = {'suite_passed': code == 0 and not producer_failure,
+                        'cases_passed': code == 0 and not producer_failure, 'cleanup': {'complete': True},
+                        'cases': {'producer': {'case_passed': not producer_failure}, 'consumer': {'case_passed': code == 0}}}
+        (work/'suite-result.json').write_text(json.dumps(suite_result))
+        (work/'leases.json').write_text(json.dumps({'active': {}}))
+        suite = SimpleNamespace(ROOT=work, UNIT='suite', CASES=('producer', 'consumer'),
+                                quiescent=lambda _: True, properties=lambda _: {},
+                                module=lambda role, **_: modules[role], absent=lambda *_: True)
+        record = {'candidate': FACTS, 'profile': profile, 'recipe': {'build_id': 'f'*64}}
+        with patch.object(self.host, 'suite_for', return_value=suite), \
+             patch.object(self.host.S, 'read_json', side_effect=lambda p: json.loads(p.read_text())), \
+             patch.object(self.host.S, 'write_json'):
+            return self.host.report_record(root, record, '0123456789')
+
+    def test_native_counts_and_timings_survive_status_and_foreground_final(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            observed = observation()
+            observed['credentials'] = 'private-do-not-export'
+            status = self.public_status(root, observed)
+            self.assertEqual(status['exit_code'], 0)
+            proof = status['actor_runtime']
+            self.assertEqual(proof['result']['cycles'], 3)
+            self.assertEqual(set(proof['result']['completed_cases']), actor.CASES)
+            self.assertEqual(proof['stage_seconds'], {'actor-lifecycle': 3})
+            self.assertNotIn('private-do-not-export', json.dumps(proof))
+            client = root/'client'
+            (client/'uploads'/str(os.getuid())).mkdir(parents=True)
+            def prepare(source, directory, **_):
+                iso = directory/'fake.iso'
+                iso.write_bytes(b'x')
+                return iso, FACTS
+            def request(value):
+                if value['op'] == 'run':
+                    return dict(started=True, run_id=value['run_id'], candidate=FACTS, build_id='f'*64)
+                self.assertEqual(value['op'], 'status')
+                return dict(status, run_id=value['run_id'])
+            output = io.StringIO()
+            with patch.object(candidate, 'BASE', client), patch.object(candidate, 'prepare', prepare), \
+                 patch.object(candidate, 'request', request), contextlib.redirect_stdout(output):
+                self.assertEqual(candidate.execute(root, actor.PROFILE), 0)
+            final = json.loads(output.getvalue().splitlines()[-1])
+            self.assertEqual(final['actor_runtime'], proof)
+            self.assertTrue(final['accepted'])
+
+    def test_assertion_evidence_preserves_failure_and_unit_shape(self):
+        for profile, code in [(actor.PROFILE, 1), ('build-unit-v1', 0)]:
+            with self.subTest(profile=profile), tempfile.TemporaryDirectory() as tmp:
+                status = self.public_status(Path(tmp), observation(code=code), profile, code)
+                self.assertEqual(status['exit_code'], code)
+                if profile == actor.PROFILE:
+                    self.assertEqual(status['actor_runtime']['result']['status'], 'assertion-failed')
+                    self.assertFalse(status['accepted'])
+                else:
+                    self.assertNotIn('actor_runtime', status)
+
+    def test_unknown_missing_and_bad_timing_do_not_export_raw_data(self):
+        for change in (None, {'elapsed_seconds': float('inf')}, {'elapsed_seconds': 10**400},
+                       {'elapsed_seconds': True}, {'stage_seconds': {'private-password': 1}},
+                       {'result': {'raw': 'private-password'}}, {'database_cleanup': 'private-password'}):
+            with self.subTest(change=str(change)[:50]), tempfile.TemporaryDirectory() as tmp:
+                observed = dict(observation(), **change) if change is not None else None
+                status = self.public_status(Path(tmp), observed)
+                self.assertIsNone(status['actor_runtime'])
+                self.assertEqual(status['exit_code'], 2 if change is None or 'result' in change or 'database_cleanup' in change else 0)
+                self.assertNotIn('private-password', json.dumps(status))
+
+    def test_native_timing_overflow_cannot_hide_known_producer_failure(self):
+        observed = observation()
+        observed['result']['elapsed_seconds']['boot'] = 10**400
+        with tempfile.TemporaryDirectory() as tmp:
+            status = self.public_status(Path(tmp), observed, producer_failure=True)
+        self.assertEqual(status['exit_code'], 1)
+        self.assertIsNone(status['actor_runtime'])
+        self.assertIn('Candidate compile failed', status['diagnostics']['producer'])
+
+    def test_bad_observation_container_cannot_hide_known_producer_failure(self):
+        for container in (None, [], 'private-password'):
+            with self.subTest(container=container), tempfile.TemporaryDirectory() as tmp:
+                status = self.public_status(Path(tmp), observation(), producer_failure=True, container=container)
+            self.assertEqual(status['exit_code'], 1)
+            self.assertIsNone(status['actor_runtime'])
+            self.assertNotIn('private-password', json.dumps(status))
+
+
 class ExportedDiagnostics(unittest.TestCase):
     def test_native_assertion_text_survives_guest_cleanup_and_redacts_split_credentials(self):
         import hashlib

@@ -19,6 +19,45 @@ RECIPE = {
 }
 CASES = {'create-duplicate', 'name-collision', 'native-processing',
          'retire-recreate', 'external-removal-id-reuse', 'save-fresh-zone'}
+PUBLIC_STAGES = {
+    'actor-mount-input', 'actor-package-plan', 'actor-mask-services',
+    'actor-package-install', 'actor-package-audit', 'actor-package-identities',
+    'actor-perl-modules', 'actor-db-init', 'actor-db-create',
+    'actor-import-content', 'actor-import-login', 'actor-import-player',
+    'actor-import-state', 'actor-import-system', 'actor-tables', 'actor-version',
+    'actor-empty', 'actor-content', 'actor-state', 'actor-fixture',
+    'actor-fixture-checked', 'actor-account', 'actor-shared-memory', 'actor-lifecycle',
+}
+
+
+def summary(value, control=None):
+    """Project only bounded proof fields; raw guest observations stay private."""
+    if (not isinstance(value, dict) or value.get('profile') != PROFILE
+            or not isinstance(value.get('result'), dict)
+            or not isinstance(value.get('fixture_manifest_sha256'), str)
+            or not re.fullmatch('[a-f0-9]{64}', value['fixture_manifest_sha256'])):
+        raise ValueError('Actor summary identity')
+    native = dict(value['result'])
+    code = native.pop('exit_code', None)
+    try:
+        native = result(native, code, control)
+    except OverflowError:
+        raise ValueError('Actor summary native timing') from None
+    stages = value.get('stage_seconds')
+    if not isinstance(stages, dict) or not set(stages) <= PUBLIC_STAGES:
+        raise ValueError('Actor summary stages')
+    times = [value.get('elapsed_seconds'), *stages.values()]
+    if any(type(t) not in (int, float) or not 0 <= t <= 19000 or not math.isfinite(t) for t in times):
+        raise ValueError('Actor summary timings')
+    flags = ('database_cleanup', 'outputs_unchanged', 'inputs_unchanged')
+    if any(type(value.get(name)) is not bool for name in flags):
+        raise ValueError('Actor summary cleanup')
+    view = dict(profile=PROFILE, fixture_manifest_sha256=value['fixture_manifest_sha256'],
+                result=native, elapsed_seconds=value['elapsed_seconds'],
+                stage_seconds=dict(stages), **{name: value[name] for name in flags})
+    if len(json.dumps(view, allow_nan=False).encode()) > 8192:
+        raise ValueError('Actor summary budget')
+    return view
 
 
 def options(profile, control=None, retain=False, reuse=None):
