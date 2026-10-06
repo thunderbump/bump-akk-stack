@@ -46,8 +46,9 @@ def run_id(value):
     return value
 
 
-def candidate_profile(baseline, candidate, tree):
-    profile = json.loads(json.dumps(baseline))
+def candidate_profile(baseline, candidate, tree, profile_name=PROFILE, fixture=None):
+    from actor import selected
+    profile = selected(baseline, profile_name, fixture)
     profile['sources']['eqemu'].update(commit=candidate, tree=tree)
     return profile
 
@@ -81,13 +82,54 @@ def candidate_failure(worker, consumer=False):
             and not re.search(r'(?i)out of memory|cannot allocate memory|no space left|killed signal', error))
 
 
-def outcome(summary, workers, clean):
-    """Scope is build/unit only. Unknown failures never trigger automatic repair."""
+def outcome(summary, workers, clean, profile=PROFILE, control=None, reused=False):
+    """Selected coverage must complete. Unknown failures never trigger repair."""
     if not clean:
         return 2
+    cleanup = summary.get('cleanup', {})
+    ordinary_cleanup = not cleanup.get('rescued') and 'controller_budget_error' not in cleanup
+    producer = workers.get('producer', {})
+    consumer = workers.get('consumer', {})
+    producer_guest = producer.get('guest_report_untrusted') if isinstance(producer,dict) else None
+    known_consumer_failure = (summary.get('cases', {}).get('producer', {}).get('case_passed') is True
+                             and worker_safe(producer) and isinstance(producer_guest,dict)
+                             and producer_guest.get('ok') is True
+                             and candidate_failure(consumer,consumer=True)
+                             and consumer['cleanup'].get('artifact_input_unchanged') is True)
+    # Utility checks precede the actor stage. Their existing narrow failure evidence
+    # stays repairable in ordinary runs, but cannot qualify an unexecuted control.
+    if ordinary_cleanup and control is None and (candidate_failure(producer) or known_consumer_failure):
+        return 1
+    from actor import PROFILE as ACTOR, result
+    if profile == ACTOR:
+        consumer = workers.get('consumer', {})
+        actor = consumer.get('observations_untrusted', {}).get('actor-runtime', {})
+        try:
+            record = dict(actor['result']); code = record.pop('exit_code')
+            result(record, code, control)
+            proven = (actor['database_cleanup'] is True and actor['outputs_unchanged'] is True
+                      and actor['inputs_unchanged'] is True and worker_safe(consumer)
+                      and consumer['cleanup'].get('artifact_input_unchanged') is True
+                      and consumer.get('stages', {}).get('actor-lifecycle', {}).get('state') in ('passed', 'failed'))
+        except (KeyError, ValueError, TypeError):
+            proven = False
+        producer_ok = reused or (summary.get('cases', {}).get('producer', {}).get('case_passed') is True
+                               and worker_safe(workers.get('producer', {})))
+        if not proven or not producer_ok:
+            return 2
+        guest = consumer.get('guest_report_untrusted', {})
+        evidenced_assertion = (code == 1 and guest.get('ok') is False
+                               and re.match(r'^actor-lifecycle: exit 1\n', guest.get('error', ''))
+                               and ordinary_cleanup)
+        if control is not None:
+            return 1 if control == 'assertion' and evidenced_assertion else 2
+        if evidenced_assertion:
+            return 1
+        if code != 0:
+            return 2
     if summary.get('suite_passed') is True and summary.get('cases_passed') is True:
         cases = summary.get('cases', {})
-        if set(cases) == {'producer', 'consumer'} and all(cases[c].get('case_passed') is True for c in cases):
+        if set(cases) == ({'consumer'} if reused else {'producer', 'consumer'}) and all(cases[c].get('case_passed') is True for c in cases):
             return 0
     # Candidate failure requires ordinary cleanup without rescue or controller faults.
     cleanup = summary.get('cleanup', {})

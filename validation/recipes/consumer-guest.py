@@ -510,6 +510,8 @@ import errno
 import stat
 
 ROLE = 'consumer'
+VALIDATION_PROFILE = 'build-unit-v1'
+QUALIFICATION_CONTROL = None
 BUILD_ID = '1499707f727a4a8af16c47a569b00a49612670ef17283a95261e0010bead44b6'
 ARTIFACT_SIZE = 4*1024**3
 MOUNT = P('/opt/build-artifact')
@@ -611,12 +613,22 @@ def consume_build():
     if observed != set(libraries): raise RuntimeError('Consumer dependency set differs')
     runner_controls(build_controls=False)
     real_utility_suite()
-    return {'identity': BUILD_ID, 'manifest_sha256': EXPECTED_ARTIFACT,
+    actor = None
+    if VALIDATION_PROFILE == 'actor-lifecycle-v1':
+        import sys
+        sys.path.insert(0, '/opt/eqemu-proof')
+        from actor_runtime import run
+        fixture = json.loads(P('/opt/eqemu-proof/runtime-fixture.json').read_text())
+        actor = run(sys.modules[__name__], QUALIFICATION_CONTROL, fixture,
+                    {e['path']:e['sha256'] for e in inventory['files']}, libraries)
+    result = {'identity': BUILD_ID, 'manifest_sha256': EXPECTED_ARTIFACT,
             'utility': OBSERVATIONS['utility'],
             'controls': {name: OBSERVATIONS[name] for name in ['reporting-controls', *('runner-' + mode for mode in EXPECTED)]},
             'binaries': {e['path']: e['sha256'] for e in inventory['files']},
             'libraries': libraries, 'before_status': before, 'after_status': after,
             'readonly': True, 'unmounted': True, 'compiled': False}
+    if actor is not None: result['actor'] = actor
+    return result
 
 
 def build():

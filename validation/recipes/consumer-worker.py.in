@@ -22,6 +22,9 @@ NAME='eqemu-cb-cons01'
 ENV={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8'}
 INPUTS=P('/nonexistent/eqemu-build-inputs')
 CASE='consumer'
+VALIDATION_PROFILE = 'build-unit-v1'
+QUALIFICATION_CONTROL = None
+ACTOR_FIXTURE = None
 GIB=1024**3
 FILES={
  'base.qcow2':('inputs/ubuntu-noble-20260911/ubuntu-24.04-server-cloudimg-amd64.img',625256960,'612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354'),
@@ -121,6 +124,38 @@ def domain(s):
   </devices>
   <seclabel type="static" model="apparmor" relabel="no"><label>{s['profile']}</label></seclabel>
 </domain>'''
+
+
+def validate_devices(tree):
+    """Verify the effective owned topology before resuming either fixed profile."""
+    if (tree.attrib.get('type') != 'kvm' or tree.findall('./devices/interface')
+            or any(tree.findall('./devices/'+tag) for tag in
+                   ('filesystem','hostdev','graphics','channel','redirdev','vsock'))):
+        raise RuntimeError('Unexpected guest device')
+    expected = {'vda': ('disk','root.raw','virtio',False),
+                'sda': ('cdrom','seed.iso','sata',True),
+                'sdb': ('cdrom','fixture.iso','sata',True),
+                'vdb': ('disk','artifact.raw','virtio',True)}
+    if VALIDATION_PROFILE == 'actor-lifecycle-v1':
+        expected['sdc'] = ('cdrom','runtime.iso','sata',True)
+    elif VALIDATION_PROFILE != 'build-unit-v1':
+        raise RuntimeError('Unknown guest device profile')
+    disks = tree.findall('./devices/disk')
+    if len(disks) != len(expected):
+        raise RuntimeError('Guest device count mismatch')
+    seen = set()
+    for disk in disks:
+        target = disk.find('target'); source = disk.find('source'); driver = disk.find('driver')
+        name = target.get('dev') if target is not None else None
+        if name not in expected or name in seen or source is None or driver is None:
+            raise RuntimeError('Guest device identity mismatch')
+        kind, filename, bus, readonly = expected[name]
+        if (disk.get('type') != 'file' or disk.get('device') != kind
+                or target.get('bus') != bus or source.get('file') != str(DATA/filename)
+                or driver.get('type') != 'raw' or (disk.find('readonly') is not None) != readonly
+                or name == 'vdb' and driver.get('discard') != 'ignore'):
+            raise RuntimeError('Guest device policy mismatch')
+        seen.add(name)
 
 
 def schema_check(xml):
@@ -298,11 +333,7 @@ def worker():
         if s['profile']+' (enforce)' not in P('/sys/kernel/security/apparmor/profiles').read_text():raise RuntimeError('Profile not enforcing')
         virsh('create',str(EVIDENCE/'domain.xml'),'--paused','--validate',timeout=60)
         xml=virsh('dumpxml',s['uuid']).stdout;(EVIDENCE/'effective-domain.xml').write_text(xml);tree=ET.fromstring(xml)
-        if tree.attrib.get('type')!='kvm' or tree.findall('./devices/interface') or any(tree.findall('./devices/'+tag) for tag in ['filesystem','hostdev','graphics','channel','redirdev','vsock']):raise RuntimeError('Unexpected guest device')
-        disks=tree.findall('./devices/disk')
-        artifact_disk=next((d for d in disks if d.find('target').get('dev')=='vdb'),None)
-        if len(disks)!=4 or artifact_disk is None or artifact_disk.find('source').get('file')!=str(DATA/'artifact.raw') or artifact_disk.find('driver').get('type')!='raw' or artifact_disk.find('driver').get('discard')!='ignore' or (artifact_disk.find('readonly') is not None)!=(CASE=='consumer'):
-            raise RuntimeError('Artifact device policy mismatch')
+        validate_devices(tree)
         if virsh('domstate',s['uuid']).stdout.strip()!='paused':raise RuntimeError('Guest was not paused')
         pids=owned_pids(s)
         if len(pids)!=1:raise RuntimeError('Expected exactly one owned QEMU process')
@@ -950,7 +981,36 @@ class BuildProtocol(ProducerBuildProtocol):
                 return super().accept(copy)
             return super().accept(value)
         kind = value.get('kind')
+        if kind == 'stage' and value.get('name') == 'actor-created':
+            if VALIDATION_PROFILE != 'actor-lifecycle-v1' or QUALIFICATION_CONTROL != 'cancel' or getattr(self,'actor_created',False):
+                raise RuntimeError('Unexpected/duplicate actor-created phase')
+            self.actor_created = True
+        if kind == 'stage' and value.get('name') == 'actor-lifecycle' and value.get('state') == 'failed':
+            if VALIDATION_PROFILE != 'actor-lifecycle-v1':
+                raise RuntimeError('Actor stage in unit-only profile')
+            copy = dict(value); copy['state'] = 'passed'
+            return BaseBuildProtocol.accept(self,copy)
         if kind == 'ready': return super().accept(value)
+        if kind == 'observation' and value.get('name') == 'actor-runtime':
+            if VALIDATION_PROFILE != 'actor-lifecycle-v1':
+                raise RuntimeError('Actor observation in build-unit profile')
+            self.frames += 1
+            if self.frames > 1500 or self.result is not None or not self.ready or value.get('nonce') != self.nonce or 'actor-runtime' in self.observations:
+                raise RuntimeError('Actor observation identity/order')
+            if set(value) != {'kind','nonce','name','value'}:
+                raise RuntimeError('Actor observation shape')
+            item = value['value']
+            from actor import result as actor_result, RECIPE
+            record = dict(item.get('result', {})); rc = record.pop('exit_code', None)
+            actor_result(record, rc, QUALIFICATION_CONTROL)
+            if (not isinstance(item.get('diagnostics'),str) or len(item['diagnostics'].encode()) > 3000
+                    or item.get('profile') != VALIDATION_PROFILE or item.get('recipe') != RECIPE
+                    or item.get('fixture_manifest_sha256') != ACTOR_FIXTURE['manifest_sha256']
+                    or item.get('database_cleanup') is not True or item.get('outputs_unchanged') is not True
+                    or item.get('inputs_unchanged') is not True):
+                raise RuntimeError('Actor fixture or cleanup evidence')
+            self.observations['actor-runtime'] = item
+            return 'observation'
         if kind == 'observation':
             if value.get('name') not in {'utility', 'reporting-controls', *('runner-' + mode for mode in EXPECTED)}:
                 raise RuntimeError('Unexpected consumer observation')
@@ -960,7 +1020,15 @@ class BuildProtocol(ProducerBuildProtocol):
             if self.frames > 1500 or self.result is not None or not self.ready or value.get('nonce') != self.nonce:
                 raise RuntimeError('Consumer completion identity/order')
             if set(value) != {'kind', 'nonce', 'ok', 'consumer'}: raise RuntimeError('Consumer completion shape')
-            item = value['consumer']; prior = producer_result()
+            item = value['consumer']
+            if VALIDATION_PROFILE == 'actor-lifecycle-v1':
+                actor = self.observations.get('actor-runtime')
+                if (QUALIFICATION_CONTROL is not None or not isinstance(actor, dict)
+                        or actor['result']['exit_code'] != 0 or item.get('actor') != actor):
+                    raise RuntimeError('Positive actor stage missing or replaced by control')
+            elif 'actor' in item:
+                raise RuntimeError('Unexpected actor stage in unit profile')
+            prior = producer_result()
             binaries = prior['guest_report_untrusted']['binaries']
             libraries = {entry['path']:entry['sha256'] for name,entry in prior['observations_untrusted'].items()
                          if name.startswith('elf-') and not entry['build_file']}

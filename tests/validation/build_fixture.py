@@ -14,7 +14,7 @@ def main(root,mode):
     candidate.BASE=root
     upload=root/'uploads'/str(os.getuid());upload.mkdir(parents=True)
     candidate.POLL_SECONDS=.02
-    def prepare(source,directory):
+    def prepare(source,directory,**kwargs):
         iso=directory/'fake.iso';iso.write_bytes(b'x');return iso,FACTS
     def request(value):
         with (root/'calls').open('a') as f:f.write(value['op']+'\n')
@@ -24,12 +24,13 @@ def main(root,mode):
             return dict(started=True,run_id=value['run_id'],candidate=FACTS,build_id='f'*64)
         if value['op']=='status' and mode=='malformed-status':return []
         if value['op']=='cancel' and mode in ('malformed-cancel','malformed-both'):return []
-        terminal=mode!='timeout' or value['op']=='cancel'
+        terminal=mode not in ('timeout','actor-cancel') or value['op']=='cancel'
         code=0 if mode=='pass' else 1 if mode=='candidate' else 2
-        return dict(version=1,run_id=value['run_id'],profile=PROFILE,candidate=FACTS,
+        return dict(version=1,run_id=value['run_id'],profile='actor-lifecycle-v1' if mode=='actor-cancel' else PROFILE,candidate=FACTS,
+                    actor_created=mode=='actor-cancel' and value['op']=='status',
                     build_id='0'*64 if mode=='wrong' else 'f'*64,terminal=terminal,
                     cleanup_complete=terminal and mode!='cleanup',accepted=code==0,exit_code=code)
     candidate.prepare=prepare;candidate.request=request
-    return candidate.execute(root)
+    return candidate.execute(root,'actor-lifecycle-v1','cancel',reuse='1111111111') if mode=='actor-cancel' else candidate.execute(root)
 
 if __name__=='__main__':raise SystemExit(main(Path(sys.argv[1]),sys.argv[2]))

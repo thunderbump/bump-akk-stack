@@ -51,7 +51,7 @@ def request(value):
     return json.loads(result.stdout)
 
 
-def prepare(source, directory, package=HERE):
+def prepare(source, directory, package=HERE, profile_name=PROFILE):
     inputs = load('candidate_inputs',package/'inputs.py')
     config = json.loads((package/'client-config.json').read_text())
     baseline = json.loads((package/'profile.json').read_text())
@@ -59,7 +59,8 @@ def prepare(source, directory, package=HERE):
     view = inputs.GitTree(source,scratch)
     candidate = view.location('HEAD')
     tree = view.git('rev-parse',candidate+'^{tree}').decode().strip()
-    profile = candidate_profile(baseline,candidate,tree)
+    fixture = json.loads((package/'runtime-fixture.json').read_text())
+    profile = candidate_profile(baseline,candidate,tree,profile_name,fixture)
     receipt = inputs.prepare(profile,{'eqemu':source,'websocketpp':config['websocketpp']},
                              config['input_store'],directory/'source')
     iso = directory/'candidate.iso'
@@ -71,9 +72,9 @@ def prepare(source, directory, package=HERE):
     return iso,facts
 
 
-def checked(value,identifier,facts,build_id):
+def checked(value,identifier,facts,build_id,profile_name=PROFILE):
     if (not isinstance(value,dict) or type(value.get('version')) is not int or value.get('version')!=1 or value.get('run_id')!=identifier
-            or value.get('profile')!=PROFILE or value.get('candidate')!=facts
+            or value.get('profile')!=profile_name or value.get('candidate')!=facts
             or value.get('build_id')!=build_id
             or any(type(value.get(k)) is not bool for k in ('terminal','cleanup_complete','accepted'))
             or type(value.get('exit_code')) is not int or value['exit_code'] not in (0,1,2)
@@ -83,7 +84,9 @@ def checked(value,identifier,facts,build_id):
     return value
 
 
-def execute(source):
+def execute(source, profile_name=PROFILE, control=None, retain=False, reuse=None):
+    from actor import options
+    options(profile_name, control, retain, reuse)
     interrupted = None
     def stop(signum,_frame):
         nonlocal interrupted
@@ -106,7 +109,7 @@ def execute(source):
             previous_alarm = signal.signal(signal.SIGALRM, preparation_timeout)
             signal.alarm(600)
             try:
-                iso,facts = prepare(Path(source).resolve(),Path(tmp))
+                iso,facts = prepare(Path(source).resolve(),Path(tmp),profile_name=profile_name)
             finally:
                 signal.alarm(0)
                 signal.signal(signal.SIGALRM, previous_alarm)
@@ -118,7 +121,11 @@ def execute(source):
                 while block:=src.read(1024**2):
                     dst.write(block)
             submitted = True  # Caller knows the run ID even if admission response is lost.
-            admission = request(dict(version=1,op='run',run_id=identifier,profile=PROFILE,candidate=facts))
+            payload = dict(version=1,op='run',run_id=identifier,profile=profile_name,candidate=facts)
+            if retain: payload['retain_artifact'] = True
+            if reuse is not None:
+                payload.update(reuse_artifact=reuse,qualification_control=control)
+            admission = request(payload)
             if (not isinstance(admission,dict) or admission.get('run_id')!=identifier
                     or admission.get('candidate')!=facts):
                 raise ValueError('Build admission identity mismatch')
@@ -126,16 +133,18 @@ def execute(source):
             if admission.get('started') is True and (not isinstance(build_id,str) or not re.fullmatch('[a-f0-9]{64}',build_id)):
                 raise ValueError('Missing build identity in admission')
             if admission.get('started') is not True:
-                result = checked(admission,identifier,facts,build_id)
+                result = checked(admission,identifier,facts,build_id,profile_name)
                 raise RuntimeError(result.get('error') or 'Build setup refused')
         upload.unlink(missing_ok=True)
         upload_created = False
-        print(json.dumps(dict(event='submitted',run_id=identifier,profile=PROFILE,
+        print(json.dumps(dict(event='submitted',run_id=identifier,profile=profile_name,
                               candidate_revision=facts['candidate'],build_identity=build_id)),flush=True)
         while True:
             if interrupted or time.monotonic()>deadline:
                 raise RuntimeError('Interrupted' if interrupted else 'Build command deadline reached')
-            result = checked(request(dict(version=1,op='status',run_id=identifier)),identifier,facts,build_id)
+            result = checked(request(dict(version=1,op='status',run_id=identifier)),identifier,facts,build_id,profile_name)
+            if control == 'cancel' and result.get('actor_created') is True:
+                print(json.dumps(dict(event='actor-created', run_id=identifier, profile=profile_name)), flush=True)
             if result['terminal']:
                 break
             time.sleep(POLL_SECONDS)
@@ -147,7 +156,7 @@ def execute(source):
                 cancelled = request(dict(version=1,op='cancel',run_id=identifier))
                 if build_id is None and isinstance(cancelled,dict):
                     build_id = cancelled.get('build_id')
-                result = checked(cancelled,identifier,facts,build_id)
+                result = checked(cancelled,identifier,facts,build_id,profile_name)
             except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as exc:
                 secondary = str(exc)[:2000]; result = None
         if upload_created:
@@ -157,9 +166,10 @@ def execute(source):
                 secondary = str(exc)[:2000]
                 error = error or 'Owned upload cleanup failed'
         code = 128+interrupted if interrupted else 2 if error or result is None else result['exit_code']
-        print(json.dumps(dict(event='final',profile=PROFILE,run_id=identifier if submitted else None,
+        print(json.dumps(dict(event='final',profile=profile_name,run_id=identifier if submitted else None,
             candidate_revision=facts['candidate'] if facts else None,build_identity=build_id,
-            accepted=code==0,coverage=['compile','utility-tests','fresh-consumer'],
+            accepted=code==0,coverage=['reused-compile' if reuse else 'compile','utility-tests','fresh-consumer']+(['actor-lifecycle'] if profile_name=='actor-lifecycle-v1' else []),
+            retained_artifact=(result or {}).get('retained_artifact'),qualification_control=control,reused_from=reuse,
             cleanup_complete=result['cleanup_complete'] if result else None,
             exit_code=code,error=error or (result or {}).get('error'),secondary_error=secondary,
             diagnostics=(result or {}).get('diagnostics',{}))),flush=True)
@@ -203,7 +213,8 @@ def installed_identity(package=HERE):
              'disable.py', 'host_support.py', 'installer_support.py', 'inputs.py',
              'profile.json', 'producer-user.json', 'consumer-user.json', 'producer-guest.py',
              'consumer-guest.py', 'producer-worker.py.in', 'consumer-worker.py.in',
-             'suite.py.in', 'recipe-binding.json', 'host-inputs.json', 'client-config.json'}
+             'suite.py.in', 'recipe-binding.json', 'host-inputs.json', 'client-config.json',
+             'actor.py', 'actor_runtime.py', 'runtime-fixture.json'}
     if (not isinstance(manifest, dict) or set(manifest) != {'version', 'files'}
             or type(manifest['version']) is not int or manifest['version'] != 1
             or not isinstance(manifest['files'], dict) or set(manifest['files']) != names):
@@ -222,13 +233,17 @@ def installed_identity(package=HERE):
     host_inputs = json.loads(checked['host-inputs.json'], object_pairs_hook=unique)
     client = json.loads(checked['client-config.json'], object_pairs_hook=unique)
     if (not isinstance(profile, dict) or not isinstance(profile.get('dependencies'), dict)
-            or not isinstance(host_inputs, dict) or set(host_inputs) != {'base.qcow2', 'fixture.iso'}
+            or not isinstance(host_inputs, dict) or set(host_inputs) not in ({'base.qcow2', 'fixture.iso'}, {'base.qcow2', 'fixture.iso', 'runtime.iso'})
             or not isinstance(client, dict) or set(client) != {'input_store', 'websocketpp'}
             or any(not isinstance(v, str) or not Path(v).is_absolute() for v in client.values())):
         raise ValueError('Installed declared input contract shape')
-    for name, key in [('base.qcow2', 'base'), ('fixture.iso', 'media')]:
+    dependencies = dict(profile['dependencies'])
+    dependencies['runtime'] = json.loads(checked['runtime-fixture.json'], object_pairs_hook=unique)['iso']
+    declared = [('base.qcow2', 'base'), ('fixture.iso', 'media')]
+    if 'runtime.iso' in host_inputs: declared.append(('runtime.iso', 'runtime'))
+    for name, key in declared:
         entry = host_inputs[name]
-        dependency = profile['dependencies'].get(key)
+        dependency = dependencies.get(key)
         if (not isinstance(entry, dict) or set(entry) != {'source', 'bytes', 'sha256'}
                 or not isinstance(dependency, dict)
                 or type(entry['bytes']) is not int or entry['bytes'] <= 0
@@ -250,7 +265,24 @@ def main():
     group = parser.add_mutually_exclusive_group()
     group.add_argument('--source', type=Path)
     group.add_argument('--identity', action='store_true', help='Read sealed validator identity without starting work')
+    from actor import PROFILE as ACTOR, PROFILES, CONTROLS, options
+    parser.add_argument('--profile', choices=PROFILES, default=PROFILE)
+    parser.add_argument('--retain-artifact', action='store_true', help='Actor qualification only: retain one artifact for at most one day')
+    parser.add_argument('--reuse-artifact', help='Actor qualification only: exact retained positive run ID')
+    parser.add_argument('--qualification-control', choices=CONTROLS)
+    parser.add_argument('--release-artifact', help='Release one exact owned retained actor run; starts no jobs')
     args=parser.parse_args()
+    try:
+        options(args.profile, args.qualification_control, args.retain_artifact, args.reuse_artifact)
+        if args.identity and (args.profile != PROFILE or args.retain_artifact or args.reuse_artifact or args.release_artifact):
+            raise ValueError('Identity probe does not select or execute profiles')
+        if args.release_artifact:
+            from common import run_id
+            run_id(args.release_artifact)
+            if args.source or args.retain_artifact or args.reuse_artifact:
+                raise ValueError('Release cannot be combined with work')
+    except ValueError as exc:
+        parser.error(str(exc))
     resource.setrlimit(resource.RLIMIT_AS,(1024**3,1024**3))
     resource.setrlimit(resource.RLIMIT_FSIZE,(512*1024**2,512*1024**2))
     if args.identity:
@@ -260,7 +292,10 @@ def main():
         except (OSError, ValueError, TypeError, KeyError, RecursionError) as error:
             print('Validator identity refused: ' + str(error)[:500], file=sys.stderr)
             return 2
-    return execute(args.source or Path.cwd())
+    if args.release_artifact:
+        print(json.dumps(request(dict(version=1,op='release',run_id=args.release_artifact))))
+        return 0
+    return execute(args.source or Path.cwd(),args.profile,args.qualification_control,args.retain_artifact,args.reuse_artifact)
 
 if __name__=='__main__':
     raise SystemExit(main())

@@ -1,23 +1,26 @@
 {
-  "version": 1,
   "files": {
-    "candidate.py": "7a82001f3ec427590118787d9c10893f4e8a9b43089d0900a5a7c5a0f6e87047",
-    "common.py": "a60d213d47dbb565d7ba9ab3f8f7262d4f2c24b00bf6f6a9a574ecf09188721c",
+    "actor.py": "f7c120e47aa0e744ed598cfbece6f16897dfbcaed95e57c2111f7385fafbd233",
+    "actor_runtime.py": "ca87b7a4b01af353ed98143da674dda689c11489bd5cc3dc0222e234c9898244",
+    "candidate.py": "217c89d58c4a36a48981deb36c4cc41f1866f748d220e1cf5ef2d1f8dcfc7b4c",
+    "common.py": "33d2663207105170b2d716f07bd7d14cd68b7dde652aae29d319f20f91765fe4",
     "disable.py": "cce431b80baebc5102182e37027fc90e9f5c3fa8e959343da2ae463b9b3ed8b2",
-    "host.py": "62f03bf76aa5c46d0818e56f5f2ff0222de44e89c07fa9d1459cbf98c3864309",
+    "host.py": "f8510e78cb96a953d93946227dbf4f2149263a8559790e8f1af858f6995eec04",
     "host_support.py": "2c99ed83fac1735b300bf99c32482ebf68d169544000ceed2fcdabb934835b69",
     "inputs.py": "9aa3cb9b40438e902bb422ad4a8c994c856ebd8a3161db155735f65abf8206b9",
-    "install.py": "44dca4d28e79ccf26faa8118b2bd764bbe42241882bf1c98dcef1612355e2694",
+    "install.py": "879a7cd70fbddd90655b8c23cdb3b720d051ba842fb1a5f2d4f4eca2f85574f6",
     "installer_support.py": "77a81756eb7e24e4e7af62658e98cc023fc59428a23c1564238d76b96378c4fc",
     "profile.json": "99e26a21ad4fadb1f68ac88240b925d3a65629124b8eae115edb80422c0d9a95",
-    "recipes/consumer-guest.py": "2a2bd617463f6bf789a8dcf98733c97fb24c30d4520bfbae6adfce4eb8013fc6",
+    "recipes/consumer-guest.py": "807fd40d90727355fbf0c999c992ef4e1e5a91508b8a12cc6d1f90a2c82d57f6",
     "recipes/consumer-user.json": "673fd9153185b0f401afc135a50059b2895725aca1e84303fccff01380064c81",
-    "recipes/consumer-worker.py.in": "ab764714853210ad4c16ac6776150193e094a3d5d55431a21c7bf66bbaeb8ab9",
+    "recipes/consumer-worker.py.in": "f3b04a67a26889ac1cde09852176ff91190971308a16d75b08931df7e9f8a939",
     "recipes/producer-guest.py": "cd1270accddce64b376e68b28917b3a2462ff822f1b9ccb6147a5c2e081153f9",
     "recipes/producer-user.json": "fdd849f3ac35f8f93b4eecd824a0b05bb919e6621530167d4c3b528d5e59939b",
     "recipes/producer-worker.py.in": "21a6539d7028cc48652d053fb2f7a22fca28cb8b54e596c086a139ae9978125e",
     "recipes/recipe-binding.json": "26a6e2b658b9cca1632e25a9d881f0b966f1d7091a2a4eb3d9b718909132ea48",
-    "recipes/suite.py.in": "7e1bedbde30fe28a53043972bf6bf73e2c314a05ffc772fd5acd7ab57089674c",
-    "render.py": "cfd0d62da52611536c5c2d8dbeb5aab0a1b78d230007684fbd027a9433aa4b86"
-  }
+    "recipes/suite.py.in": "f8d2185180d59c377775a460fb0f7c00a8968f31a6e1f50fb11c5620bac31d84",
+    "render.py": "8858848a6820d8b85c750b87ef038421a97c8b2986f19400579586f68b3279ba",
+    "runtime-fixture.json": "c15c16143c625c4e1be07e797a2a13dc31608c40012614331434ca2ef38c3323"
+  },
+  "version": 1
 }

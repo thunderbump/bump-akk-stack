@@ -14,7 +14,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from common import HERE, load, sha
 
 RUNTIME = ('common.py', 'render.py', 'host.py', 'candidate.py', 'install.py',
-           'disable.py', 'host_support.py', 'installer_support.py', 'inputs.py', 'profile.json')
+           'disable.py', 'host_support.py', 'installer_support.py', 'inputs.py', 'profile.json',
+           'actor.py', 'actor_runtime.py', 'runtime-fixture.json')
 RECIPES = ('producer-user.json', 'consumer-user.json', 'producer-guest.py', 'consumer-guest.py', 'producer-worker.py.in',
            'consumer-worker.py.in', 'suite.py.in', 'recipe-binding.json')
 
@@ -45,7 +46,7 @@ def verified_sources(package=HERE):
     return manifest
 
 
-def prepare(output, input_store, websocketpp, package=HERE):
+def prepare(output, input_store, websocketpp, package=HERE, actor=False):
     if os.geteuid() == 0:
         raise ValueError('Prepare as the normal user')
     output = Path(output).absolute()
@@ -61,6 +62,10 @@ def prepare(output, input_store, websocketpp, package=HERE):
     inputs = load('preparation_inputs', package/'inputs.py')
     profile = json.loads((package/'profile.json').read_text())
     inputs.check_dependencies(profile, store)
+    fixture = json.loads((package/'runtime-fixture.json').read_text())
+    if actor:
+        from actor import verify_media
+        verify_media(store, fixture, inputs.file_record)
     with tempfile.TemporaryDirectory(prefix='eqemu-package-') as scratch:
         view = inputs.GitTree(websocketpp, Path(scratch))
         wanted = profile['sources']['websocketpp']
@@ -77,6 +82,9 @@ def prepare(output, input_store, websocketpp, package=HERE):
         host_inputs = {name: dict(source=str(store/profile['dependencies'][key]['path']),
                                   **{k: profile['dependencies'][key][k] for k in ('bytes', 'sha256')})
                        for name, key in [('base.qcow2', 'base'), ('fixture.iso', 'media')]}
+        if actor:
+            host_inputs['runtime.iso'] = dict(source=str(store/fixture['iso']['path']),
+                                              **{k: fixture['iso'][k] for k in ('bytes', 'sha256')})
         (output/'host-inputs.json').write_text(json.dumps(host_inputs, indent=2)+'\n')
         (output/'client-config.json').write_text(json.dumps(dict(input_store=str(store),
                                                                websocketpp=str(websocketpp)), indent=2)+'\n')
@@ -97,5 +105,6 @@ if __name__ == '__main__':
     parser.add_argument('--output', type=Path, required=True)
     parser.add_argument('--input-store', type=Path, required=True)
     parser.add_argument('--websocketpp', type=Path, required=True)
+    parser.add_argument('--with-actor', action='store_true', help='Verify and declare fixed actor runtime media')
     args = parser.parse_args()
-    print(json.dumps(prepare(args.output, args.input_store, args.websocketpp)))
+    print(json.dumps(prepare(args.output, args.input_store, args.websocketpp, actor=args.with_actor)))

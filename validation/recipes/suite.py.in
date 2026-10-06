@@ -8,6 +8,8 @@ UNIT='eqemu-vm-candidate-build-01-suite.service';CHILD='eqemu-vm-recovery-parent
 CTL='eqemuvmcandidatebuild01ctl.slice';CTLFILE=P('/run/systemd/system')/CTL
 CTLTEXT='[Unit]\nDescription=Owned offline build proof controllers\nStopWhenUnneeded=yes\n[Slice]\nMemoryMax=1G\nMemorySwapMax=0\n'
 CASES=('producer','consumer')
+EXECUTE_CASES=('producer','consumer')
+RETAIN_ARTIFACT=False
 HASHES={'producer-worker.py': 'c198624cb718521d587fd0b4b2e81d2db19aedaeed73327219632f1ae23fb14f', 'consumer-worker.py': '9d15380adffaa9422dbfd7100219a17bcc4241fe294be6f6cecab98fe1e2d3a3'}
 ENV={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8'}
 GIB=1024**3
@@ -178,7 +180,7 @@ def supervise():
     try:
         controller_budget()
         deadline = time.monotonic() + 17700
-        for case in CASES:
+        for case in EXECUTE_CASES:
             m = admit(case)
             while time.monotonic() < deadline:
                 props = properties(m.UNIT)
