@@ -39,7 +39,10 @@ def summary(value, control=None):
         raise ValueError('Actor summary identity')
     native = dict(value['result'])
     code = native.pop('exit_code', None)
-    native = result(native, code, control)
+    try:
+        native = result(native, code, control)
+    except OverflowError:
+        raise ValueError('Actor summary native timing') from None
     stages = value.get('stage_seconds')
     if not isinstance(stages, dict) or not set(stages) <= PUBLIC_STAGES:
         raise ValueError('Actor summary stages')

@@ -416,7 +416,7 @@ class PublicEvidence(unittest.TestCase):
     def tearDownClass(cls):
         cls.fixture.tearDownClass()
 
-    def public_status(self, root, observed, profile=actor.PROFILE, code=0):
+    def public_status(self, root, observed, profile=actor.PROFILE, code=0, producer_failure=False, container=...):
         work = root/'work'
         work.mkdir()
         workers = {'producer': worker(), 'consumer': worker()}
@@ -424,6 +424,10 @@ class PublicEvidence(unittest.TestCase):
             workers['consumer']['observations_untrusted'] = {}
         else:
             workers['consumer']['observations_untrusted']['actor-runtime'] = observed
+        if container is not ...:
+            workers['consumer']['observations_untrusted'] = container
+        if producer_failure:
+            workers['producer']['guest_report_untrusted'] = {'ok': False, 'error': 'server-build: exit 1\nCandidate compile failed'}
         if code == 1:
             workers['consumer']['guest_report_untrusted'] = {'ok': False, 'error': 'actor-lifecycle: exit 1\nNative assertion'}
             workers['consumer']['stages']['actor-lifecycle']['state'] = 'failed'
@@ -435,8 +439,9 @@ class PublicEvidence(unittest.TestCase):
             (evidence/'report.json').write_text(json.dumps(data))
             modules[role] = SimpleNamespace(ROOT=directory, UNIT=role, EVIDENCE=evidence,
                                             STORE=work/'absent-artifact', state=lambda: {})
-        suite_result = {'suite_passed': code == 0, 'cases_passed': code == 0, 'cleanup': {'complete': True},
-                        'cases': {'producer': {'case_passed': True}, 'consumer': {'case_passed': code == 0}}}
+        suite_result = {'suite_passed': code == 0 and not producer_failure,
+                        'cases_passed': code == 0 and not producer_failure, 'cleanup': {'complete': True},
+                        'cases': {'producer': {'case_passed': not producer_failure}, 'consumer': {'case_passed': code == 0}}}
         (work/'suite-result.json').write_text(json.dumps(suite_result))
         (work/'leases.json').write_text(json.dumps({'active': {}}))
         suite = SimpleNamespace(ROOT=work, UNIT='suite', CASES=('producer', 'consumer'),
@@ -500,6 +505,23 @@ class PublicEvidence(unittest.TestCase):
                 self.assertIsNone(status['actor_runtime'])
                 self.assertEqual(status['exit_code'], 2 if change is None or 'result' in change or 'database_cleanup' in change else 0)
                 self.assertNotIn('private-password', json.dumps(status))
+
+    def test_native_timing_overflow_cannot_hide_known_producer_failure(self):
+        observed = observation()
+        observed['result']['elapsed_seconds']['boot'] = 10**400
+        with tempfile.TemporaryDirectory() as tmp:
+            status = self.public_status(Path(tmp), observed, producer_failure=True)
+        self.assertEqual(status['exit_code'], 1)
+        self.assertIsNone(status['actor_runtime'])
+        self.assertIn('Candidate compile failed', status['diagnostics']['producer'])
+
+    def test_bad_observation_container_cannot_hide_known_producer_failure(self):
+        for container in (None, [], 'private-password'):
+            with self.subTest(container=container), tempfile.TemporaryDirectory() as tmp:
+                status = self.public_status(Path(tmp), observation(), producer_failure=True, container=container)
+            self.assertEqual(status['exit_code'], 1)
+            self.assertIsNone(status['actor_runtime'])
+            self.assertNotIn('private-password', json.dumps(status))
 
 
 class ExportedDiagnostics(unittest.TestCase):

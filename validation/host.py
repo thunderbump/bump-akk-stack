@@ -183,8 +183,11 @@ def report_record(root, record, identifier, persist=True):
                                      for role,value in workers.items()}
             if record.get('profile') == 'actor-lifecycle-v1':
                 from actor import summary as actor_summary
-                observation = workers.get('consumer', {}).get('observations_untrusted', {}).get('actor-runtime')
                 try:
+                    observations = workers.get('consumer', {}).get('observations_untrusted', {})
+                    if not isinstance(observations, dict):
+                        raise ValueError('Actor observation container')
+                    observation = observations.get('actor-runtime')
                     result['actor_runtime'] = actor_summary(observation, record.get('qualification_control'))
                 except (TypeError, ValueError):
                     # Evidence availability is separate from the existing outcome authority.
