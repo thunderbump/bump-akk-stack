@@ -47,6 +47,14 @@ Actor selection changes the source input/profile and build identity; unit-only e
 
 The runtime allocation is 1800 seconds, including package installation, import, shared data, execution and diagnostics. Ordinary zone execution is capped at 300 seconds. The actor consumer has a 3900-second work deadline within the unchanged 18000-second supervisor and 19000-second foreground work ceiling. The helper reserves the full runtime allocation before starting it and checks the remaining zone allocation before launch. These are limits awaiting real qualification, not measured performance. An 8 GiB runtime growth cap, 8 GiB free floor, bounded DB/shared/log allocations and existing host resource/cleanup gates apply.
 
+For actor runs, public `status` and the foreground final JSON include an optional
+`actor_runtime` summary with the validated native result, completed cases/counts,
+fixture identity, finite stage/total timings and cleanup/input/output observations.
+The summary has an 8192-byte limit and fixed proof fields and stage names. Raw
+guest observations and credentials are not forwarded. Missing or malformed proof
+has a null summary; existing exit/cleanup classification remains authoritative.
+Build/unit results retain their existing output shape.
+
 ### Native command contract for EQEmu `.7.1`
 
 The scenario implementation belongs to EQEmu. This adapter requires one final stdout line, emitted only after native shutdown, beginning with `EQEMU_ACTOR_RESULT ` and followed by a JSON object with exactly these fields:

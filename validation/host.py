@@ -181,6 +181,14 @@ def report_record(root, record, identifier, persist=True):
             result['stages'] = summary.get('cases',{})
             result['diagnostics'] = {role: str(value.get('guest_report_untrusted',{}).get('error') or value.get('error') or '')[-4500:]
                                      for role,value in workers.items()}
+            if record.get('profile') == 'actor-lifecycle-v1':
+                from actor import summary as actor_summary
+                observation = workers.get('consumer', {}).get('observations_untrusted', {}).get('actor-runtime')
+                try:
+                    result['actor_runtime'] = actor_summary(observation, record.get('qualification_control'))
+                except (TypeError, ValueError):
+                    # Evidence availability is separate from the existing outcome authority.
+                    result['actor_runtime'] = None
     if persist and result['terminal'] and result['cleanup_complete']:
         # Only large copied input media owned by this finished run are removed.
         # Keep small recipes and bounded receipts for inspection, capped at 8 runs.
