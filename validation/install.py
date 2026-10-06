@@ -62,7 +62,7 @@ def install():
     if shutil.disk_usage('/var/lib').free<180*1024**3:raise ValueError('Need 180 GiB free disk')
     release=hashlib.sha256(raw).hexdigest()[:16];version=LIB/release
     inputs=json.loads(package['host-inputs.json'])
-    if set(inputs)!={'base.qcow2','fixture.iso'} or sum(x['bytes'] for x in inputs.values())>2*1024**3:
+    if set(inputs) not in ({'base.qcow2','fixture.iso'}, {'base.qcow2','fixture.iso','runtime.iso'}) or sum(x['bytes'] for x in inputs.values())>2*1024**3:
         raise ValueError('Unexpected installed input budget')
     support.make_dir(BASE,0o711);support.make_dir(LIB,0o755);support.make_dir(version,0o755)
     record={'enabled':False,'version':str(version),'manifest_sha256':hashlib.sha256(raw).hexdigest()}

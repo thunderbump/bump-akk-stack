@@ -25,7 +25,7 @@ Run the prepared `install.py` once with sudo after administrator review and sepa
 
 Each request verifies the current user's existing NSS membership in `eqemu-test`. If the process inherited stale supplementary groups, only the fixed no-argument sudo helper runs through `sg eqemu-test`; its JSON input remains on stdin. Nonmembers refuse without a prompt or membership/policy change.
 
-Admission can inspect retained terminal receipts from exactly two prior package manifests: `b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a` and `fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97`. The administrator-owned prior release must remain installed with all original files and profile seals intact. The helper verifies candidate/build identity, sealed generated recipes, saved completion and live resource absence without rewriting receipts, removing media or stopping old units. Active, unknown or unverifiable prior releases block admission. Public status and cancel remain bound to the current release.
+Admission can inspect retained terminal receipts from exactly three prior package manifests: `b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a` `fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97`, and `a1eec9b33bbca1ba1d3c4b8911a1827ca1b1dd4d2ef72657699a0569201ba83a`. The administrator-owned prior release must remain installed with all original files and profile seals intact. The helper verifies candidate/build identity, sealed generated recipes, saved completion and live resource absence without rewriting receipts, removing media or stopping old units. Active, unknown or unverifiable prior releases block admission. Public status and cancel remain bound to the current release.
 
 The fixed profile retains a 180 GiB admission / 100 GiB emergency reserve, 32 GiB guest root, 4 GiB transfer artifact, one compile job and 18,000-second supervisor. Eight retained runs block admission pending exact-owned archival. Source uploads and generated media are bounded. No saved-world or NAS data is involved.
 
@@ -36,3 +36,47 @@ python3 -B -m unittest discover -s tests/validation -v
 ```
 
 These checks exercise subprocess exits, interruption/cancellation, identity refusal, cleanup failure, recipe/input tampering and static preparation. VM qualification and host installation remain separate. AFK fixture policy belongs in its current PR configuration after the caller accepts `termination_grace_seconds` and `repairable_exit_codes`; the suggested build-unit profile uses `20400`, `780` and `[1]` respectively. No standalone Validator/Coordinator integration is supported here.
+
+## Actor lifecycle profile
+
+The default remains `build-unit-v1`. `eqemu-validate --profile actor-lifecycle-v1` selects the fixed public Plane of Knowledge fixture plus candidate `zone tests:actor-lifecycle`. It compiles once in the producer, then verifies and uses the six transferred executables in the fresh offline consumer. Utilities and reporting/runner controls still run in both guests. The consumer installs the pinned runtime package closure, verifies that no transferred executable or measured library changed, imports five public SQL members in fixed order, removes ambient `poknowledge` spawns, disables the zone controller and external sinks, generates shared items/spells and runs the native scenario. It starts only its owned disposable database and zone command. No world, login, UCS or queryserv process starts.
+
+Prepare the actor-capable package with the existing command plus `--with-actor`. Ordinary preparation does not require runtime media. Actor preparation checks the exact ISO byte count and SHA-256 from `runtime-fixture.json`, reads its sealed payload manifest, and hashes all 47 opaque payload members. The manifest itself makes 48 verified files. No SQL, package or quest code executes during preparation. Missing or changed runtime inputs refuse. The guest checks the same fixed input identities again before use.
+
+Actor selection changes the source input/profile and build identity; unit-only evidence cannot satisfy actor coverage. The installed identity probe seals the actor helpers and declarations too. The recipe remains one fixed scenario, with no arbitrary zone, command forwarding or scenario language.
+
+The runtime allocation is 1800 seconds, including package installation, import, shared data, execution and diagnostics. Ordinary zone execution is capped at 300 seconds. The actor consumer has a 3900-second work deadline within the unchanged 18000-second supervisor and 19000-second foreground work ceiling. The helper reserves the full runtime allocation before starting it and checks the remaining zone allocation before launch. These are limits awaiting real qualification, not measured performance. An 8 GiB runtime growth cap, 8 GiB free floor, bounded DB/shared/log allocations and existing host resource/cleanup gates apply.
+
+### Native command contract for EQEmu `.7.1`
+
+The scenario implementation belongs to EQEmu. This adapter requires one final stdout line, emitted only after native shutdown, beginning with `EQEMU_ACTOR_RESULT ` and followed by a JSON object with exactly these fields:
+
+```json
+{
+  "version": 1,
+  "scenario": "actor-lifecycle-v1",
+  "control": null,
+  "status": "passed",
+  "completed_cases": ["create-duplicate", "name-collision", "native-processing", "retire-recreate", "external-removal-id-reuse", "save-fresh-zone"],
+  "cycles": 3,
+  "ticks": 1,
+  "id_reuse": true,
+  "save_restore": true,
+  "native_cleanup": true,
+  "elapsed_seconds": {"boot": 1.0, "processing": 1.0, "shutdown": 1.0}
+}
+```
+
+Counts and times are actual observations. A positive exit `0` requires every fixed named case, three cycles, positive native ticks, actual ID reuse/save-restore and complete native cleanup. Ordinary evidenced assertions use status `assertion-failed`, exit `1`, completed-case/count observations up to failure and `native_cleanup:true`. Refusal or orderly cancellation uses `refused` or `cancelled` and exit `2`. Incomplete native shutdown, missing/duplicate/malformed completion, unknown nonzero or signal, missing maps/CLI/stage, timeout/OOM and incomplete host/DB cleanup stay infrastructure non-pass `2`. The foreground process itself preserves signal exits.
+
+`--force-failure-after-create` is the fixed assertion control and reports `control:"assertion"`. `--wait-for-cancellation-after-create` reports `control:"cancel"`; after actual creation it emits `EQEMU_ACTOR_PHASE {"version":1,"phase":"actor-created"}` as a separate line and flushes it. JSON field order/spacing do not matter. The guest forwards that phase immediately to the worker, host status and foreground `actor-created` event. The caller can then signal the foreground process. Waiting is bounded to 60 seconds in native code; absence of a phase is refusal. The flags are mutually exclusive and unknown arguments must refuse. The adapter accepts no ordinary positive result for a control invocation.
+
+### One-build qualification controls
+
+Qualification is separately authorized host work in `.4.2`. One explicit positive actor invocation with `--retain-artifact` may retain exactly one verified artifact for at most one day. Native and host worker cleanup must still complete; the final receipt separately identifies intentionally retained artifact custody. Regular PR validation discards its artifact.
+
+Run controls against that exact clean source checkout with `--profile actor-lifecycle-v1 --reuse-artifact <positive-run-id> --qualification-control assertion`, `missing-map` or `cancel`. Each starts a fresh consumer only, using the existing sealed artifact. Reuse requires the same submitter, candidate/tree/source-input manifest, actor profile, current installed package/build identity and successful positive cleanup. Expired, changed, unknown or unit-only evidence refuses before run-directory creation. Controls never return pass. Missing-map removes only the disposable base map before the required-map gate and cannot launch the actor. Cancellation exposes the live creation phase before caller interruption. Controls own only their copies and preserve the original custody bytes and receipts.
+
+Release the original with `eqemu-validate --release-artifact <positive-run-id>`. This exact-owner operation starts no jobs and verifies quiescent/absent workers, original custody and artifact bytes. Active or uncertain control consumers block release. Expired artifacts remain owned and inspectable until this explicit release; no unrelated resource is pruned. The one-artifact and eight-run limits remain fixed. A positive run plus three fresh control runs needs four available receipt slots; `.4.2` must establish that headroom through separately reviewed exact-owned archival.
+
+Cheap source tests and static preparation establish this adapter's wiring. They do not establish that the future native command boots without world or passes actor assertions. Actual runtime qualification remains `.4.2` after `.7.1` supplies the command.

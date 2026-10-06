@@ -22,6 +22,9 @@ NAME='eqemu-cb-cons01'
 ENV={'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8'}
 INPUTS=P('/nonexistent/eqemu-build-inputs')
 CASE='consumer'
+VALIDATION_PROFILE = 'build-unit-v1'
+QUALIFICATION_CONTROL = None
+ACTOR_FIXTURE = None
 GIB=1024**3
 FILES={
  'base.qcow2':('inputs/ubuntu-noble-20260911/ubuntu-24.04-server-cloudimg-amd64.img',625256960,'612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354'),
@@ -950,7 +953,35 @@ class BuildProtocol(ProducerBuildProtocol):
                 return super().accept(copy)
             return super().accept(value)
         kind = value.get('kind')
+        if kind == 'stage' and value.get('name') == 'actor-created':
+            if VALIDATION_PROFILE != 'actor-lifecycle-v1' or QUALIFICATION_CONTROL != 'cancel' or getattr(self,'actor_created',False):
+                raise RuntimeError('Unexpected/duplicate actor-created phase')
+            self.actor_created = True
+        if kind == 'stage' and value.get('name') == 'actor-lifecycle' and value.get('state') == 'failed':
+            if VALIDATION_PROFILE != 'actor-lifecycle-v1':
+                raise RuntimeError('Actor stage in unit-only profile')
+            copy = dict(value); copy['state'] = 'passed'
+            return BaseBuildProtocol.accept(self,copy)
         if kind == 'ready': return super().accept(value)
+        if kind == 'observation' and value.get('name') == 'actor-runtime':
+            if VALIDATION_PROFILE != 'actor-lifecycle-v1':
+                raise RuntimeError('Actor observation in build-unit profile')
+            self.frames += 1
+            if self.frames > 1500 or self.result is not None or not self.ready or value.get('nonce') != self.nonce or 'actor-runtime' in self.observations:
+                raise RuntimeError('Actor observation identity/order')
+            if set(value) != {'kind','nonce','name','value'}:
+                raise RuntimeError('Actor observation shape')
+            item = value['value']
+            from actor import result as actor_result, RECIPE
+            record = dict(item.get('result', {})); rc = record.pop('exit_code', None)
+            actor_result(record, rc, QUALIFICATION_CONTROL)
+            if (item.get('profile') != VALIDATION_PROFILE or item.get('recipe') != RECIPE
+                    or item.get('fixture_manifest_sha256') != ACTOR_FIXTURE['manifest_sha256']
+                    or item.get('database_cleanup') is not True or item.get('outputs_unchanged') is not True
+                    or item.get('inputs_unchanged') is not True):
+                raise RuntimeError('Actor fixture or cleanup evidence')
+            self.observations['actor-runtime'] = item
+            return 'observation'
         if kind == 'observation':
             if value.get('name') not in {'utility', 'reporting-controls', *('runner-' + mode for mode in EXPECTED)}:
                 raise RuntimeError('Unexpected consumer observation')
@@ -960,7 +991,15 @@ class BuildProtocol(ProducerBuildProtocol):
             if self.frames > 1500 or self.result is not None or not self.ready or value.get('nonce') != self.nonce:
                 raise RuntimeError('Consumer completion identity/order')
             if set(value) != {'kind', 'nonce', 'ok', 'consumer'}: raise RuntimeError('Consumer completion shape')
-            item = value['consumer']; prior = producer_result()
+            item = value['consumer']
+            if VALIDATION_PROFILE == 'actor-lifecycle-v1':
+                actor = self.observations.get('actor-runtime')
+                if (QUALIFICATION_CONTROL is not None or not isinstance(actor, dict)
+                        or actor['result']['exit_code'] != 0 or item.get('actor') != actor):
+                    raise RuntimeError('Positive actor stage missing or replaced by control')
+            elif 'actor' in item:
+                raise RuntimeError('Unexpected actor stage in unit profile')
+            prior = producer_result()
             binaries = prior['guest_report_untrusted']['binaries']
             libraries = {entry['path']:entry['sha256'] for name,entry in prior['observations_untrusted'].items()
                          if name.startswith('elf-') and not entry['build_file']}

@@ -24,7 +24,8 @@ S.BASE = BASE
 # One administrator-reviewed installed release predates maintained packaging.
 # This is an admission-only trust pin, not a general historical record reader.
 PRIOR_MANIFEST = 'b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a'
-PRIOR_MANIFESTS = (PRIOR_MANIFEST, 'fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97')
+PRIOR_MANIFESTS = (PRIOR_MANIFEST, 'fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97',
+                   'a1eec9b33bbca1ba1d3c4b8911a1827ca1b1dd4d2ef72657699a0569201ba83a')
 LIB = Path('/usr/local/lib/eqemu-build')
 
 
@@ -43,10 +44,16 @@ def parse(raw):
     required = {'version','op','run_id'}
     if value.get('op') == 'run':
         required |= {'profile','candidate'}
-        if value.get('profile') != PROFILE:
-            raise ValueError('Unknown build profile')
+        from actor import options
+        retain = value.get('retain_artifact', False)
+        control = value.get('qualification_control')
+        reuse = value.get('reuse_artifact')
+        options(value.get('profile'), control, retain, reuse)
+        if 'retain_artifact' in value: required.add('retain_artifact')
+        if 'qualification_control' in value: required.add('qualification_control')
+        if 'reuse_artifact' in value: required.add('reuse_artifact')
         identity(value.get('candidate'))
-    elif value.get('op') not in ('status','cancel'):
+    elif value.get('op') not in ('status','cancel','release'):
         raise ValueError('Unknown operation')
     if set(value) != required:
         raise ValueError('Unknown request fields')
@@ -113,7 +120,7 @@ def unstarted_absent(suite, worker):
 
 
 def report_record(root, record, identifier, persist=True):
-    result = dict(version=1, run_id=identifier, profile=PROFILE, candidate=record['candidate'],
+    result = dict(version=1, run_id=identifier, profile=record.get('profile',PROFILE), candidate=record['candidate'],
                   build_id=record.get('recipe',{}).get('build_id'), terminal=False,
                   cleanup_complete=False, exit_code=2, accepted=False, error=record.get('error'))
     if record.get('setup_failed_clean'):
@@ -129,6 +136,12 @@ def report_record(root, record, identifier, persist=True):
                 raise ValueError('Prior owned launcher changed')
         stopped = suite.quiescent(suite.properties(suite.UNIT))
         result['terminal'] = stopped
+        progress = suite.ROOT/'consumer/evidence/report.json'
+        if progress.exists():
+            stages = S.read_json(progress).get('stages', {})
+            result['actor_created'] = stages.get('actor-created', {}).get('state') == 'started'
+        else:
+            result['actor_created'] = False
         if stopped and (suite.ROOT/'suite-result.json').exists():
             summary = S.read_json(suite.ROOT/'suite-result.json')
             clean = summary.get('cleanup',{}).get('complete') is True
@@ -153,10 +166,16 @@ def report_record(root, record, identifier, persist=True):
             if not persist and (not isinstance(leases, dict) or not isinstance(leases.get('active'), dict)):
                 raise ValueError('Prior active lease state is unknown')
             clean = clean and not leases['active']
-            clean = clean and not suite.module('producer').STORE.exists()
+            producer = suite.module('producer')
+            if record.get('retain_artifact') and producer.STORE.exists():
+                retained = retained_record(root, record, suite)
+                result['retained_artifact'] = retained
+            else:
+                clean = clean and not producer.STORE.exists()
             if not persist and suite.module('producer').STORE.is_symlink():
                 clean = False
-            result.update(cleanup_complete=bool(clean), exit_code=outcome(summary,workers,clean),
+            result.update(cleanup_complete=bool(clean), exit_code=outcome(summary,workers,clean,record.get('profile',PROFILE),
+                                               record.get('qualification_control'),record.get('reuse_artifact') is not None),
                           error=summary.get('error',record.get('error')))
             result['accepted'] = result['exit_code'] == 0
             result['stages'] = summary.get('cases',{})
@@ -228,6 +247,50 @@ def prior_report(root, record):
     return report_record(root, record, identifier, persist=False)
 
 
+
+def retained_record(root, record, suite):
+    """Separate live worker cleanup from explicitly retained immutable custody."""
+    if record.get('profile') != 'actor-lifecycle-v1' or record.get('retain_artifact') is not True:
+        raise ValueError('Unexpected retained artifact')
+    worker = suite.module('producer')
+    path = suite.retained_file(worker)
+    value = S.read_json(worker.CUSTODY)
+    # Expired bytes remain owned until exact release; expiry forbids reuse.
+    if (value.get('identity') != record['recipe']['build_id'] or value.get('eligible') is not True
+            or value.get('consumer_verified') is not True or value.get('discarded')
+            or value.get('producer_uuid') != suite.ownership_released(worker)['uuid']
+            or type(value.get('expires_at')) not in (int,float)
+            or not 0 < value['expires_at']-value.get('retained_at',0) <= 86400
+            or not re.fullmatch('[a-f0-9]{64}',value.get('sha256',''))
+            or not re.fullmatch('[a-f0-9]{64}',value.get('manifest_sha256',''))):
+        raise ValueError('Retained custody changed')
+    return dict(owner_run=root.name,bytes=path.stat().st_size,sha256=value['sha256'],
+                manifest_sha256=value['manifest_sha256'],expires_at=value['expires_at'],
+                expired=value['expires_at'] <= time.time())
+
+
+def reusable_artifact(request, uid):
+    """Allow only fresh controls of one successful actor build from this exact release."""
+    root, record = owner(request['reuse_artifact'],uid)
+    previous = report_record(root, record, root.name)
+    retained = previous.get('retained_artifact')
+    if (record.get('profile') != request['profile'] or request['profile'] != 'actor-lifecycle-v1'
+            or previous['terminal'] is not True or previous['cleanup_complete'] is not True
+            or previous['accepted'] is not True or not retained or retained['expired']):
+        raise ValueError('Retained actor artifact is unavailable, expired or unqualified')
+    if any(record['candidate'][key] != request['candidate'][key]
+           for key in ('candidate','tree','input_id','manifest_sha256')):
+        raise ValueError('Retained candidate/profile/input identity mismatch')
+    baseline = S.read_json(HERE/'profile.json'); fixture = S.read_json(HERE/'runtime-fixture.json')
+    profile = candidate_profile(baseline,request['candidate']['candidate'],request['candidate']['tree'],request['profile'],fixture)
+    manifest = S.read_json(HERE/'manifest.json')
+    expected = seal(dict(profile=profile,input_id=request['candidate']['input_id'],
+                         manifest_sha256=request['candidate']['manifest_sha256'],recipe=manifest['files']))
+    if record['recipe']['build_id'] != expected:
+        raise ValueError('Retained package or build profile changed')
+    return root
+
+
 def start(request, uid):
     identifier = request['run_id']; facts = request['candidate']
     # One build at a time. Unknown cleanup retains the admission reservation.
@@ -237,18 +300,28 @@ def start(request, uid):
                  else prior_report(root, old))
         if not prior['terminal'] or not prior['cleanup_complete']:
             raise RuntimeError('Previous build active or cleanup incomplete: '+root.name)
+        if request.get('retain_artifact') and prior.get('retained_artifact'):
+            raise RuntimeError('One retained qualification artifact already exists; release exact owner first')
     if len(list((BASE/'runs').iterdir())) >= 8:
         raise RuntimeError('Eight-run retention limit; administrator review required')
     if os.statvfs('/var/lib').f_bavail*os.statvfs('/var/lib').f_frsize < 180*1024**3:
         raise RuntimeError('Build admission requires 180 GiB free disk')
+    reuse_root = None
+    if request.get('reuse_artifact'):
+        reuse_root = reusable_artifact(request, uid)
     root = BASE/'runs'/identifier
     root.mkdir(mode=0o711); root.chmod(0o711)
     prepared = root/'prepared'; prepared.mkdir(mode=0o700)
-    record = dict(uid=uid,run_id=identifier,version=str(HERE),candidate=facts,created_at=time.time())
+    record = dict(uid=uid,run_id=identifier,version=str(HERE),candidate=facts,created_at=time.time(),
+                  profile=request['profile'], retain_artifact=request.get('retain_artifact',False))
+    if reuse_root is not None:
+        record.update(reuse_artifact=request['reuse_artifact'], qualification_control=request['qualification_control'])
     S.write_json(root/'owner.json',record)
     try:
         copy_upload(uid,identifier,facts,prepared/'candidate.iso')
-        record['recipe'] = render(identifier,facts,prepared)
+        record['recipe'] = render(identifier,facts,prepared,profile_name=request['profile'],
+                                  control=request.get('qualification_control'),retain=request.get('retain_artifact',False),
+                                  reuse_root=reuse_root)
         S.write_json(root/'owner.json',record)
         suite = suite_for(root,record)
         with contextlib.redirect_stdout(io.StringIO()):
@@ -273,6 +346,22 @@ def dispatch(request,uid):
                 raise ValueError('Build admission disabled or installation changed')
             return start(request,uid)
         root,record = owner(request['run_id'],uid)
+        if request['op']=='release':
+            if not record.get('retain_artifact') or record.get('profile') != 'actor-lifecycle-v1':
+                raise ValueError('Run does not own a qualification artifact')
+            state = report(request['run_id'],uid)
+            if not state['terminal'] or not state['cleanup_complete']:
+                raise ValueError('Cannot release an active or uncertain run')
+            for other in (BASE/'runs').iterdir():
+                if other == root: continue
+                child = S.read_json(other/'owner.json')
+                if child.get('reuse_artifact') == root.name:
+                    child_status = report(other.name, child['uid'])
+                    if not child_status['terminal'] or not child_status['cleanup_complete']:
+                        raise ValueError('Retained artifact has an active or uncertain consumer')
+            suite = suite_for(root,record)
+            with contextlib.redirect_stdout(io.StringIO()): suite.discard_artifact()
+            return dict(released=True,run_id=request['run_id'],vm_started=False)
         if request['op']=='cancel' and 'recipe' in record:
             suite = suite_for(root,record)
             if not suite.quiescent(suite.properties(suite.UNIT)):

@@ -107,4 +107,10 @@ class ValidatorIdentity(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'Unsafe installed identity ancestor'):
                 candidate.identity_file(path,10)
         # Ordinary users can inspect sealed, nonmutable operating-system files.
-        self.assertTrue(candidate.identity_file(Path('/etc/os-release').resolve(),1024))
+        system = Path('/etc/os-release').resolve()
+        if system.stat().st_uid == 0 and all(p.stat().st_uid == 0 for p in system.parents):
+            self.assertTrue(candidate.identity_file(system,1024))
+        else:
+            # Managed filesystem views can remap OS ownership; that must refuse.
+            with self.assertRaisesRegex(ValueError,'Unsafe installed identity'):
+                candidate.identity_file(system,1024)

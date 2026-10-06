@@ -1,0 +1,299 @@
+{
+  "iso": {
+    "bytes": 171806720,
+    "path": "runtime-inputs-20260926/runtime-inputs.iso",
+    "sha256": "5fa2a4822e03ee7693c566e8670ddab5ee35c7a5d25d4671ac57c53ddf82c767"
+  },
+  "manifest": {
+    "files": [
+      {
+        "bytes": 32153606,
+        "path": "database/peq-1787356814.zip",
+        "role": "public-fixture",
+        "sha256": "71c9969a65c190ab7f388f5887136d0e5f705ad3ed54788276827ccd275f1266"
+      },
+      {
+        "bytes": 3789428,
+        "path": "quests/quests-b3e34b8.tar.gz",
+        "role": "public-fixture",
+        "sha256": "863afda49a1e666fac53faddd52557dbe907525711378ce49d31be3fca240523"
+      },
+      {
+        "bytes": 940304,
+        "path": "maps/base/poknowledge.map",
+        "role": "public-fixture",
+        "sha256": "794b618d86852b47bd593424129aaf34eee326e5e3fec7290aeeb0e32bc41d20"
+      },
+      {
+        "bytes": 1210906,
+        "path": "maps/nav/poknowledge.nav",
+        "role": "public-fixture",
+        "sha256": "edf48789922d0de8a7b30ee47b8fe023c89c07cebd014f399dd6202ee7752b24"
+      },
+      {
+        "bytes": 129726,
+        "path": "maps/water/poknowledge.wtr",
+        "role": "public-fixture",
+        "sha256": "78596081d06ca3027ddf68c0b6bbaec291833d9ad2c238b4165a5a2313362045"
+      },
+      {
+        "bytes": 81896,
+        "path": "debs/libjson-perl_4.10000-1_all.deb",
+        "role": "guest-package",
+        "sha256": "b88095b0b6307650f581c17240ea2cc7ba1676c6f7eb72b0066eaf159215d926"
+      },
+      {
+        "bytes": 21092,
+        "path": "debs/liburing2_2.5-1build1_amd64.deb",
+        "role": "guest-package",
+        "sha256": "c2aef62accee92a06263c3ad4ef46132c13e409b54296c44792a20491830a7b0"
+      },
+      {
+        "bytes": 6746,
+        "path": "debs/mysql-common_5.8+1.1.0build1_all.deb",
+        "role": "guest-package",
+        "sha256": "2a9ed286f4a78849bb0231b11a9ababf8c8694667caf986cd2563a6b67f939bc"
+      },
+      {
+        "bytes": 736208,
+        "path": "debs/galera-4_26.4.16-2build4_amd64.deb",
+        "role": "guest-package",
+        "sha256": "ed3865d816a42318f12f77b1917c4480f7d21f770d144752f08560683e786f3a"
+      },
+      {
+        "bytes": 85538,
+        "path": "debs/libdbd-mysql-perl_4.052-1ubuntu3_amd64.deb",
+        "role": "guest-package",
+        "sha256": "2ce8c3a6658186360134e3f2532897e1927dbccb4c7908655723a444016b8f4b"
+      },
+      {
+        "bytes": 38548,
+        "path": "debs/libconfig-inifiles-perl_3.000003-2ubuntu0.1_all.deb",
+        "role": "guest-package",
+        "sha256": "a1957aae3d25a1bfb5c594f1e470c6919ba2859c6b5bd1fa719ccd71a636d2fd"
+      },
+      {
+        "bytes": 720392,
+        "path": "debs/libdbi-perl_1.643-4ubuntu0.1_amd64.deb",
+        "role": "guest-package",
+        "sha256": "ca999e2a01cf53f3948f9831e654644aa6be5675fabaf0e2e943a660faeef531"
+      },
+      {
+        "bytes": 1254894,
+        "path": "debs/libmysqlclient21_8.0.46-0ubuntu0.24.04.4_amd64.deb",
+        "role": "guest-package",
+        "sha256": "830f21eb986cca5b9fb46c258a7d081a95cb8ebfde142bac3e9b7b5fb6418dbc"
+      },
+      {
+        "bytes": 374324,
+        "path": "debs/socat_1.8.0.0-4ubuntu0.1_amd64.deb",
+        "role": "guest-package",
+        "sha256": "46e854289b6b1c97e28be5d9293bea61e8633d00d6a65d9513f019c7232696fe"
+      },
+      {
+        "bytes": 196354,
+        "path": "debs/libmariadb3_10.11.14-0ubuntu0.24.04.1_amd64.deb",
+        "role": "guest-package",
+        "sha256": "1608427381a08eefd7e5b1c4cf5b4f360cbb7296f489989c2453ec26989a9fa5"
+      },
+      {
+        "bytes": 2502348,
+        "path": "debs/mariadb-client_10.11.14-0ubuntu0.24.04.1_amd64.deb",
+        "role": "guest-package",
+        "sha256": "b44ef0f31ffe0be1295ee7085c6e4177bbac408278d42f19116bd0caac4a0e27"
+      },
+      {
+        "bytes": 1039390,
+        "path": "debs/mariadb-client-core_10.11.14-0ubuntu0.24.04.1_amd64.deb",
+        "role": "guest-package",
+        "sha256": "b52694e010f55841f97b6bbf34bf88f7d1a2b47e59fae3e601da0f1f99ae4afb"
+      },
+      {
+        "bytes": 28550,
+        "path": "debs/mariadb-common_10.11.14-0ubuntu0.24.04.1_all.deb",
+        "role": "guest-package",
+        "sha256": "5b4257abd9bd0fb24b7b4a28646fe78af25099beeb5b5fbbd011b6b935d03aae"
+      },
+      {
+        "bytes": 3463086,
+        "path": "debs/mariadb-server_10.11.14-0ubuntu0.24.04.1_amd64.deb",
+        "role": "guest-package",
+        "sha256": "99d76e8c2278b66542c240e55312c8546994dd6e07830f3c249a73436ccd0fea"
+      },
+      {
+        "bytes": 8406140,
+        "path": "debs/mariadb-server-core_10.11.14-0ubuntu0.24.04.1_amd64.deb",
+        "role": "guest-package",
+        "sha256": "851dee13f004199973a044a3449c4ce55406e3065896998a2ed02e1a9d4f9fdb"
+      },
+      {
+        "bytes": 255850,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble_InRelease",
+        "role": "signed-package-metadata",
+        "sha256": "cdb2f31d809f589719a53c6ad15f255b27569c4059542ada282aaa21b8e164b0"
+      },
+      {
+        "bytes": 7165069,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble_main_binary-amd64_Packages",
+        "role": "signed-package-metadata",
+        "sha256": "8f6f71ae839c8cba390a7643fcbbdacddb0bc7d12c1583a2dd80a1f8443a30e5"
+      },
+      {
+        "bytes": 73379142,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble_universe_binary-amd64_Packages",
+        "role": "signed-package-metadata",
+        "sha256": "687ffc969e7700137677b9cfe2f614ee2d638052a91a7c9bf31f3f6a3040a99a"
+      },
+      {
+        "bytes": 126125,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-updates_InRelease",
+        "role": "signed-package-metadata",
+        "sha256": "269dd8e4030f0963cbbdbdc7e12a53d06494263f4cf9878e4a26fb13d42a6d63"
+      },
+      {
+        "bytes": 7120827,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-updates_main_binary-amd64_Packages",
+        "role": "signed-package-metadata",
+        "sha256": "e1330d4b0d1604808295d4af71bc14fdb83f4180ac982bbcf33a1b9bd54f94ee"
+      },
+      {
+        "bytes": 10591098,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-updates_universe_binary-amd64_Packages",
+        "role": "signed-package-metadata",
+        "sha256": "f518bf312aeb75c2e8c6c9a4fccc1ebc05876141087fb77f8f3b40f12ce07958"
+      },
+      {
+        "bytes": 126127,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-security_InRelease",
+        "role": "signed-package-metadata",
+        "sha256": "6be2718be70acbf245b9fe37ca753c043b970db6cd27594ec081d6809cb9908d"
+      },
+      {
+        "bytes": 5721326,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-security_main_binary-amd64_Packages",
+        "role": "signed-package-metadata",
+        "sha256": "207e1d251ecfc9215516c8db3a71c23cc6039298803c56bc5c2bca8c35bb4c55"
+      },
+      {
+        "bytes": 7666073,
+        "path": "apt-lists/archive.ubuntu.com_ubuntu_dists_noble-security_universe_binary-amd64_Packages",
+        "role": "signed-package-metadata",
+        "sha256": "69ef69e72ed3bd48f7e5feddbf114d32f45046a6fb4cefa43e2b394a550d9bf2"
+      },
+      {
+        "bytes": 3607,
+        "path": "ubuntu-archive-keyring.gpg",
+        "role": "ubuntu-keyring",
+        "sha256": "80a36b0a6de2f69f49d2df75ef473ccde121e9e190b9ea01d20a4f63778d5c31"
+      },
+      {
+        "bytes": 5056,
+        "path": "runtime-input-contract.json",
+        "role": "runtime-data",
+        "sha256": "4c6372d62faf682c1400bc60a5bd8f792b0d270997cd14fe9c1eca32c5addc54"
+      },
+      {
+        "bytes": 16675,
+        "path": "opcodes/opcodes.conf",
+        "role": "runtime-data",
+        "sha256": "6a38877b337c983bb8fee2fa1e72eb2265cc5f34ac91b68d8c86e2eec860d52c"
+      },
+      {
+        "bytes": 21278,
+        "path": "opcodes/patch_UF.conf",
+        "role": "runtime-data",
+        "sha256": "c1fa95bd76959dace3ba7a09b933341859285cc281af3bcfc024d2a603dda540"
+      },
+      {
+        "bytes": 20304,
+        "path": "opcodes/patch_Titanium.conf",
+        "role": "runtime-data",
+        "sha256": "c65eccc75a5cbd2319db826bed225e2b6c2da22c996a7993cf5173636ea0a579"
+      },
+      {
+        "bytes": 300,
+        "path": "opcodes/mail_opcodes.conf",
+        "role": "runtime-data",
+        "sha256": "128e0bd0b8f18a11d3451280748d4390bc222029966ef2d732b80f26c3b743d7"
+      },
+      {
+        "bytes": 19954,
+        "path": "opcodes/patch_SoD.conf",
+        "role": "runtime-data",
+        "sha256": "4d165616777fb7219cc077e939414d187db99da6283b0710f0faa96c0e966bb4"
+      },
+      {
+        "bytes": 23317,
+        "path": "opcodes/patch_SoF.conf",
+        "role": "runtime-data",
+        "sha256": "deb17b9bdb94edc066272b47ca07a2db57e00c1868e5b3462cc50868260c97b1"
+      },
+      {
+        "bytes": 18415,
+        "path": "opcodes/patch_RoF2.conf",
+        "role": "runtime-data",
+        "sha256": "b2059cda5169cb820cd031f46f608af23c376bcf7a247fa67a971b3c8ac7c6b1"
+      },
+      {
+        "bytes": 16973,
+        "path": "opcodes/patch_RoF.conf",
+        "role": "runtime-data",
+        "sha256": "ea29b22c609fc1e9085aeef694ac53307adc67f730f46a237b9173862f0a2ef9"
+      },
+      {
+        "bytes": 1553,
+        "path": "provenance/public-downloads.json",
+        "role": "provenance",
+        "sha256": "7e6991ec71d15444602a95fa86a5084c482c5c697ac661dea1f4653b6f1fb0e5"
+      },
+      {
+        "bytes": 36153,
+        "path": "provenance/database-inspection.json",
+        "role": "provenance",
+        "sha256": "3864b6bc15b77b5773ffc7608394d326e981eeb0827d1560f92a076852771e82"
+      },
+      {
+        "bytes": 1781750,
+        "path": "provenance/quest-inspection.json",
+        "role": "provenance",
+        "sha256": "2f1d960a10308562554572d1960e207b5fea5f50d6927db1a0a1729a5548b230"
+      },
+      {
+        "bytes": 2117,
+        "path": "provenance/opcode-inspection.json",
+        "role": "provenance",
+        "sha256": "6090cca80b2ee0ce211f394139df88feb53735bf4e0b902dd0d2d05e51612d89"
+      },
+      {
+        "bytes": 35637,
+        "path": "provenance/runtime-package-proof.json",
+        "role": "provenance",
+        "sha256": "210f9c9ca3ee4382283ea8400dc37e5583f1b6a0bff1b1d3ad7e912a6357e639"
+      },
+      {
+        "bytes": 3600,
+        "path": "provenance/runtime-apt-plan.txt",
+        "role": "provenance",
+        "sha256": "3ed83f8b2f00db39201646a92b9db3fdfa395275b9c797999a4ff382e40de412"
+      },
+      {
+        "bytes": 335,
+        "path": "provenance/runtime-package-roots.json",
+        "role": "provenance",
+        "sha256": "161aeefe630bdb0b8d6eb81122e270520c0cf4f0bf20442d452b5ec81eb1ac69"
+      },
+      {
+        "bytes": 117,
+        "path": "provenance/package-size-admission.json",
+        "role": "provenance",
+        "sha256": "b88443c87ad18256e543893dfcdf783ef7915bcb2500f52d2100ad2db46e1aff"
+      }
+    ],
+    "requires_build_iso_sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4",
+    "schema": 1,
+    "scope": "public input integrity and static inventory only; not runtime acceptance",
+    "status": "prepared-unexecuted"
+  },
+  "manifest_sha256": "b51d4751fe2a31689dd906b392da1e24d9510e26418067b09788f43b78403b28",
+  "version": 1
+}
