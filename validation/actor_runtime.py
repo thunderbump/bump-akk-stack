@@ -35,6 +35,7 @@ class Runtime:
         self.used = shutil.disk_usage('/opt').used
         self.deadline = min(build.DEADLINE, time.monotonic()+RUNTIME_SECONDS)
         self.stage_times = {}
+        self.actor_diagnostics = ''
 
     def scrub(self, value):
         for secret in self.secrets:
@@ -110,6 +111,10 @@ class Runtime:
                 rc = proc.wait(timeout=5)
             text = self.scrub(output.decode(errors='replace'))
             if actor:
+                diagnostic = ''.join(c if c in '\n\t' or ord(c) >= 32 and not 127 <= ord(c) <= 159 else '?' for c in text)
+                self.actor_diagnostics = diagnostic.encode()[-3000:].decode('utf-8', 'ignore')
+                if group_live(proc.pid):
+                    raise RuntimeError(name+': native process group remains after leader exit')
                 if self.control == 'cancel' and not created:
                     raise RuntimeError('Actor cancellation phase missing')
                 record = completion(text, rc, self.control)
@@ -371,10 +376,11 @@ def run(build, control, fixture, binaries, libraries):
         value = {'profile': PROFILE, 'fixture_manifest_sha256': fixture['manifest_sha256'], 'recipe': RECIPE,
                  'result': record, 'database_cleanup': clean, 'elapsed_seconds': round(time.monotonic()-start, 3),
                  'stage_seconds': runtime.stage_times, 'shared': shared, 'package_plan_sha256': package_plan,
+                 'diagnostics': runtime.actor_diagnostics,
                  'outputs_unchanged': error is None, 'inputs_unchanged': error is None}
         build.emit({'kind': 'observation', 'name': 'actor-runtime', 'value': value})
     if error or not clean or record is None:
         raise RuntimeError('Actor runtime refused: '+(error or 'Missing result or database cleanup'))
     if record['exit_code'] != 0:
-        raise RuntimeError('actor-lifecycle: exit '+str(record['exit_code'])+'\nCompleted native scenario with database cleanup')
+        raise RuntimeError('actor-lifecycle: exit '+str(record['exit_code'])+'\n'+runtime.actor_diagnostics)
     return value

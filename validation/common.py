@@ -88,7 +88,17 @@ def outcome(summary, workers, clean, profile=PROFILE, control=None, reused=False
         return 2
     cleanup = summary.get('cleanup', {})
     ordinary_cleanup = not cleanup.get('rescued') and 'controller_budget_error' not in cleanup
-    if ordinary_cleanup and candidate_failure(workers.get('producer', {})):
+    producer = workers.get('producer', {})
+    consumer = workers.get('consumer', {})
+    producer_guest = producer.get('guest_report_untrusted') if isinstance(producer,dict) else None
+    known_consumer_failure = (summary.get('cases', {}).get('producer', {}).get('case_passed') is True
+                             and worker_safe(producer) and isinstance(producer_guest,dict)
+                             and producer_guest.get('ok') is True
+                             and candidate_failure(consumer,consumer=True)
+                             and consumer['cleanup'].get('artifact_input_unchanged') is True)
+    # Utility checks precede the actor stage. Their existing narrow failure evidence
+    # stays repairable in ordinary runs, but cannot qualify an unexecuted control.
+    if ordinary_cleanup and control is None and (candidate_failure(producer) or known_consumer_failure):
         return 1
     from actor import PROFILE as ACTOR, result
     if profile == ACTOR:

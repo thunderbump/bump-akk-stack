@@ -126,6 +126,38 @@ def domain(s):
 </domain>'''
 
 
+def validate_devices(tree):
+    """Verify the effective owned topology before resuming either fixed profile."""
+    if (tree.attrib.get('type') != 'kvm' or tree.findall('./devices/interface')
+            or any(tree.findall('./devices/'+tag) for tag in
+                   ('filesystem','hostdev','graphics','channel','redirdev','vsock'))):
+        raise RuntimeError('Unexpected guest device')
+    expected = {'vda': ('disk','root.raw','virtio',False),
+                'sda': ('cdrom','seed.iso','sata',True),
+                'sdb': ('cdrom','fixture.iso','sata',True),
+                'vdb': ('disk','artifact.raw','virtio',True)}
+    if VALIDATION_PROFILE == 'actor-lifecycle-v1':
+        expected['sdc'] = ('cdrom','runtime.iso','sata',True)
+    elif VALIDATION_PROFILE != 'build-unit-v1':
+        raise RuntimeError('Unknown guest device profile')
+    disks = tree.findall('./devices/disk')
+    if len(disks) != len(expected):
+        raise RuntimeError('Guest device count mismatch')
+    seen = set()
+    for disk in disks:
+        target = disk.find('target'); source = disk.find('source'); driver = disk.find('driver')
+        name = target.get('dev') if target is not None else None
+        if name not in expected or name in seen or source is None or driver is None:
+            raise RuntimeError('Guest device identity mismatch')
+        kind, filename, bus, readonly = expected[name]
+        if (disk.get('type') != 'file' or disk.get('device') != kind
+                or target.get('bus') != bus or source.get('file') != str(DATA/filename)
+                or driver.get('type') != 'raw' or (disk.find('readonly') is not None) != readonly
+                or name == 'vdb' and driver.get('discard') != 'ignore'):
+            raise RuntimeError('Guest device policy mismatch')
+        seen.add(name)
+
+
 def schema_check(xml):
     # Use the installed XML library; no extra host package or external entity fetch.
     lib=ctypes.CDLL(ctypes.util.find_library('xml2'))
@@ -301,11 +333,7 @@ def worker():
         if s['profile']+' (enforce)' not in P('/sys/kernel/security/apparmor/profiles').read_text():raise RuntimeError('Profile not enforcing')
         virsh('create',str(EVIDENCE/'domain.xml'),'--paused','--validate',timeout=60)
         xml=virsh('dumpxml',s['uuid']).stdout;(EVIDENCE/'effective-domain.xml').write_text(xml);tree=ET.fromstring(xml)
-        if tree.attrib.get('type')!='kvm' or tree.findall('./devices/interface') or any(tree.findall('./devices/'+tag) for tag in ['filesystem','hostdev','graphics','channel','redirdev','vsock']):raise RuntimeError('Unexpected guest device')
-        disks=tree.findall('./devices/disk')
-        artifact_disk=next((d for d in disks if d.find('target').get('dev')=='vdb'),None)
-        if len(disks)!=4 or artifact_disk is None or artifact_disk.find('source').get('file')!=str(DATA/'artifact.raw') or artifact_disk.find('driver').get('type')!='raw' or artifact_disk.find('driver').get('discard')!='ignore' or (artifact_disk.find('readonly') is not None)!=(CASE=='consumer'):
-            raise RuntimeError('Artifact device policy mismatch')
+        validate_devices(tree)
         if virsh('domstate',s['uuid']).stdout.strip()!='paused':raise RuntimeError('Guest was not paused')
         pids=owned_pids(s)
         if len(pids)!=1:raise RuntimeError('Expected exactly one owned QEMU process')
@@ -975,7 +1003,8 @@ class BuildProtocol(ProducerBuildProtocol):
             from actor import result as actor_result, RECIPE
             record = dict(item.get('result', {})); rc = record.pop('exit_code', None)
             actor_result(record, rc, QUALIFICATION_CONTROL)
-            if (item.get('profile') != VALIDATION_PROFILE or item.get('recipe') != RECIPE
+            if (not isinstance(item.get('diagnostics'),str) or len(item['diagnostics'].encode()) > 3000
+                    or item.get('profile') != VALIDATION_PROFILE or item.get('recipe') != RECIPE
                     or item.get('fixture_manifest_sha256') != ACTOR_FIXTURE['manifest_sha256']
                     or item.get('database_cleanup') is not True or item.get('outputs_unchanged') is not True
                     or item.get('inputs_unchanged') is not True):

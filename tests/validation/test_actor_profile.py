@@ -38,7 +38,7 @@ def observation(control=None, code=0):
     return dict(profile=actor.PROFILE, fixture_manifest_sha256='a'*64, recipe=actor.RECIPE,
                 result=actor.result(native(control, code), code, control),
                 database_cleanup=True, outputs_unchanged=True, inputs_unchanged=True,
-                elapsed_seconds=3, stage_seconds={'actor-lifecycle': 3}, shared={}, package_plan_sha256='b'*64)
+                elapsed_seconds=3, stage_seconds={'actor-lifecycle': 3}, shared={}, package_plan_sha256='b'*64,diagnostics='native diagnostic')
 
 
 def worker():
@@ -68,6 +68,27 @@ class Completion(unittest.TestCase):
         with self.assertRaises(ValueError):actor.result(dict(value,native_cleanup=False),1)
         self.assertEqual(actor.result(native('assertion',1),1,'assertion')['exit_code'],1)
         with self.assertRaises(ValueError):actor.result(native(),0,'assertion')
+
+    def test_actor_profile_preserves_known_consumer_utility_repairs_before_actor_stage(self):
+        summary={'suite_passed':False,'cases_passed':False,
+                 'cases':{'producer':{'case_passed':True},'consumer':{'case_passed':False}},'cleanup':{}}
+        for name in ('upstream-tests','reporting-controls','runner-fail','runner-teardown-exception'):
+            workers={'producer':worker(),'consumer':worker()}
+            consumer=workers['consumer'];consumer['observations_untrusted']={};consumer['stages']={}
+            consumer['guest_report_untrusted']={'ok':False,'error':name+': exit 1\nKnown candidate check failed'}
+            self.assertEqual(common.outcome(summary,workers,True,actor.PROFILE),1,name)
+            for control in actor.CONTROLS:
+                self.assertEqual(common.outcome(summary,workers,True,actor.PROFILE,control,True),2)
+            for kind in ('oom','changed-artifact','failed-producer','unknown','missing-actor-stage','unclean','rescue'):
+                altered=copy.deepcopy(workers);changed_summary=copy.deepcopy(summary)
+                if kind=='oom':altered['consumer']['resource_observations']['memory.events']='oom 1\noom_kill 1\n'
+                if kind=='changed-artifact':altered['consumer']['cleanup']['artifact_input_unchanged']=False
+                if kind=='failed-producer':changed_summary['cases']['producer']['case_passed']=False
+                if kind=='unknown':altered['consumer']['guest_report_untrusted']['error']='Unknown crash'
+                if kind=='missing-actor-stage':altered['consumer']['guest_report_untrusted']['error']='Actor stage missing'
+                if kind=='rescue':changed_summary['cleanup']['rescued']=['consumer']
+                with self.subTest(name=name,kind=kind):
+                    self.assertEqual(common.outcome(changed_summary,altered,kind!='unclean',actor.PROFILE),2)
 
     def test_fixed_options_reject_arbitrary_profiles_controls_and_uncoupled_reuse(self):
         actor.options('build-unit-v1');actor.options(actor.PROFILE,retain=True)
@@ -168,6 +189,36 @@ class Rendering(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError,'Positive actor stage'):
             protocol.accept({'kind':'result','nonce':'n'*32,'ok':True,'consumer':{}})
 
+    def test_effective_actor_and_unit_topologies_require_exact_owned_readonly_media(self):
+        import xml.etree.ElementTree as ET
+        self.render()
+        consumer=common.load('actor_device_gate',self.destination/'consumer-worker.py')
+        tree=ET.fromstring(consumer.domain({'uuid':'00000000-0000-4000-8000-000000000031','profile':'p'}))
+        consumer.validate_devices(tree)
+        self.assertEqual(len(tree.findall('./devices/disk')),5)
+        runtime=next(d for d in tree.findall('./devices/disk') if d.find('target').get('dev')=='sdc')
+        for kind in ('missing','writable','wrong-source','duplicate','extra','wrong-type'):
+            altered=copy.deepcopy(tree)
+            disk=next(d for d in altered.findall('./devices/disk') if d.find('target').get('dev')=='sdc')
+            devices=altered.find('./devices')
+            if kind=='missing':devices.remove(disk)
+            if kind=='writable':disk.remove(disk.find('readonly'))
+            if kind=='wrong-source':disk.find('source').set('file','/unowned/runtime.iso')
+            if kind=='duplicate':devices.append(copy.deepcopy(disk))
+            if kind=='extra':
+                extra=copy.deepcopy(disk);extra.find('target').set('dev','sdd');devices.append(extra)
+            if kind=='wrong-type':disk.find('driver').set('type','qcow2')
+            with self.subTest(kind=kind),self.assertRaisesRegex(RuntimeError,'device'):
+                consumer.validate_devices(altered)
+        self.destination=self.fixture.root/'unit-device-gate';self.destination.mkdir()
+        self.render(profile='build-unit-v1')
+        unit=common.load('unit_device_gate',self.destination/'consumer-worker.py')
+        unit_tree=ET.fromstring(unit.domain({'uuid':'00000000-0000-4000-8000-000000000031','profile':'p'}))
+        unit.validate_devices(unit_tree)
+        self.assertEqual(len(unit_tree.findall('./devices/disk')),4)
+        unit_tree.find('./devices').append(runtime)
+        with self.assertRaisesRegex(RuntimeError,'device'):unit.validate_devices(unit_tree)
+
     def test_actor_media_must_be_explicit_but_unit_only_render_has_no_dependency(self):
         self.render(profile='build-unit-v1')
         worker_text=(self.destination/'consumer-worker.py').read_text()
@@ -200,6 +251,20 @@ class Processes(unittest.TestCase):
             child=int(self.runtime.command('leader-exit',[sys.executable,'-c',source]).strip())
         stat=Path('/proc')/str(child)/'stat'
         self.assertTrue(not stat.exists() or stat.read_text().rsplit(')',1)[1].split()[0]=='Z')
+
+    def test_positive_and_assertion_results_refuse_rescued_live_descendants(self):
+        for code in (0,1):
+            value=native(code=code)
+            marker=self.root/('child-'+str(code))
+            source=("import os,time; p=os.fork();\n"
+                    "if p==0:\n os.close(1);os.close(2);time.sleep(60)\n"
+                    "else:\n open("+repr(str(marker))+",'w').write(str(p));print("+
+                    repr('EQEMU_ACTOR_RESULT '+json.dumps(value))+",flush=True);raise SystemExit("+str(code)+")")
+            with self.subTest(code=code),patch.object(self.runtime,'guard'),self.assertRaisesRegex(RuntimeError,'native process group'):
+                self.runtime.command('native-rescue-'+str(code),[sys.executable,'-c',source],actor=True)
+            child=int(marker.read_text());stat=Path('/proc')/str(child)/'stat'
+            self.assertTrue(not stat.exists() or stat.read_text().rsplit(')',1)[1].split()[0]=='Z')
+            self.assertFalse(any(e['name']=='native-rescue-'+str(code) and e['state']=='passed' for e in self.events))
 
     def test_native_signal_unknown_result_and_timeout_are_refusal_with_cleanup(self):
         for name,source in [('signal','import os,signal;os.kill(os.getpid(),signal.SIGTERM)'),
@@ -337,6 +402,64 @@ class QualificationAdmission(unittest.TestCase):
             with self.subTest(change=change),self.assertRaises(ValueError):self.host.parse(json.dumps(dict(self.request,**change)))
         for op in ('status','cancel','release'):
             self.assertEqual(self.host.parse(json.dumps({'version':1,'op':op,'run_id':'1111111111'}))['op'],op)
+
+
+class ExportedDiagnostics(unittest.TestCase):
+    def test_native_assertion_text_survives_guest_cleanup_and_redacts_split_credentials(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);work=root/'work';bins=work/'build/bin';bins.mkdir(parents=True)
+            logs=root/'logs';logs.mkdir();server=root/'server';(server/'shared').mkdir(parents=True)
+            for name in ('items','spells'):(server/'shared'/name).write_bytes(b'data')
+            secret='actor-credential-across-output-chunks'
+            zone=bins/'zone'
+            native_record=native(code=1)
+            text=("#!/usr/bin/python3\nimport os,time\n"
+                  "os.write(1,b'Actor snapshot assertion failed: expected retired, saw live\\n')\n"
+                  "os.write(1,b'actor-credential-across-');time.sleep(.05);os.write(1,b'output-chunks\\n')\n"
+                  "print("+repr('EQEMU_ACTOR_RESULT '+json.dumps(native_record))+")\nraise SystemExit(1)\n")
+            zone.write_text(text);zone.chmod(0o700)
+            events=[]
+            build=SimpleNamespace(DEADLINE=time.monotonic()+4000,WORK=work,LOGS=logs,
+                                  ENV={'PATH':'/usr/bin:/bin'},emit=events.append,
+                                  sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest())
+            original_command=actor_runtime.Runtime.command
+            def command(runtime,name,args,**kwargs):
+                if kwargs.get('actor'):return original_command(runtime,name,args,**kwargs)
+                return ''
+            def packages(runtime):runtime.secrets.append(secret);return 'a'*64
+            marker=Path('/opt/eqemu-proof/BUILD_GUEST_ONLY')
+            actual_is_file=Path.is_file
+            def is_file(path):return True if path==marker else actual_is_file(path)
+            with patch.object(actor_runtime,'ROOT',root/'guest-runtime'),patch.object(actor_runtime,'MEDIA',root/'media'),\
+                 patch.object(actor_runtime.os,'geteuid',return_value=0),patch.object(Path,'is_file',is_file),\
+                 patch.object(actor_runtime.Runtime,'guard'),patch.object(actor_runtime.Runtime,'verify_inputs'),\
+                 patch.object(actor_runtime.Runtime,'install_packages',packages),\
+                 patch.object(actor_runtime.Runtime,'initialize_database'),patch.object(actor_runtime.Runtime,'import_database'),\
+                 patch.object(actor_runtime.Runtime,'configure',return_value=server),\
+                 patch.object(actor_runtime.Runtime,'command',command):
+                with self.assertRaises(RuntimeError) as failure:
+                    actor_runtime.run(build,None,{'manifest_sha256':'a'*64},{'zone':build.sha(zone)},{})
+            error=str(failure.exception)
+            self.assertTrue(error.startswith('actor-lifecycle: exit 1\n'))
+            self.assertIn('Actor snapshot assertion failed',error)
+            actor_events=[e for e in events if e.get('name')=='actor-runtime']
+            self.assertEqual(len(actor_events),1)
+            exported=actor_events[0]['value']
+            self.assertIn('expected retired, saw live',exported['diagnostics'])
+            self.assertNotIn(secret,error+json.dumps(exported))
+            self.assertNotIn('actor-credential-across-',error+json.dumps(exported))
+            self.assertIn('[redacted]',error)
+            self.assertLessEqual(len(exported['diagnostics'].encode()),3000)
+            summary={'suite_passed':False,'cases_passed':False,'cases':{'producer':{'case_passed':True}},'cleanup':{}}
+            workers={'producer':worker(),'consumer':worker()}
+            workers['consumer']['observations_untrusted']['actor-runtime']=exported
+            workers['consumer']['guest_report_untrusted']={'ok':False,'error':error}
+            workers['consumer']['stages']['actor-lifecycle']['state']='failed'
+            self.assertEqual(common.outcome(summary,workers,True,actor.PROFILE),1)
+            # Host's existing diagnostics export retains this same guest error.
+            retained_tail=error[-4500:]
+            self.assertIn('expected retired, saw live',retained_tail)
 
 
 class ForegroundCancellation(unittest.TestCase):
