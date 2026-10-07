@@ -117,7 +117,17 @@ class Runtime:
                     raise RuntimeError(name+': native process group remains after leader exit')
                 if self.control == 'cancel' and not created:
                     raise RuntimeError('Actor cancellation phase missing')
-                record = completion(text, rc, self.control)
+                try:
+                    record = completion(text, rc, self.control)
+                except Exception as exc:
+                    # A missing/malformed completion is infrastructure non-pass. Preserve its actual
+                    # native exit and scrubbed context before guest-disk cleanup removes the local log.
+                    reason = self.scrub(str(exc))
+                    reason = ''.join(c if c in '\n\t' or ord(c) >= 32 and not 127 <= ord(c) <= 159 else '?' for c in reason)
+                    heading = (name+': native exit '+str(rc)+'; completion refused: '+reason).encode()[:512].decode('utf-8', 'ignore')+'\n'
+                    remaining = 3000-len(heading.encode())
+                    tail = self.actor_diagnostics.encode()[-remaining:].decode('utf-8', 'ignore')
+                    raise ValueError(heading+tail) from exc
                 self.build.emit({'kind': 'stage', 'name': name, 'state': 'passed' if rc == 0 else 'failed'})
                 return record
             if rc != 0:

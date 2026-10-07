@@ -416,7 +416,7 @@ class PublicEvidence(unittest.TestCase):
     def tearDownClass(cls):
         cls.fixture.tearDownClass()
 
-    def public_status(self, root, observed, profile=actor.PROFILE, code=0, producer_failure=False, container=...):
+    def public_status(self, root, observed, profile=actor.PROFILE, code=0, producer_failure=False, container=..., consumer_error=None):
         work = root/'work'
         work.mkdir()
         workers = {'producer': worker(), 'consumer': worker()}
@@ -428,6 +428,9 @@ class PublicEvidence(unittest.TestCase):
             workers['consumer']['observations_untrusted'] = container
         if producer_failure:
             workers['producer']['guest_report_untrusted'] = {'ok': False, 'error': 'server-build: exit 1\nCandidate compile failed'}
+        if consumer_error is not None:
+            workers['consumer']['guest_report_untrusted']={'ok':False,'error':consumer_error}
+            workers['consumer']['stages']['actor-lifecycle']['state']='started'
         if code == 1:
             workers['consumer']['guest_report_untrusted'] = {'ok': False, 'error': 'actor-lifecycle: exit 1\nNative assertion'}
             workers['consumer']['stages']['actor-lifecycle']['state'] = 'failed'
@@ -580,6 +583,93 @@ class ExportedDiagnostics(unittest.TestCase):
             # Host's existing diagnostics export retains this same guest error.
             retained_tail=error[-4500:]
             self.assertIn('expected retired, saw live',retained_tail)
+
+
+class IncompleteNativeDiagnostics(unittest.TestCase):
+    def runtime_error(self, text, returncode=0, signal_number=None):
+        """Actual maintained command/run with only acquired guest setup mocked; toy zone emits bytes."""
+        import hashlib
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);work=root/'work';bins=work/'build/bin';bins.mkdir(parents=True)
+            logs=root/'logs';logs.mkdir();server=root/'server';(server/'shared').mkdir(parents=True)
+            for name in ('items','spells'):(server/'shared'/name).write_bytes(b'data')
+            secret='actor-diagnostic-secret-split-across-chunks'
+            zone=bins/'zone'
+            script=("#!/usr/bin/python3\nimport os,time,signal\n"
+                    "os.write(1,b'actor-diagnostic-secret-split-');time.sleep(.03);os.write(1,b'across-chunks\\n')\n"
+                    "os.write(1,"+repr(text.encode())+")\n")
+            script+=("os.kill(os.getpid(),"+str(signal_number)+")\n" if signal_number else "raise SystemExit("+str(returncode)+")\n")
+            zone.write_text(script);zone.chmod(0o700)
+            events=[];build=SimpleNamespace(DEADLINE=time.monotonic()+4000,WORK=work,LOGS=logs,
+                ENV={'PATH':'/usr/bin:/bin'},emit=events.append,sha=lambda p:hashlib.sha256(p.read_bytes()).hexdigest())
+            original_command=actor_runtime.Runtime.command
+            def command(runtime,name,args,**kwargs):
+                if kwargs.get('actor'):return original_command(runtime,name,args,**kwargs)
+                return ''
+            def packages(runtime):runtime.secrets.append(secret);return 'a'*64
+            marker=Path('/opt/eqemu-proof/BUILD_GUEST_ONLY');actual_is_file=Path.is_file
+            def is_file(path):return True if path==marker else actual_is_file(path)
+            with patch.object(actor_runtime,'ROOT',root/'runtime'),patch.object(actor_runtime,'MEDIA',root/'media'),\
+                 patch.object(actor_runtime.os,'geteuid',return_value=0),patch.object(Path,'is_file',is_file),\
+                 patch.object(actor_runtime.Runtime,'guard'),patch.object(actor_runtime.Runtime,'verify_inputs'),\
+                 patch.object(actor_runtime.Runtime,'install_packages',packages),patch.object(actor_runtime.Runtime,'initialize_database'),\
+                 patch.object(actor_runtime.Runtime,'import_database'),patch.object(actor_runtime.Runtime,'configure',return_value=server),\
+                 patch.object(actor_runtime.Runtime,'command',command):
+                with self.assertRaises(RuntimeError) as error:
+                    actor_runtime.run(build,None,{'manifest_sha256':'a'*64},{'zone':build.sha(zone)},{})
+            return str(error.exception),events,secret
+
+    def test_missing_completion_retains_actual_zero_exit_and_native_startup_tail(self):
+        error,events,secret=self.runtime_error('native startup diagnostic: fixture refused before actor\n')
+        self.assertIn('native exit 0',error)
+        self.assertIn('Actor completion missing or duplicated',error)
+        self.assertIn('fixture refused before actor',error)
+        self.assertNotIn(secret,error)
+        self.assertFalse(any(e.get('name')=='actor-runtime' for e in events))
+
+    def test_duplicate_malformed_and_signal_completion_failures_keep_actual_exit_and_tail(self):
+        encoded='EQEMU_ACTOR_RESULT '+json.dumps(native())+'\n'
+        for text,code,sig,reason in [(encoded*2,0,None,'missing or duplicated'),
+                                     ('EQEMU_ACTOR_RESULT {broken-json}\n',2,None,'Expecting'),
+                                     ('native signal diagnostic before completion\n',0,signal.SIGTERM,'missing or duplicated')]:
+            with self.subTest(code=code,signal=sig):
+                error,events,secret=self.runtime_error(text,code,sig)
+                self.assertIn('native exit '+str(-sig if sig else code),error)
+                self.assertIn(reason,error);self.assertNotIn(secret,error)
+                self.assertFalse(any(e.get('name')=='actor-runtime' for e in events))
+    def test_large_unicode_tail_keeps_reason_exit_and_strips_controls_and_split_credentials(self):
+        text=('large startup diagnostic '+('λ'*4000)+'\n')+'bounded final startup tail \x00\x1b[31m bad fixture\n'
+        error,events,secret=self.runtime_error(text,7)
+        self.assertIn('native exit 7',error);self.assertIn('Actor completion missing or duplicated',error)
+        self.assertIn('bounded final startup tail',error);self.assertIn('bad fixture',error)
+        self.assertNotIn('\x00',error);self.assertNotIn('\x1b',error);self.assertNotIn(secret,error)
+        self.assertLessEqual(len(error.encode()),3000+len('Actor runtime refused: '.encode()))
+        # Short output places the deliberately split credential inside the retained exported tail.
+        short,_,_=self.runtime_error('short startup diagnostic\n')
+        self.assertIn('[redacted]',short);self.assertNotIn('actor-diagnostic-secret-split-',short)
+    def test_missing_completion_diagnostic_reaches_existing_public_status_and_foreground_final_as_exit_two(self):
+        error,events,secret=self.runtime_error('native startup reason retained through guest cleanup\n',0)
+        PublicEvidence.setUpClass()
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);public=PublicEvidence()
+                status=public.public_status(root,None,code=2,consumer_error=error)
+                self.assertEqual(status['exit_code'],2);self.assertFalse(status['accepted']);self.assertIsNone(status['actor_runtime'])
+                self.assertIn('native exit 0',status['diagnostics']['consumer'])
+                self.assertIn('native startup reason retained',status['diagnostics']['consumer'])
+                client=root/'client';(client/'uploads'/str(os.getuid())).mkdir(parents=True)
+                def prepare(source,directory,**_):
+                    iso=directory/'fake.iso';iso.write_bytes(b'x');return iso,FACTS
+                def request(value):
+                    if value['op']=='run':return dict(started=True,run_id=value['run_id'],candidate=FACTS,build_id='f'*64)
+                    self.assertEqual(value['op'],'status');return dict(status,run_id=value['run_id'])
+                output=io.StringIO()
+                with patch.object(candidate,'BASE',client),patch.object(candidate,'prepare',prepare),patch.object(candidate,'request',request),contextlib.redirect_stdout(output):
+                    self.assertEqual(candidate.execute(root,actor.PROFILE),2)
+                final=json.loads(output.getvalue().splitlines()[-1]);self.assertFalse(final['accepted']);self.assertIsNone(final['actor_runtime'])
+                self.assertIn('native exit 0',final['diagnostics']['consumer']);self.assertIn('native startup reason retained',final['diagnostics']['consumer'])
+                self.assertNotIn(secret,json.dumps(final))
+        finally:PublicEvidence.tearDownClass()
 
 
 class ForegroundCancellation(unittest.TestCase):
