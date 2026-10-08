@@ -203,6 +203,8 @@ class Runtime:
         self.command('actor-perl-modules', ['perl', '-MDBI', '-MDBD::mysql', '-MJSON', '-MScalar::Util', '-e', 'print "modules loaded\\n"'])
         if subprocess.run(['pgrep', '-x', 'mariadbd'], stdout=subprocess.DEVNULL).returncode != 1:
             raise RuntimeError('Unexpected database process')
+        from debugger import inventory
+        inventory(self.command)
         return hashlib.sha256(plan.encode()).hexdigest()
 
     def query(self, label, sql, db=True, timeout=60):
@@ -346,7 +348,7 @@ def run(build, control, fixture, binaries, libraries):
     runtime = Runtime(build, control, fixture)
     prior = {sig: signal.signal(sig, lambda *_: setattr(runtime, 'cancelled', True))
              for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP)}
-    record = None; error = None; clean = False
+    record = None; error = None; clean = False; args = None
     start = time.monotonic()
     try:
         MEDIA.mkdir()
@@ -379,6 +381,22 @@ def run(build, control, fixture, binaries, libraries):
         verify_outputs(); runtime.verify_inputs()
     except Exception as exc:
         error = runtime.scrub(str(exc))[-3000:]
+        # Missing native completion gets one short diagnostic replay of the exact
+        # binary before fixture teardown. Its outcome never changes acceptance.
+        if isinstance(exc, ValueError) and args is not None:
+            from debugger import capture, scrub
+            try:
+                trace = capture(args, server, build.ENV, runtime.secrets, binaries['zone'],
+                                runtime.deadline, lambda: runtime.cancelled)
+            except Exception as diagnostic_error:
+                trace = 'Debugger capture failed: '+scrub(str(diagnostic_error), runtime.secrets)[:300]
+            original = error.encode()
+            if len(original) > 1200:
+                error = (original[:256].decode('utf-8', 'ignore')+'\n[original log truncated]\n'
+                         +original[-900:].decode('utf-8', 'ignore'))
+            if len(trace.encode()) > 1700:
+                trace = trace.encode()[:1660].decode('utf-8', 'ignore')+'\n[trace truncated]'
+            error += '\n'+trace
     finally:
         clean = runtime.cleanup()
         for sig, handler in prior.items(): signal.signal(sig, handler)

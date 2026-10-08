@@ -45,6 +45,16 @@ Prepare the actor-capable package with the existing command plus `--with-actor`.
 
 Actor selection changes the source input/profile and build identity; unit-only evidence cannot satisfy actor coverage. The installed identity probe seals the actor helpers and declarations too. The recipe remains one fixed scenario, with no arbitrary zone, command forwarding or scenario language.
 
+### Bounded crash diagnostics
+
+The runtime media now declares GDB 15.1, its offline dependency closure, and libc/libstdc++ debug packages matching the existing guest versions. Fresh runtime installation verifies GDB Python, `addr2line` and `readelf`. Binutils is already in the consumer's build-package closure; no duplicate binutils package is added. These declarations need the separately prepared guest provisioning proof before host activation.
+
+A missing native completion triggers one diagnostic replay against the exact executable SHA-256, in the same disposable fixture before teardown. It preserves the original non-pass result. Replay is limited to 30 seconds and 128 KiB of output within the existing runtime deadline, with bounded public traces and explicit capture failure, timeout, cancellation and truncation. Normal and completed assertion runs do not replay. Fixture mutations during replay are diagnostic-only; replay cannot establish scenario acceptance.
+
+The fixed GDB command disables init files, auto-loading and network debuginfod, suppresses argument values, prints only frame names and file/line locations, and intercepts crash signals before the inherited crash handler. It caps threads/frames, forbids cores and owns debugger/inferior cleanup. Known guest credentials are redacted before export. The helper is available for the surviving normal-server fixture; this change does not resume actor qualification or launch a world service.
+
+`validation/debugger/prepare_inputs.py` authenticates the retained Ubuntu signatures/indexes and acquires opaque packages without host installation. `prepare_proof.py` checks the exact published isolation-controller template and renders one offline provisioning VM. That proof installs the actual consumer packages and runs five real-GDB controls against tiny trusted C fixtures, with no EQEmu rebuild. Host activation remains a separate reviewed operation after the proof passes.
+
 The runtime allocation is 1800 seconds, including package installation, import, shared data, execution and diagnostics. Ordinary zone execution is capped at 300 seconds. The actor consumer has a 3900-second work deadline within the unchanged 18000-second supervisor and 19000-second foreground work ceiling. The helper reserves the full runtime allocation before starting it and checks the remaining zone allocation before launch. These are limits awaiting real qualification, not measured performance. An 8 GiB runtime growth cap, 8 GiB free floor, bounded DB/shared/log allocations and existing host resource/cleanup gates apply.
 
 For actor runs, public `status` and the foreground final JSON include an optional

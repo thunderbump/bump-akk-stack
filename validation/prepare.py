@@ -15,7 +15,7 @@ from common import HERE, load, sha
 
 RUNTIME = ('common.py', 'render.py', 'host.py', 'candidate.py', 'install.py',
            'disable.py', 'host_support.py', 'installer_support.py', 'inputs.py', 'profile.json',
-           'actor.py', 'actor_runtime.py', 'runtime-fixture.json')
+           'actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py')
 RECIPES = ('producer-user.json', 'consumer-user.json', 'producer-guest.py', 'consumer-guest.py', 'producer-worker.py.in',
            'consumer-worker.py.in', 'suite.py.in', 'recipe-binding.json')
 
