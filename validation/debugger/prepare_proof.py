@@ -29,6 +29,20 @@ def assign(text, name, expression):
     return ''.join(lines[:node.lineno-1])+name+'='+expression+'\n'+''.join(lines[node.end_lineno:])
 
 
+def name_controller(text):
+    """Keep libvirt's runtime-directory name identical to the policy name.
+
+    Libvirt truncates this directory's domain-name component to 20 characters.
+    Keep the fixed name shorter, and preserve the failed first attempt separately.
+    """
+    text = text.replace('first-trial', 'debugger-proof-20261008b')
+    text = text.replace('eqemuvmtrial', 'eqemuvmdebugger20261008b')
+    text = assign(text, 'NAME', repr('eqemu-debug-1008b'))
+    text = text.replace('first synthetic offline VM trial; not full isolation acceptance',
+                        'offline debugger provisioning proof; no game-server qualification')
+    return text
+
+
 def prepare(store, template, output):
     store = store.resolve(strict=True); template = template.resolve(strict=True)
     if sha(template) != CONTROLLER_SHA: raise ValueError('Pinned isolation controller changed')
@@ -52,7 +66,7 @@ def prepare(store, template, output):
                 runcmd=[['systemctl','mask','--now','apt-daily.timer','apt-daily-upgrade.timer'],
                         ['python3','-B','/opt/eqemu-proof/proof_guest.py']])
     data = output/'user-data'; data.write_text('#cloud-config\n'+json.dumps(user)+'\n')
-    meta = output/'meta-data'; meta.write_text('instance-id: eqemu-debugger-proof-20261008\n')
+    meta = output/'meta-data'; meta.write_text('instance-id: eqemu-debugger-proof-20261008b\n')
     seed = output/'seed.iso'
     subprocess.run(['cloud-localds',str(seed),str(data),str(meta)],check=True,timeout=30)
     profile = json.loads((VALIDATION/'profile.json').read_text())
@@ -62,10 +76,7 @@ def prepare(store, template, output):
         path = store/item['path']
         if file_record(path, item['bytes']) != {k:item[k] for k in ('bytes','sha256')}:
             raise ValueError('Proof input identity')
-    text = template.read_text()
-    # Unique exact-owned names preserve all historical controller state.
-    text = text.replace('first-trial', 'debugger-proof-20261008').replace('first-trial.service','debugger-proof-20261008.service')
-    text = text.replace('eqemuvmtrial', 'eqemuvmdebugger20261008').replace('eqemu-first-trial','eqemu-debugger-proof-20261008')
+    text = name_controller(template.read_text())
     text = assign(text, 'INPUTS', 'P('+repr(str(store))+')')
     text = assign(text, 'FILES', repr({name:(item['path'],item['bytes'],item['sha256']) for name,item in inputs.items()}))
     text = text.replace('{DATA}/fixture.iso rk,','{DATA}/fixture.iso rk,\n  {DATA}/runtime.iso rk,')
