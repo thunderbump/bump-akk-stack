@@ -1,0 +1,77 @@
+{
+  "schema_version": 1,
+  "purpose": "stationary-non-gm-player-session",
+  "readiness": "preparation-only-requires-implementation",
+  "client": {
+    "repository": "thunderbump/bump-eqoxide",
+    "upstream_repository": "djhenry/eqoxide",
+    "upstream_revision": "81c6fee6f87ec1ab74c351b577655753ad141e92",
+    "planned_binary": "eqoxide-headless",
+    "binary_sha256": null,
+    "license_status": "not-declared-upstream",
+    "rust_build_image": "rust@sha256:2c3a22f0a5533ea2dd5a16627bc841228151faa2d4de2644ac9987e4a2f1f2fa"
+  },
+  "server": {
+    "repository": "thunderbump/bump-EQEmu",
+    "revision": "7cb554225f6628fe1faf74ef41b57cebd08932a0",
+    "required_binaries": ["loginserver", "world", "zone", "shared_memory"],
+    "artifact_build_id": null,
+    "artifact_manifest_sha256": null
+  },
+  "stack": {
+    "repository": "thunderbump/bump-akk-stack",
+    "baseline_revision": "a818cba742726486e82a6a931c44baca5a2ac74f",
+    "session_recipe_revision": null
+  },
+  "protocol": {"client_patch": "RoF2", "login_opcode_family": "SoD"},
+  "fixture": {
+    "kind": "disposable-public-peq",
+    "zone": "poknowledge",
+    "zone_id": 202,
+    "instance_id": 0,
+    "database_archive": "peq-1787356814.zip",
+    "database_sha256": "71c9969a65c190ab7f388f5887136d0e5f705ad3ed54788276827ccd275f1266",
+    "runtime_input_iso_sha256": "5fa2a4822e03ee7693c566e8670ddab5ee35c7a5d25d4671ac57c53ddf82c767",
+    "character_name": "Bumpprobe",
+    "character_status": 0,
+    "character_race": 1,
+    "character_class": 1,
+    "character_level": 1,
+    "initial_inventory_and_currency": "recorded-baseline-no-automatic-grants",
+    "credential_source": "fresh-runtime-only-private-fixture-config",
+    "observer": "separate-read-only-native-zone-observation"
+  },
+  "initial_capabilities": ["session-state", "known-spawn-observation", "say", "clean-logout", "reconnect"],
+  "excluded_capabilities": ["rendering", "warp", "walking", "combat", "loot", "trade", "followers", "zoning"],
+  "headless_contract": {
+    "requires_display_or_gpu": false,
+    "explicit_config_required": true,
+    "fake_frames_or_asset_readiness_allowed": false,
+    "client_configuration_auto_create_character": false,
+    "http_bind": "loopback-inside-fixture",
+    "network_failure_must_invalidate_http_session": true,
+    "shutdown_must_use_native_logout": true
+  },
+  "budgets_seconds": {
+    "runtime_setup": 240,
+    "single_client_connect": 60,
+    "observe_and_chat": 30,
+    "steady_session": 30,
+    "graceful_exit": 45,
+    "reconnect": 60,
+    "overall_scenario": 600,
+    "outer_cleanup_grace": 120
+  },
+  "evidence_required": [
+    "matched-server-client-and-fixture-identities",
+    "non-gm-account-and-character-baseline",
+    "exactly-one-native-client-registration",
+    "known-native-npc-correlated-with-client-observation",
+    "unique-chat-marker-confirmed-by-server",
+    "client-health-through-idle-probe",
+    "native-client-absence-after-graceful-logout",
+    "same-character-reconnected-without-duplicate-session",
+    "inventory-currency-and-persisted-state-comparison",
+    "owned-runtime-teardown-and-bounded-redacted-diagnostics"
+  ]
+}
