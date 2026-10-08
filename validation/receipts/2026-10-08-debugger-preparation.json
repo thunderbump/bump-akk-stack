@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-08",
+  "bead": "central-t0e1.4.2.5",
+  "status": "source-reviewed-provisioning-pending-os-authentication",
+  "source_commit": "f0a96645d0ceceb5671bd1ad4cbf86ef76147028",
+  "reviews": {
+    "standards": "PASS",
+    "spec": "PASS",
+    "operator_wrapper": "two independent PASS"
+  },
+  "helper_tests": {
+    "passed": 87,
+    "real_gdb_fixture_methods": 5
+  },
+  "package_manifest_sha256": "5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055",
+  "prepared_proof": {
+    "controller_sha256": "98eadd5d0e7d9cd4da8f675336616fac8b87d44eef37fcb11b39e5e1bdf5df00",
+    "seed_sha256": "80a35ebdf1f49e2323f3f17e813606dda74c6cbd202de870622cf30b92809030",
+    "verified_runtime": {
+      "iso_sha256": "a714115dcd1c654df9fcbdad41d41d367cebf042f57b8813b8dee7d203f731bb",
+      "manifest_sha256": "445828ddd3600d72ed885fb9cfbc3a223ab165856f2af5ee94d147a903f2e023",
+      "files_verified": 57,
+      "executed": false
+    },
+    "vm_started": false
+  },
+  "operator_wrapper_sha256": "3c9bc3fc96a8bc1a5df8417cd996a527a5793741376367c78e4c0f6636d7bba2",
+  "installed_package_unchanged": "9f298e87d6e466e54e6e58e10dcd643d2d2700b7d94a4ab2960a5620aec17812",
+  "vm_started": false,
+  "host_install": false,
+  "game_server_build": false,
+  "world_or_actor_run": false
+}
