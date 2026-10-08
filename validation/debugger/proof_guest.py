@@ -38,7 +38,7 @@ def proof():
     runtime.command('actor-mount-input', ['mount', '-o', 'ro,nosuid,nodev,noexec',
                     '/dev/disk/by-label/EQEMURUNTIME', str(actor_runtime.MEDIA)])
     runtime.verify_inputs(); package_plan = runtime.install_packages()
-    versions = debugger.inventory(runtime.command)
+    versions = runtime.debugger_versions
     wanted = ['gdb', 'libc6', 'libc6-dbg', 'libstdc++6', 'libstdc++6-14-dbg']
     installed = runtime.command('debugger-matching-symbols', ['dpkg-query', '-W',
                                 '-f=${Package}\t${Version}\n', *wanted])

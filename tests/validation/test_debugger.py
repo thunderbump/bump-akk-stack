@@ -36,6 +36,10 @@ int main(int argc, char **argv) {
     if (argc > 1 && !strcmp(argv[1], "wait")) {
         printf("PID %d\\n", getpid()); fflush(stdout); sleep(90); return 0;
     }
+    if (argc > 1 && !strcmp(argv[1], "guard")) {
+        FILE *f = fopen("inferior.pid", "w"); fprintf(f, "%d", getpid()); fclose(f);
+        sleep(90); return 0;
+    }
     if (argc > 1 && !strcmp(argv[1], "child")) {
         int child = fork();
         if (!child) { sleep(90); return 0; }
@@ -87,6 +91,17 @@ int main(int argc, char **argv) {
         self.assertIn('skipped', self.capture(cancelled=lambda: True))
         end = time.monotonic()+.3
         self.assertIn('replay cancelled', self.capture('wait', cancelled=lambda: time.monotonic() >= end))
+        end = time.monotonic()+.3
+        def guard():
+            if time.monotonic() >= end: raise RuntimeError('Runtime allocation cap')
+        with self.assertRaisesRegex(RuntimeError, 'allocation cap'):
+            self.capture('guard', guard=guard)
+        pid = int((self.root/'inferior.pid').read_text())
+        path = Path('/proc')/str(pid)/'stat'
+        for _ in range(50):
+            if not path.exists() or path.read_text().rsplit(')',1)[1].split()[0] == 'Z': break
+            time.sleep(.02)
+        else: self.fail('Debugger inferior survived resource guard')
         text = self.capture('flood')
         self.assertIn('replay truncated', text)
         self.assertLess(len(text.encode()), 3000)

@@ -204,7 +204,7 @@ class Runtime:
         if subprocess.run(['pgrep', '-x', 'mariadbd'], stdout=subprocess.DEVNULL).returncode != 1:
             raise RuntimeError('Unexpected database process')
         from debugger import inventory
-        inventory(self.command)
+        self.debugger_versions = inventory(self.command)
         return hashlib.sha256(plan.encode()).hexdigest()
 
     def query(self, label, sql, db=True, timeout=60):
@@ -387,7 +387,7 @@ def run(build, control, fixture, binaries, libraries):
             from debugger import capture, scrub
             try:
                 trace = capture(args, server, build.ENV, runtime.secrets, binaries['zone'],
-                                runtime.deadline, lambda: runtime.cancelled)
+                                runtime.deadline, lambda: runtime.cancelled, guard=runtime.guard)
             except Exception as diagnostic_error:
                 trace = 'Debugger capture failed: '+scrub(str(diagnostic_error), runtime.secrets)[:300]
             original = error.encode()

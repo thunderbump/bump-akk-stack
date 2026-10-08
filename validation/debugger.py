@@ -21,13 +21,14 @@ def scrub(text, secrets):
     return ''.join(c if c in '\n\t' or ord(c) >= 32 and not 127 <= ord(c) <= 159 else '?' for c in text)
 
 
-def capture(args, cwd, env, secrets, expected_sha256, deadline, cancelled=lambda: False):
+def capture(args, cwd, env, secrets, expected_sha256, deadline, cancelled=lambda: False, guard=lambda: None):
     """Replay the same executable with a fixed debugger; preserve the triggering failure.
 
     The caller owns fixture state. Replay can change disposable state and never
     substitutes for the original scenario result. No core or arbitrary GDB command.
     """
     start = time.monotonic()
+    guard()
     end = min(deadline, start + SECONDS)
     binary = Path(args[0])
     with binary.open('rb') as stream:
@@ -55,6 +56,7 @@ def capture(args, cwd, env, secrets, expected_sha256, deadline, cancelled=lambda
             selector.register(proc.stdout, selectors.EVENT_READ)
             eof = False
             while not eof or proc.poll() is None:
+                guard()
                 if cancelled():
                     state = 'cancelled'; break
                 if time.monotonic() >= end:
