@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-08",
+  "bead": "central-t0e1.4.2.5",
+  "status": "installed-and-admission-enabled",
+  "package_manifest_sha256": "5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055",
+  "sealed_installed_files_verified": 25,
+  "release_owner_uid": 0,
+  "release_mode": "0o755",
+  "old_release_manifest_sha256": "9f298e87d6e466e54e6e58e10dcd643d2d2700b7d94a4ab2960a5620aec17812",
+  "old_release_seals_verified": 23,
+  "wrappers_sha256": {
+    "/usr/local/bin/eqemu-validate": "fb7700726f9ff7b2a9b6b7ea877f4c256264241bc9d6c5e7582f044f84c3923e",
+    "/usr/local/sbin/eqemu-build-request": "46fca25cc32fddd06d76468a890ad940c87b481f7f1baf7740b0446a7f5b9c4c"
+  },
+  "afk_configuration_sha256": {
+    "config.toml": "e56445debe8e232e40d4ac91783f84c685c6dfc4443fa508bf2df42beb2aa44c",
+    "config.json": "38e57f04ff5a6c43902e77bc6242ef055b95d9f1b2f9d83453772173adfbb552"
+  },
+  "activation_backup_present": true,
+  "activation_root_receipt": "retained privately by the installed transaction",
+  "read_only_admission_probe": {
+    "enabled_selection_verified": true,
+    "existing_prior_receipts_accepted_by_read_only_gate": true,
+    "old_unit_artifact_refused": "Run ownership mismatch",
+    "new_run_directory_created": false,
+    "vm_started": false
+  },
+  "guest_provisioning_receipt": "2026-10-08-debugger-provisioning.json",
+  "source_reviews": "two independent PASS",
+  "activation_controls_passed": 42,
+  "helper_tests_passed": 88,
+  "new_vm_or_gameplay_job_started_by_postflight": false
+}
