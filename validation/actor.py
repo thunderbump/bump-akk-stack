@@ -27,6 +27,7 @@ PUBLIC_STAGES = {
     'actor-import-state', 'actor-import-system', 'actor-tables', 'actor-version',
     'actor-empty', 'actor-content', 'actor-state', 'actor-fixture',
     'actor-fixture-checked', 'actor-account', 'actor-shared-memory', 'actor-lifecycle',
+    'actor-debugger-gdb', 'actor-debugger-addr2line', 'actor-debugger-readelf', 'actor-debugger-python',
 }
 
 
@@ -97,7 +98,7 @@ def verify_media(store, fixture, records):
     if len(raw) > 32768 or hashlib.sha256(raw).hexdigest() != fixture['manifest_sha256']:
         raise ValueError('Runtime payload manifest identity mismatch')
     manifest = json.loads(raw)
-    if manifest != fixture['manifest'] or len(manifest['files']) != 47:
+    if manifest != fixture['manifest'] or not 1 <= len(manifest['files']) <= 128:
         raise ValueError('Unexpected runtime manifest')
     seen = set()
     for item in manifest['files']:

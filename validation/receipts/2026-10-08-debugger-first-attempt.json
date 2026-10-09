@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "ok": false,
+  "workload_ok": false,
+  "uuid": "bbaa26b5-9405-4169-92a8-b836f2443b7e",
+  "inputs": {
+    "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "fixture.iso": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4",
+    "runtime.iso": "a714115dcd1c654df9fcbdad41d41d367cebf042f57b8813b8dee7d203f731bb",
+    "seed.iso": "80a35ebdf1f49e2323f3f17e813606dda74c6cbd202de870622cf30b92809030"
+  },
+  "started_at": 1791478758.389207,
+  "error": "['/usr/bin/virsh', '-c', 'qemu:///system']: 1 error: Failed to create domain from /var/lib/eqemu-vm-proof/debugger-proof-20261008/evidence/domain.xml\nerror: internal error: process exited while connecting to monitor: 2026-10-08T16:59:21.704353Z qemu-system-x86_64: Unable to read /var/lib/libvirt/qemu/domain-1-eqemu-debugger-proof/master-key.aes: Failed to open file \u201c/var/lib/libvirt/qemu/domain-1-eqemu-debugger-proof/master-key.aes\u201d: Permission denied\n\n",
+  "finished_at": 1791478761.7163131,
+  "resource_observations": {
+    "memory.peak": "8630272",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+    "cpu.stat": "usage_usec 11357\nuser_usec 8259\nsystem_usec 3097\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 3\nnr_throttled 0\nthrottled_usec 0\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "cleanup": {
+    "complete": true,
+    "uuid": "bbaa26b5-9405-4169-92a8-b836f2443b7e",
+    "started_at": 1791478761.7683513,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "data_absent": true
+  },
+  "service_result": "exit-code",
+  "date": "2026-10-08",
+  "bead": "central-t0e1.4.2.5",
+  "guest_booted": false,
+  "diagnosis": "AppArmor rule used the full 29-character domain name; libvirt runtime directory used its first 20 characters.",
+  "kernel_audit": {
+    "profile": "libvirt-bbaa26b5-9405-4169-92a8-b836f2443b7e",
+    "operation": "open",
+    "denied_path": "/var/lib/libvirt/qemu/domain-1-eqemu-debugger-proof/master-key.aes",
+    "requested_mask": "r",
+    "denied_mask": "r",
+    "fsuid": 64055,
+    "ouid": 64055
+  },
+  "corrected_source_commit": "7da31762ffb71b23a30dcdc967c686f3dc8f5d06",
+  "helper_tests_passed": 88,
+  "retry_reviews": {
+    "standards": "PASS",
+    "spec": "PASS",
+    "wrapper": "two independent PASS"
+  },
+  "prepared_retry": {
+    "controller_sha256": "a7215ac804f31bd419c1fdf6794b43ccf2efeb45fe6e8212e86069107313aed9",
+    "seed_sha256": "7151e45176d139633b1d87bb944ada8252ecfbdb9af5f25dd7f7f4f2df957560",
+    "verified_runtime": {
+      "iso_sha256": "a714115dcd1c654df9fcbdad41d41d367cebf042f57b8813b8dee7d203f731bb",
+      "manifest_sha256": "445828ddd3600d72ed885fb9cfbc3a223ab165856f2af5ee94d147a903f2e023",
+      "files_verified": 57,
+      "executed": false
+    },
+    "vm_started": false
+  },
+  "retry_vm_started": false,
+  "operator_wrapper_sha256": "a360deafb14dc4e06264d680c01074c6b2fefacf66b95c57a57bf2bedc3f4576"
+}

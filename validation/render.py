@@ -78,7 +78,7 @@ def render(identifier, facts, destination, package=HERE, profile_name='build-uni
                 entry['content'] = guest
                 compile(guest, role+'-guest.py', 'exec')
         if role == 'consumer' and profile_name == ACTOR:
-            for name in ('actor.py', 'actor_runtime.py', 'runtime-fixture.json'):
+            for name in ('actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py'):
                 user['write_files'].append(dict(path='/opt/eqemu-proof/'+name, permissions='0600', content=(package/name).read_text()))
         ud = destination/(role+'-user-data'); md = destination/(role+'-meta-data')
         ud.write_text('#cloud-config\n'+json.dumps(user)+'\n')

@@ -215,7 +215,7 @@ def installed_identity(package=HERE):
              'profile.json', 'producer-user.json', 'consumer-user.json', 'producer-guest.py',
              'consumer-guest.py', 'producer-worker.py.in', 'consumer-worker.py.in',
              'suite.py.in', 'recipe-binding.json', 'host-inputs.json', 'client-config.json',
-             'actor.py', 'actor_runtime.py', 'runtime-fixture.json'}
+             'actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py'}
     if (not isinstance(manifest, dict) or set(manifest) != {'version', 'files'}
             or type(manifest['version']) is not int or manifest['version'] != 1
             or not isinstance(manifest['files'], dict) or set(manifest['files']) != names):

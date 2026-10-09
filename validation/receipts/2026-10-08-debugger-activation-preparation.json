@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-08",
+  "bead": "central-t0e1.4.2.5",
+  "status": "reviewed-activation-pending-os-authentication",
+  "source_commit": "eb85288c073a07a04016378508bdd3a0d6cedbdf",
+  "transaction_sha256": "ab575ec494f8090ef4b5db137fbb77a7cc7f6f652de44dea012ab04cb0769d10",
+  "package_manifest_sha256": "5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055",
+  "current_installed_manifest_sha256": "9f298e87d6e466e54e6e58e10dcd643d2d2700b7d94a4ab2960a5620aec17812",
+  "reviews": {
+    "standards": "PASS",
+    "spec": "PASS"
+  },
+  "fake_root_controls_passed": 42,
+  "helper_tests_passed": 88,
+  "wrapper_sha256": {
+    "apply-reviewed-package.sh": "679938616cbdb8f139c31d96bcb9f1146979fdf508854f923e9aa0f0c3344b64",
+    "preflight-reviewed-package.sh": "792d5c330ee703b6d83511d3274e659c0d0cb857d36a2077944de7082aa1a660",
+    "undo-reviewed-package.sh": "343f6088b1178ec19f6f7f0a10eb5a66e69600090c21aaf178cb2ef04f769feb"
+  },
+  "archive_exact_failed_run": "9924578091",
+  "retained_qualified_unit_runs": [
+    "0c7f619915",
+    "298c315718",
+    "a83098b0d0",
+    "bdf35611d3"
+  ],
+  "old_runtime_media_preserved": true,
+  "old_release_preserved": true,
+  "vm_started": false,
+  "host_activated": false,
+  "privilege_policy_changes": false,
+  "afk_config_changes": false
+}

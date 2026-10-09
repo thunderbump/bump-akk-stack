@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "ok": true,
+  "workload_ok": true,
+  "scope": "offline debugger provisioning proof; no game-server qualification",
+  "uuid": "361f97c0-fa4a-4f65-86b3-d3d7edf12ada",
+  "checks": {
+    "host_pre_resume": true,
+    "guest_synthetic_workload": true,
+    "readonly_inputs_unchanged": true
+  },
+  "inputs": {
+    "base.qcow2": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+    "fixture.iso": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4",
+    "runtime.iso": "a714115dcd1c654df9fcbdad41d41d367cebf042f57b8813b8dee7d203f731bb",
+    "seed.iso": "7151e45176d139633b1d87bb944ada8252ecfbdb9af5f25dd7f7f4f2df957560"
+  },
+  "started_at": 1791486066.9346025,
+  "resumed_at": 1791486069.4807196,
+  "finished_at": 1791486234.3273797,
+  "resource_observations": {
+    "memory.peak": "2967711744",
+    "memory.events": "low 0\nhigh 0\nmax 0\noom 0\noom_kill 0\noom_group_kill 0\nsock_throttled 0",
+    "cpu.stat": "usage_usec 32332327\nuser_usec 21999178\nsystem_usec 10333149\nnice_usec 0\ncore_sched.force_idle_usec 0\nnr_periods 1108\nnr_throttled 11\nthrottled_usec 71203\nnr_bursts 0\nburst_usec 0",
+    "pids.events": "max 0"
+  },
+  "guest_report_untrusted": {
+    "schema": 1,
+    "kind": "debugger-provisioning-trial",
+    "ok": true,
+    "checks": {
+      "guest_root": true,
+      "no_virtual_nic": true,
+      "approved_inputs": true,
+      "runtime_install": true,
+      "matching_debug_packages": true,
+      "gdb_python": true,
+      "source_trace": true,
+      "no_private_values": true,
+      "bounded_controls": true,
+      "no_cores": true
+    },
+    "versions": {
+      "gdb": "GNU gdb (Ubuntu 15.1-1ubuntu1~24.04.1) 15.1",
+      "addr2line": "GNU addr2line (GNU Binutils for Ubuntu) 2.42",
+      "readelf": "GNU readelf (GNU Binutils for Ubuntu) 2.42"
+    },
+    "package_identities": {
+      "gdb": "15.1-1ubuntu1~24.04.1",
+      "libc6": "2.39-0ubuntu8.9",
+      "libc6-dbg": "2.39-0ubuntu8.9",
+      "libstdc++6": "14.2.0-4ubuntu2~24.04.1",
+      "libstdc++6-14-dbg": "14.2.0-4ubuntu2~24.04.1"
+    },
+    "package_plan_sha256": "0e569e002ae94d96a341fd37178373d7efef0bef0d0a7dab6841ebbd6a346d17",
+    "fixture_manifest_sha256": "445828ddd3600d72ed885fb9cfbc3a223ab165856f2af5ee94d147a903f2e023",
+    "fixture_binary_sha256": "2dd289342ee543aa8ff2a7a698f0f7beeabe0f39ba50dd5a45e7578dcff1d4b0",
+    "fixture_build_id": "daea6464e95ac8c24933903eec1c6753a89a7ceb",
+    "trace": "Debugger replay complete; debugger exit 2; executable sha256 2dd289342ee543aa8ff2a7a698f0f7beeabe0f39ba50dd5a45e7578dcff1d4b0\nEQEMU_CRASH_TRACE signal SIGSEGV\nthread 1\n#0 proof_crash at /opt/eqemu-build/trace-fixture.c:5\n#1 main at /opt/eqemu-build/trace-fixture.c:7\n"
+  },
+  "cleanup": {
+    "complete": true,
+    "uuid": "361f97c0-fa4a-4f65-86b3-d3d7edf12ada",
+    "started_at": 1791486234.3737073,
+    "domain_absent": true,
+    "profile_absent": true,
+    "slice_file_absent": true,
+    "data_absent": true
+  },
+  "service_result": "success"
+}
