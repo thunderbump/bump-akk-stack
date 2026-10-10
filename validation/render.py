@@ -67,6 +67,7 @@ def render(identifier, facts, destination, package=HERE, profile_name='build-uni
             elif entry['path'].endswith('/guest_build.py'):
                 guest = entry['content'].replace(previous['build_id'], build_id)
                 if role == 'producer':
+                    guest = assign(guest, 'VALIDATION_PROFILE', profile_name)
                     guest = assign(guest, 'CANDIDATE_INPUT', facts['input_id'])
                     guest = assign(guest, 'CANDIDATE_SEAL', facts['manifest_sha256'])
                     guest = assign(guest, 'CANDIDATE_FACTS', binding)
@@ -77,6 +78,9 @@ def render(identifier, facts, destination, package=HERE, profile_name='build-uni
                         guest = guest.replace('DEADLINE=time.monotonic()+1800', 'DEADLINE=time.monotonic()+3900')
                 entry['content'] = guest
                 compile(guest, role+'-guest.py', 'exec')
+        if role == 'producer':
+            user['write_files'].append(dict(path='/opt/eqemu-proof/native_diagnostics.py', permissions='0600',
+                                           content=(package/'native_diagnostics.py').read_text()))
         if role == 'consumer' and profile_name == ACTOR:
             for name in ('actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py'):
                 user['write_files'].append(dict(path='/opt/eqemu-proof/'+name, permissions='0600', content=(package/name).read_text()))
@@ -86,6 +90,9 @@ def render(identifier, facts, destination, package=HERE, profile_name='build-uni
         seed = destination/(role+'-seed.iso')
         subprocess.run(['/usr/bin/cloud-localds', str(seed), str(ud), str(md)], check=True, timeout=30)
         worker = rename((package/(role+'-worker.py.in')).read_text())
+        if role == 'producer':
+            worker = assign(worker, 'VALIDATION_PROFILE', profile_name)
+            worker = worker.replace('P=pathlib.Path', 'sys.path.insert(0, '+repr(str(package.resolve()))+')\nP=pathlib.Path', 1)
         worker = re.sub(r'^INPUTS=.+$', 'INPUTS=P('+repr(str(destination))+')', worker, count=1, flags=re.M)
         files = {name: (str(BASE/'inputs'/name), item['bytes'], item['sha256']) for name,item in inputs.items() if name != 'runtime.iso' or role == 'consumer'}
         worker = assign(worker, 'VALIDATION_PROFILE', profile_name) if role == 'consumer' else worker

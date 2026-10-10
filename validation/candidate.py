@@ -168,7 +168,7 @@ def execute(source, profile_name=PROFILE, control=None, retain=False, reuse=None
         code = 128+interrupted if interrupted else 2 if error or result is None else result['exit_code']
         print(json.dumps(dict(event='final',profile=profile_name,run_id=identifier if submitted else None,
             candidate_revision=facts['candidate'] if facts else None,build_identity=build_id,
-            accepted=code==0,coverage=['reused-compile' if reuse else 'compile','utility-tests','fresh-consumer']+(['actor-lifecycle'] if profile_name=='actor-lifecycle-v1' else []),
+            accepted=code==0,coverage=['reused-compile' if reuse else 'compile','utility-tests','fresh-consumer']+(['actor-lifecycle'] if profile_name=='actor-lifecycle-v1' else ['native-static-pilot'] if profile_name=='build-static-unit-v1' else []),
             retained_artifact=(result or {}).get('retained_artifact'),qualification_control=control,reused_from=reuse,
             cleanup_complete=result['cleanup_complete'] if result else None,
             exit_code=code,error=error or (result or {}).get('error'),secondary_error=secondary,
@@ -215,7 +215,8 @@ def installed_identity(package=HERE):
              'profile.json', 'producer-user.json', 'consumer-user.json', 'producer-guest.py',
              'consumer-guest.py', 'producer-worker.py.in', 'consumer-worker.py.in',
              'suite.py.in', 'recipe-binding.json', 'host-inputs.json', 'client-config.json',
-             'actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py'}
+             'actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py',
+             'native_diagnostics.py'}
     if (not isinstance(manifest, dict) or set(manifest) != {'version', 'files'}
             or type(manifest['version']) is not int or manifest['version'] != 1
             or not isinstance(manifest['files'], dict) or set(manifest['files']) != names):

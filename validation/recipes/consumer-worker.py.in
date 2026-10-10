@@ -472,7 +472,7 @@ def strict_json(data):
 
 # Host accepts only bounded protocol data; guest reports cannot select host paths/actions.
 # Host accepts only bounded protocol data; guest reports cannot select host paths/actions.
-MANIFEST_SHA='95eb1cf160fdc3704d17d9d18be0919ed393f6951a98f6143a144b2c91b8f7e4'
+MANIFEST_SHA='d54caae3e24ce4b571767887c11444688bca519339599361d01d2c9bced51fa6'
 class BuildSerial:
     def __init__(self):self.tail=b'';self.total=0
     def feed(self,data):

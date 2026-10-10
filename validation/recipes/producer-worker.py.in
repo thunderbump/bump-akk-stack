@@ -9,6 +9,7 @@ import argparse, ctypes, ctypes.util, hashlib, json, os, pathlib, pwd
 import re, shutil, signal, socket, stat, subprocess, sys, time, uuid
 import xml.etree.ElementTree as ET
 P=pathlib.Path
+VALIDATION_PROFILE='build-unit-v1'
 BASE=P('/var/lib/eqemu-vm-proof')
 ROOT=BASE/'candidate-build-01'/'producer'
 DATA=ROOT/'data'
@@ -446,7 +447,7 @@ def strict_json(data):
 
 # Host accepts only bounded protocol data; guest reports cannot select host paths/actions.
 # Host accepts only bounded protocol data; guest reports cannot select host paths/actions.
-MANIFEST_SHA='95eb1cf160fdc3704d17d9d18be0919ed393f6951a98f6143a144b2c91b8f7e4'
+MANIFEST_SHA='d54caae3e24ce4b571767887c11444688bca519339599361d01d2c9bced51fa6'
 class BuildSerial:
     def __init__(self):self.tail=b'';self.total=0
     def feed(self,data):
@@ -628,6 +629,11 @@ class BuildProtocol(BaseBuildProtocol):
                     raise RuntimeError('Reporting control completion missing or failed')
             elif name == 'utility':
                 utility_result('EQEMU_TEST_RESULT ' + json.dumps(item), 0)
+            elif name == 'native-static-pilot':
+                if VALIDATION_PROFILE != 'build-static-unit-v1': raise RuntimeError('Unexpected native static pilot')
+                from native_diagnostics import validate_summary
+                try: validate_summary(item)
+                except ValueError as error: raise RuntimeError(str(error)) from error
             elif name != 'measurement' and not re.fullmatch(r'(elf|loader)-\d{1,3}', name):
                 raise RuntimeError('Unknown observation')
             self.observations[name] = item
@@ -635,6 +641,7 @@ class BuildProtocol(BaseBuildProtocol):
         if value.get('kind') == 'result' and value.get('ok') is True:
             required = {'candidate', 'utility', 'measurement', 'reporting-controls', *('runner-' + mode for mode in EXPECTED),
                         *('loader-' + str(i) for i in range(6))}
+            if VALIDATION_PROFILE == 'build-static-unit-v1': required.add('native-static-pilot')
             if not required <= self.observations.keys(): raise RuntimeError('Incomplete corrected build evidence')
             files = [item for name, item in self.observations.items() if name.startswith('elf-')]
             if not 6 <= len(files) <= 128: raise RuntimeError('Incomplete ELF inventory')

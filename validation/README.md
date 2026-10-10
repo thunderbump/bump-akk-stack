@@ -35,6 +35,43 @@ Run the cheap package and foreground-command checks without an AFK checkout:
 python3 -B -m unittest discover -s tests/validation -v
 ```
 
+## Offline native static-analysis pilot
+
+The prepared build medium includes pinned Ubuntu Clang 18.1.3, clang-tidy-18 and
+clang-format-18 plus their authenticated dependency archives. Preparation only
+handles signed metadata and opaque bytes. It installs nothing on the host. The
+fresh offline proof must pass before installing a replacement validator package.
+Both guests currently install the same build-package closure; static analysis
+runs only in the producer. Guest package-install cost must be measured too.
+
+`eqemu-validate --profile build-static-unit-v1 --source <clean-checkout>` adds an
+explicit compatibility pilot after the existing single native build. It analyzes
+`common/crash.cpp` and `zone/worldserver.cpp` with the producer's exact
+`compile_commands.json`, generated headers and dependencies before teardown.
+This fixed representative selection does not establish changed-code coverage or
+affected-header selection. The default remains `build-unit-v1`; there is no
+whole-repository format change or format gate.
+
+The selected checks are `clang-analyzer-core.NullDereference`,
+`clang-analyzer-core.CallAndMessage`, `clang-analyzer-cplusplus.NewDelete` and
+`bugprone-use-after-move`. Candidate `.clang-tidy` configuration is disabled for
+this trusted pilot. Selected findings exit `1`; compiler/context diagnostics,
+unexpected diagnostics/exits, missing or ambiguous compilation commands,
+timeouts and output overflow exit `2`. Both remain non-pass. A complete result
+requires both exact targets and bounded host-validated evidence. The pilot has
+120 seconds per file, 600 seconds total and 1 MiB per output file. The existing
+outer command owns cancellation and VM cleanup. JSON evidence includes database
+identity, checks, targets and wall/child peak-RSS measurements; failed checks
+retain the existing bounded error tail. It is partial static coverage, not a
+memory-safety guarantee or a reviewed inherited baseline.
+
+`validation/static_analysis/prepare_inputs.py` produces a new build medium from
+the hash-pinned baseline and signed retained indexes. `prepare_proof.py` renders
+one fixed offline VM using the previously qualified isolation controller. Its
+guest installs the actual package closure, checks versioned LLVM executables and
+GCC/zlib compatibility, and runs tiny safe/unsafe/missing-context controls. It
+does not compile EQEmu, start a game process or access saved-world data.
+
 These checks exercise subprocess exits, interruption/cancellation, identity refusal, cleanup failure, recipe/input tampering and static preparation. VM qualification and host installation remain separate. AFK fixture policy belongs in its current PR configuration after the caller accepts `termination_grace_seconds` and `repairable_exit_codes`; the suggested build-unit profile uses `20400`, `780` and `[1]` respectively. No standalone Validator/Coordinator integration is supported here.
 
 ## Actor lifecycle profile

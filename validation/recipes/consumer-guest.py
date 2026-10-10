@@ -3,7 +3,7 @@
 import hashlib,json,os,pathlib,re,select,selectors,shutil,signal,subprocess,tarfile,time,tty
 P=pathlib.Path
 MEDIA=P('/opt/build-inputs');WORK=P('/opt/eqemu-build');LOGS=WORK/'logs'
-MANIFEST_SHA='95eb1cf160fdc3704d17d9d18be0919ed393f6951a98f6143a144b2c91b8f7e4'
+MANIFEST_SHA='d54caae3e24ce4b571767887c11444688bca519339599361d01d2c9bced51fa6'
 FD=None;NONCE=None;DEADLINE=0;EMIT=lambda value:None
 ENV={'PATH':'/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8','DEBIAN_FRONTEND':'noninteractive','HOME':'/root','VCPKG_DISABLE_METRICS':'1','VCPKG_MAX_CONCURRENCY':'1','VCPKG_BINARY_SOURCES':'clear','X_VCPKG_ASSET_SOURCES':'clear;x-block-origin','CCACHE_DISABLE':'1'}
 
