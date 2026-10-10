@@ -75,9 +75,10 @@ def candidate_failure(worker, consumer=False):
         return False
     error = guest.get('error', '')
     controls = 'reporting-controls|runner-(?:pass|fail|empty|setup-exception|body-exception|teardown-exception)'
-    stages = 'upstream-tests|' + controls if consumer else 'configure|server-build|runner-control-build|native-static-pilot|upstream-tests|' + controls
+    stages = 'upstream-tests|' + controls if consumer else 'configure|server-build|runner-control-build|upstream-tests|' + controls
     return (guest.get('ok') is False and isinstance(error, str)
             and (re.match(r'^(' + stages + r'): exit [1-9][0-9]*\n', error)
+                 or not consumer and re.match(r'^native-static-pilot: exit 1\n', error)
                  or re.match(r'^upstream-tests: exit -(4|6|7|8|11)\n', error))
             and not re.search(r'(?i)out of memory|cannot allocate memory|no space left|killed signal', error))
 

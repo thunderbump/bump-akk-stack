@@ -54,7 +54,7 @@ class StaticRecipe(unittest.TestCase):
             else:item['wall_seconds']=float('nan')
             with self.subTest(mutation=mutation),self.assertRaises(RuntimeError):
                 p=worker.BuildProtocol('n'*32);p.ready=True;p.accept(dict(value,value=item))
-        protocol=worker.BuildProtocol('n'*32);protocol.ready=True
+        protocol=worker.ProducerBuildProtocol('n'*32);protocol.ready=True
         protocol.observations={n:{} for n in {'candidate','utility','measurement','reporting-controls',
             *('runner-'+m for m in worker.EXPECTED),*('loader-'+str(i) for i in range(6))}}
         with self.assertRaisesRegex(RuntimeError,'Incomplete corrected build evidence'):
