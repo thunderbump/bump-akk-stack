@@ -41,9 +41,9 @@
       "sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354"
     },
     "media": {
-      "path": "build-inputs-20260925-v3/build-inputs.iso",
-      "bytes": 469000192,
-      "sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4"
+      "path": "build-static-inputs-20261009c/build-inputs.iso",
+      "bytes": 534415360,
+      "sha256": "05178007988a25c184b746adbfbc089864ae6665e579b516bdde13870369f736"
     },
     "registry": {
       "path": "build-inputs-20260925-v3/sources/vcpkg.bundle",

@@ -6,7 +6,7 @@ import re
 import subprocess
 
 PROFILE = 'actor-lifecycle-v1'
-PROFILES = ('build-unit-v1', PROFILE)
+PROFILES = ('build-unit-v1', 'build-static-unit-v1', PROFILE)
 CONTROLS = ('assertion', 'missing-map', 'cancel')
 RUNTIME_SECONDS = 1800
 ZONE_SECONDS = 300
@@ -79,6 +79,11 @@ def options(profile, control=None, retain=False, reuse=None):
 def selected(baseline, profile, fixture):
     options(profile)
     value = json.loads(json.dumps(baseline))
+    if profile == 'build-static-unit-v1':
+        from native_diagnostics import TARGETS
+        value['name'] = 'eqemu-complete-source-build-static-unit-v1'
+        value['native_diagnostics'] = {'targets': list(TARGETS),
+                                     'selection': 'fixed representative pilot, not changed-code coverage'}
     if profile == PROFILE:
         value['name'] = 'eqemu-complete-source-actor-lifecycle-v1'
         value['dependencies']['runtime'] = fixture['iso']
