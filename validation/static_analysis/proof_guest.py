@@ -26,7 +26,7 @@ def proof():
         versions[name]=text[:600]
     result=subprocess.run(['/usr/bin/python3','-B',str(ROOT/'tests/validation/test_native_diagnostics.py')],
         capture_output=True,text=True,timeout=60,env=build.ENV)
-    if result.returncode!=0 or 'Ran 5 tests' not in result.stderr or 'skipped' in result.stderr:
+    if result.returncode!=0 or 'Ran 6 tests' not in result.stderr or 'skipped' in result.stderr:
         raise RuntimeError('Native diagnostic controls failed: '+result.stderr[-3000:])
     build.verify_inputs()
     return dict(schema=1,kind='llvm-provisioning-trial',ok=True,

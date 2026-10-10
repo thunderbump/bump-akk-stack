@@ -2,6 +2,7 @@
 import json
 from pathlib import Path
 import sys
+import subprocess
 import tempfile
 import unittest
 
@@ -11,15 +12,23 @@ import actor
 import common
 import native_diagnostics as diagnostic
 
-SAFE = '''struct Client { void send() {} };
+SAFE = '''#include <utility>
+struct Client { void send() {} };
 void send(Client* p) { if (p) p->send(); }
 int lifetime() { int* p = new int(3); int v = *p; delete p; return v; }
 void release() { int* p = new int(1); delete p; p = nullptr; delete p; }
+int pointer(int* p) { return p ? *p : 0; }
+struct Item { Item(); Item(Item&&); void use(); };
+void moved() { Item a; Item b(std::move(a)); b.use(); }
 '''
-UNSAFE = '''struct Client { void send() {} };
+UNSAFE = '''#include <utility>
+struct Client { void send() {} };
 void send() { Client* p = nullptr; p->send(); }
 int lifetime() { int* p = new int(3); delete p; return *p; }
 void release() { int* p = new int(1); delete p; delete p; }
+int pointer() { int* p = nullptr; return *p; }
+struct Item { Item(); Item(Item&&); void use(); };
+void moved() { Item a; Item b(std::move(a)); a.use(); }
 '''
 
 
@@ -68,12 +77,28 @@ class NativeDiagnosticPolicy(unittest.TestCase):
         self.file.write_text(UNSAFE)
         bad = diagnostic.analyze(self.source,self.build,self.root/'unsafe',('probe.cpp',))
         self.assertTrue(bad['complete']); self.assertEqual(bad['targets'][0]['exit_code'],1)
-        self.assertEqual(len(bad['findings']),3)
-        self.assertEqual({x['check'] for x in bad['findings']}, set(diagnostic.CHECKS[1:3]))
+        self.assertEqual(len(bad['findings']),5)
+        self.assertEqual({x['check'] for x in bad['findings']}, set(diagnostic.CHECKS))
         self.file.write_text('#include "missing-project-generated-header.h"\n'+SAFE)
         with self.assertRaisesRegex(ValueError,'Compiler/context'):
             diagnostic.analyze(self.source,self.build,self.root/'incomplete',('probe.cpp',))
         self.assertFalse(json.loads((self.root/'incomplete/report.json').read_text())['complete'])
+
+    @unittest.skipUnless(Path(diagnostic.TIDY).is_file(), 'pinned clang-tidy-18 unavailable')
+    def test_actual_cli_status_safe_findings_and_incomplete(self):
+        paths=[];rows=[]
+        for name in diagnostic.TARGETS:
+            path=self.source/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(SAFE);paths.append(path)
+            rows.append(dict(directory=str(self.build),file=str(path),arguments=['/usr/bin/g++','-std=c++20','-c',str(path)]))
+        self.write_database(rows)
+        for name,code in [('safe-cli',0),('unsafe-cli',1),('incomplete-cli',2)]:
+            if code==1:paths[0].write_text(UNSAFE)
+            if code==2:paths[1].write_text('#include "missing-project-header.h"\n'+SAFE)
+            result=subprocess.run([sys.executable,'-B',str(ROOT/'validation/native_diagnostics.py'),
+                '--source',str(self.source),'--build',str(self.build),'--output',str(self.root/name)],
+                capture_output=True,text=True,timeout=20)
+            self.assertEqual(result.returncode,code,result.stdout+result.stderr)
+            self.assertEqual(json.loads(result.stdout)['complete'],code!=2)
 
     def test_static_profile_is_distinct_and_does_not_select_actor_or_reuse(self):
         baseline = json.loads((ROOT/'validation/profile.json').read_text())

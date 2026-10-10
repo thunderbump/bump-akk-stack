@@ -16,7 +16,7 @@
     "profile.json": "2c8b13ebf67013703af140ac4240f1935d5b620c73181cb4e06c4b560ade341c",
     "recipes/consumer-guest.py": "b60f91db8f856c5cba31a32f1600451acf71f8881bf9aaed946f4884729fa304",
     "recipes/consumer-user.json": "673fd9153185b0f401afc135a50059b2895725aca1e84303fccff01380064c81",
-    "recipes/consumer-worker.py.in": "942840bb7fdbfaa8e9885d2ea7162145bda152206065450b507a2f59b85ec94d",
+    "recipes/consumer-worker.py.in": "f6db0b77a2a65afdfe7f2bb4cc727183f84abf9453b52b067241967eeaab4cfa",
     "recipes/producer-guest.py": "f6d2c276485d1c6389f98af90cb7248113d34af96a0eeff74ccfb8518d08ad92",
     "recipes/producer-user.json": "fdd849f3ac35f8f93b4eecd824a0b05bb919e6621530167d4c3b528d5e59939b",
     "recipes/producer-worker.py.in": "9e4d91e9ca378ff4f4e20fd6b16031f3cde2160b204554ad4f4a290a6eb8cb05",

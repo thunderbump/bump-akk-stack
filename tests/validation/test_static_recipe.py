@@ -40,6 +40,12 @@ class StaticRecipe(unittest.TestCase):
         self.assertLess(guest.index("command('server-build'"),guest.index("command('native-static-pilot'"))
         consumer=common.load('static_recipe_consumer',self.destination/'consumer-worker.py')
         self.assertNotIn('runtime.iso',consumer.FILES)
+        import xml.etree.ElementTree as ET
+        tree=ET.fromstring(consumer.domain({'uuid':'00000000-0000-4000-8000-000000000031','profile':'p'}))
+        consumer.validate_devices(tree)
+        self.assertEqual(len(tree.findall('./devices/disk')),4)
+        consumer.VALIDATION_PROFILE='unknown'
+        with self.assertRaisesRegex(RuntimeError,'Unknown guest device profile'):consumer.validate_devices(tree)
 
     def test_host_refuses_missing_incomplete_or_wrong_profile_static_evidence(self):
         worker=self.render(diagnostic.PROFILE);protocol=worker.BuildProtocol('n'*32);protocol.ready=True

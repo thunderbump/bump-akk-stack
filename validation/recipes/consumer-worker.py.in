@@ -127,7 +127,7 @@ def domain(s):
 
 
 def validate_devices(tree):
-    """Verify the effective owned topology before resuming either fixed profile."""
+    """Verify the effective owned topology before resuming a fixed profile."""
     if (tree.attrib.get('type') != 'kvm' or tree.findall('./devices/interface')
             or any(tree.findall('./devices/'+tag) for tag in
                    ('filesystem','hostdev','graphics','channel','redirdev','vsock'))):
@@ -138,7 +138,7 @@ def validate_devices(tree):
                 'vdb': ('disk','artifact.raw','virtio',True)}
     if VALIDATION_PROFILE == 'actor-lifecycle-v1':
         expected['sdc'] = ('cdrom','runtime.iso','sata',True)
-    elif VALIDATION_PROFILE != 'build-unit-v1':
+    elif VALIDATION_PROFILE not in ('build-unit-v1','build-static-unit-v1'):
         raise RuntimeError('Unknown guest device profile')
     disks = tree.findall('./devices/disk')
     if len(disks) != len(expected):
