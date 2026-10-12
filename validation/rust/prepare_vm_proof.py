@@ -22,6 +22,58 @@ CONTROLLER_SHA=debugger.CONTROLLER_SHA
 REQUIRED={'guest_root','no_virtual_nic','no_host_mounts','approved_inputs','native_packages',
           'rust_stages','native_call','candidate_controls','compiler_unavailable_replay','source_unchanged'}
 
+# Exact published controller seams; a changed template refuses before rendering.
+OLD_DIGEST="""def digest(path):
+    h=hashlib.sha256()
+    with path.open('rb') as f:
+        for block in iter(lambda:f.read(1024*1024),b''):h.update(block)
+    return h.hexdigest()
+"""
+BOUNDED_INPUT_IO="""INPUT_IO_WINDOW=8*1024**2
+
+
+def digest(path):
+    h=hashlib.sha256();offset=0;pending=0
+    with path.open('rb') as f:
+        for block in iter(lambda:f.read(1024*1024),b''):
+            h.update(block);pending+=len(block)
+            if pending>=INPUT_IO_WINDOW:
+                os.posix_fadvise(f.fileno(),offset,pending,os.POSIX_FADV_DONTNEED)
+                offset+=pending;pending=0
+        if pending:os.posix_fadvise(f.fileno(),offset,pending,os.POSIX_FADV_DONTNEED)
+    return h.hexdigest()
+
+
+def sync_input_window(src,dst,offset,length):
+    # DONTNEED does not discard dirty output. Make the bounded batch durable first.
+    dst.flush();os.fdatasync(dst.fileno())
+    os.posix_fadvise(src.fileno(),offset,length,os.POSIX_FADV_DONTNEED)
+    os.posix_fadvise(dst.fileno(),offset,length,os.POSIX_FADV_DONTNEED)
+
+
+def copy_input(source,dest,length):
+    with source.open('rb') as src,dest.open('xb') as dst:
+        remain=length;offset=0;pending=0
+        while remain:
+            chunk=src.read(min(remain,1024**2))
+            if not chunk:raise RuntimeError('Short input')
+            dst.write(chunk);remain-=len(chunk);pending+=len(chunk)
+            if pending>=INPUT_IO_WINDOW:
+                sync_input_window(src,dst,offset,pending)
+                offset+=pending;pending=0
+        if src.read(1):raise RuntimeError('Input grew')
+        if pending:sync_input_window(src,dst,offset,pending)
+"""
+OLD_COPY="""            # Fixed size loop also prevents an expanding source from filling storage.
+            with source.open('rb') as src,dest.open('xb') as dst:
+                remain=length
+                while remain:
+                    chunk=src.read(min(remain,1024**2))
+                    if not chunk:raise RuntimeError('Short input')
+                    dst.write(chunk);remain-=len(chunk)
+                if src.read(1):raise RuntimeError('Input grew')
+"""
+
 
 def replace(text,old,new):
     if text.count(old)!=1:raise ValueError('Pinned VM proof seam changed')
@@ -38,8 +90,10 @@ def operator_wrapper(output,script,seed,media):
 
 
 def controller(text,files,store):
-    text=text.replace('first-trial','rust-proof-20261011').replace('eqemuvmtrial','eqemuvmrust20261011')
-    text=debugger.assign(text,'NAME',repr('eqemu-rust-1011'))
+    text=replace(text,OLD_DIGEST,BOUNDED_INPUT_IO)
+    text=replace(text,OLD_COPY,'            copy_input(source,dest,length)\n')
+    text=text.replace('first-trial','rust-proof-20261012b').replace('eqemuvmtrial','eqemuvmrust20261012b')
+    text=debugger.assign(text,'NAME',repr('eqemu-rust-1012b'))
     text=debugger.assign(text,'INPUTS','P('+repr(str(store))+')')
     text=debugger.assign(text,'FILES',repr(files))
     text=text.replace('first synthetic offline VM trial; not full isolation acceptance',
@@ -89,7 +143,7 @@ def prepare(store,bundle,template,output):
                   runcmd=[['systemctl','mask','--now','apt-daily.timer','apt-daily-upgrade.timer'],
                           ['python3','-B','/opt/eqemu-proof/rust/vm_guest.py']])
         (output/'user-data').write_text('#cloud-config\n'+json.dumps(user)+'\n')
-        (output/'meta-data').write_text('instance-id: eqemu-rust-proof-20261011\n')
+        (output/'meta-data').write_text('instance-id: eqemu-rust-proof-20261012b\n')
         seed=output/'seed.iso'
         subprocess.run(['/usr/bin/cloud-localds',str(seed),str(output/'user-data'),str(output/'meta-data')],check=True,timeout=30)
         files={name:(item['path'],item['bytes'],item['sha256']) for name,item in fixed.items()}

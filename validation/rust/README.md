@@ -68,8 +68,17 @@ bounded regular controller bytes with `O_NOFOLLOW`, verifies the embedded
 expected SHA-256 and executes those same bytes from a private root-owned stage
 under `/run`. The controller's self-copy reads that checked stage, so an
 authentication delay cannot reopen replaced user-owned source. Its fresh
-domain is `eqemu-rust-1011`, with dedicated
+domain is `eqemu-rust-1012b`, with dedicated
 state/unit/slice names. Existing proof state is never reused or removed.
+
+The controller retains its 1 GiB memory limit. Input copying flushes and
+synchronizes at most 8 MiB of writes before advising release of the completed
+source and destination cache ranges. Independent hash verification also
+releases completed read windows. This prevents dirty copies of the large
+offline inputs from accumulating against the controller's memory limit;
+cache advice alone cannot release unsynchronized dirty output. Short, growing,
+changed or unsynchronized inputs remain non-pass. Guest memory limits and
+direct-output disk conversion are unchanged.
 
 The single VM installs the pinned native package closure offline, runs the
 positive and twelve deliberate controls, removes each task-local tool/cache copy
