@@ -25,7 +25,8 @@ S.BASE = BASE
 # This is an admission-only trust pin, not a general historical record reader.
 PRIOR_MANIFEST = 'b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a'
 PRIOR_MANIFESTS = (PRIOR_MANIFEST, 'fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97',
-                   'a1eec9b33bbca1ba1d3c4b8911a1827ca1b1dd4d2ef72657699a0569201ba83a')
+                   'a1eec9b33bbca1ba1d3c4b8911a1827ca1b1dd4d2ef72657699a0569201ba83a',
+                   '5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055')
 LIB = Path('/usr/local/lib/eqemu-build')
 
 

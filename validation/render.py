@@ -59,6 +59,9 @@ def render(identifier, facts, destination, package=HERE, profile_name='build-uni
     hashes = {}
     for role in ('producer', 'consumer'):
         user = json.loads((package/(role+'-user.json')).read_text())
+        if role == 'producer':
+            for name in ('rust.py','rust_guest.py','rust-toolchain.json'):
+                user['write_files'].append(dict(path='/opt/eqemu-proof/'+name, permissions='0600', content=(package/name).read_text()))
         for entry in user['write_files']:
             if 'content_file' in entry:
                 entry['content'] = (package/entry.pop('content_file')).read_text()
@@ -87,6 +90,9 @@ def render(identifier, facts, destination, package=HERE, profile_name='build-uni
         subprocess.run(['/usr/bin/cloud-localds', str(seed), str(ud), str(md)], check=True, timeout=30)
         worker = rename((package/(role+'-worker.py.in')).read_text())
         worker = re.sub(r'^INPUTS=.+$', 'INPUTS=P('+repr(str(destination))+')', worker, count=1, flags=re.M)
+        worker = assign(worker, 'RUST_CONTRACT', profile.get('rust')) if role == 'producer' else worker
+        if role == 'producer':
+            worker = worker.replace('P=pathlib.Path', 'sys.path.insert(0, '+repr(str(package.resolve()))+')\nP=pathlib.Path', 1)
         files = {name: (str(BASE/'inputs'/name), item['bytes'], item['sha256']) for name,item in inputs.items() if name != 'runtime.iso' or role == 'consumer'}
         worker = assign(worker, 'VALIDATION_PROFILE', profile_name) if role == 'consumer' else worker
         if role == 'consumer':
