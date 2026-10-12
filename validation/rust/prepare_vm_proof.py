@@ -28,6 +28,15 @@ def replace(text,old,new):
     return text.replace(old,new,1)
 
 
+def operator_wrapper(output,script,seed,media):
+    checks=''.join('printf "%s  %s\\n" "'+common.sha(path)+'" "'+path.name+'" | sha256sum -c -\n'
+                   for path in (script,seed,media))
+    bootstrap=(Path(__file__).with_name('launch.py')).read_text()
+    return ('#!/bin/sh\nset -eu\ncd '+shlex.quote(str(output))+'\n'+checks+
+            'exec /usr/bin/sudo /usr/bin/python3 -I -c '+shlex.quote(bootstrap)+' '+
+            shlex.quote(str(script))+' '+shlex.quote(common.sha(script))+'\n')
+
+
 def controller(text,files,store):
     text=text.replace('first-trial','rust-proof-20261011').replace('eqemuvmtrial','eqemuvmrust20261011')
     text=debugger.assign(text,'NAME',repr('eqemu-rust-1011'))
@@ -87,10 +96,7 @@ def prepare(store,bundle,template,output):
         files.update({name:(str(path),path.stat().st_size,common.sha(path)) for name,path in [('seed.iso',seed),('rust.iso',media)]})
         script=output/'controller.py';script.write_text(controller(template.read_text(),files,store))
         wrapper=output/'reviewed-run.sh'
-        checks=''.join('printf \"%s  %s\\\\n\" \"'+common.sha(path)+'\" \"'+path.name+'\" | sha256sum -c -\n' for path in (script,seed,media))
-        wrapper.write_text('#!/bin/sh\nset -eu\n'+
-            'cd '+shlex.quote(str(output))+'\n'+checks+
-            'exec sudo /usr/bin/python3 -I '+shlex.quote(str(script))+'\n')
+        wrapper.write_text(operator_wrapper(output,script,seed,media))
         wrapper.chmod(0o700)
         result=dict(receipt,controller_sha256=common.sha(script),wrapper_sha256=common.sha(wrapper),
                     seed_sha256=common.sha(seed),rust_iso_sha256=common.sha(media),

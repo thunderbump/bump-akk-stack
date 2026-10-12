@@ -62,8 +62,13 @@ Preparation validates the current native base/media identities, bundles Rust
 inputs into one additional read-only ISO, embeds the exact tiny source/helpers
 and checks domain XML, policy syntax and all input hashes. It renders
 `reviewed-run.sh` for a separately authorized operator invocation. It does not
-invoke sudo or launch work. The wrapper verifies the rendered controller hash
-before requesting sudo; its fresh domain is `eqemu-rust-1011`, with dedicated
+invoke sudo or launch work. The wrapper checks controller/seed/media hashes
+before requesting sudo. Its root-side isolated bootstrap independently reads
+bounded regular controller bytes with `O_NOFOLLOW`, verifies the embedded
+expected SHA-256 and executes those same bytes from a private root-owned stage
+under `/run`. The controller's self-copy reads that checked stage, so an
+authentication delay cannot reopen replaced user-owned source. Its fresh
+domain is `eqemu-rust-1011`, with dedicated
 state/unit/slice names. Existing proof state is never reused or removed.
 
 The single VM installs the pinned native package closure offline, runs the
