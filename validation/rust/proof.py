@@ -114,7 +114,8 @@ def apply_control(source, control):
         native.write_text(native.read_text().replace('extern "C" unsigned int eqemu_rust_bridge_v1();',
                           'extern "C" unsigned int missing_symbol();\n#define eqemu_rust_bridge_v1 missing_symbol'))
     elif control == 'syntax':
-        core.write_text(core.read_text().replace('value.saturating_add(1)',';'))
+        core.write_text(core.read_text().replace('    value.saturating_add(1)',
+                                                '    let broken = ;\n    value.saturating_add(1)'))
     elif control == 'missing-marker':
         bridge=source/'bridge/src/lib.rs';native=source/'native.cpp'
         for file in (bridge,native):

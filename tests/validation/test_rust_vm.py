@@ -12,6 +12,7 @@ import common
 
 vm=common.load('rust_vm_preparation',ROOT/'validation/rust/prepare_vm_proof.py')
 guest=common.load('rust_vm_guest_contract',ROOT/'validation/rust/vm_guest.py')
+proof=common.load('rust_vm_syntax_fixture',ROOT/'validation/rust/proof.py')
 
 TEMPLATE='''P=__import__('pathlib').Path
 NAME='eqemu-first-trial'
@@ -41,6 +42,18 @@ def setup():
 
 
 class RustVmRendering(unittest.TestCase):
+    def test_syntax_control_is_malformed_expression_and_requires_compile_finding(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            source=Path(tmp);(source/'core/src').mkdir(parents=True)
+            core=source/'core/src/lib.rs'
+            core.write_text((ROOT/'validation/rust/fixture/core/src/lib.rs').read_text())
+            proof.apply_control(source,'syntax')
+            self.assertIn('    let broken = ;\n    value.saturating_add(1)',core.read_text())
+        result={'observations':{'rust-failure':{'stage':'rust-fmt','finding':'format'}}}
+        self.assertFalse(guest.control_finding('syntax',result))
+        result['observations']['rust-failure']['finding']='compile'
+        self.assertTrue(guest.control_finding('syntax',result))
+
     def test_controls_require_their_actual_failure_reason(self):
         self.assertFalse(guest.control_finding('config-drift',{'error':'unrelated infrastructure failure'}))
         self.assertTrue(guest.control_finding('config-drift',{'error':'Protected Rust tool/vendor/config input drift'}))
