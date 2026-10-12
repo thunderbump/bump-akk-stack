@@ -33,18 +33,35 @@ def contract():
 
 def preflight(expected):
     return dict(contract_sha256=rust.digest(expected),release='1.99.0',host=rust.HOST,target=rust.HOST,
-                metadata_sha256='b'*64,bundle_sha256=expected['bundle']['sha256'],source_unchanged=True)
+                metadata_sha256='b'*64,bundle_sha256=expected['bundle']['sha256'],source_unchanged=True,protected_sha256='e'*64)
 
 
 def completion(expected):
-    return dict(contract_sha256=rust.digest(expected),exit_code=0,selected=1,completed=1,failed=0,source_unchanged=True)
+    return dict(contract_sha256=rust.digest(expected),exit_code=0,selected=1,completed=1,failed=0,source_unchanged=True,protected_unchanged=True)
 
 
 def failure(expected,stage='rust-tests',code=101):
-    return dict(contract_sha256=rust.digest(expected),stage=stage,exit_code=code,finding='test',source_unchanged=True)
+    return dict(contract_sha256=rust.digest(expected),stage=stage,exit_code=code,finding='test',source_unchanged=True,protected_unchanged=True)
+
+
+def harness(package='owned',doc=False,passed=1,ignored=0):
+    artifact=json.dumps(dict(reason='compiler-artifact',package_id=package,
+                        profile={'test':True},executable='/build/test-core'))
+    header='   Doc-tests actor_core' if doc else '     Running unittests src/lib.rs (/build/test-core)'
+    return artifact+'\n'+header+'\n\nrunning '+str(passed+ignored)+' test\n'+\
+        f'test result: ok. {passed} passed; 0 failed; {ignored} ignored; 0 measured; 0 filtered out; finished in 0.00s\n'
 
 
 class RustContract(unittest.TestCase):
+    def test_inventory_rejects_oversize_before_read_and_bounds_directory_walk(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);(root/'huge').write_bytes(b'12345')
+            with patch.object(rust.os,'open') as opened,self.assertRaisesRegex(ValueError,'byte/type budget'):
+                rust.inventory(root,byte_limit=4)
+            opened.assert_not_called()
+            (root/'huge').unlink();(root/'one').mkdir();(root/'two').mkdir()
+            with self.assertRaisesRegex(ValueError,'file/count budget'):rust.inventory(root,file_limit=1)
+
     def test_empty_unsupported_and_drifting_selections_refuse(self):
         expected = contract(); rust.contract(expected)
         for change in ({'packages':[]},{'packages':[{}]},{'minimum_tests':0},{'minimum_doctests':False},
@@ -121,6 +138,96 @@ class RustClassification(unittest.TestCase):
         self.assertIsNone(rust_guest.finding('rust-clippy',output,{'dependency'}))
         self.assertEqual(rust_guest.finding('rust-fmt','Diff in /source/src/lib.rs:2:\n',set()),'format')
         self.assertEqual(rust_guest.finding('rust-doctests','test result: FAILED. 0 passed; 1 failed; 0 ignored;',set()),'test')
+        message['message']=dict(level='error',code=None,message='expected expression, found `;`',
+                                spans=[{'is_primary':True,'file_name':'core/src/lib.rs'}])
+        self.assertEqual(rust_guest.finding('rust-clippy',json.dumps(message),{'owned'}),'compile')
+        self.assertIsNone(rust_guest.finding('rust-clippy',json.dumps(message),{'other'}))
+
+    def test_missing_native_marker_preserves_successful_nm_exit_and_is_candidate_failure(self):
+        worker=self.worker();expected=worker['rust_contract']
+        worker['observations_untrusted']['rust-failure']=dict(contract_sha256=rust.digest(expected),
+            stage='rust-native-link',exit_code=1,tool_exit_code=0,binary_sha256='f'*64,finding='link',
+            source_unchanged=True,protected_unchanged=True)
+        worker['guest_report_untrusted']['error']='rust-native-link: missing required symbol\neqemu_rust_bridge_v1'
+        self.assertEqual(common.outcome({},dict(producer=worker),True),1)
+        worker['observations_untrusted']['rust-failure']['tool_exit_code']=1
+        self.assertEqual(common.outcome({},dict(producer=worker),True),2)
+
+
+class RustInputCustody(unittest.TestCase):
+    def test_cargo_ancestor_configuration_creation_and_symlink_drift_refuse(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);source=root/'source';source.mkdir();runtime=root/'rust';runtime.mkdir()
+            for name in ('toolchain','vendor','home'):(runtime/name).mkdir()
+            (runtime/'config.toml').write_text('fixed');(runtime/'home/config.toml').write_text('fixed')
+            expected=rust_guest.protected_inventory(runtime)
+            expected['cargo_cwds']=[str(source),str(root/'build')]
+            expected['ancestor_configuration']=rust_guest.ancestor_configuration(expected['cargo_cwds'])
+            (root/'.cargo').mkdir();(root/'.cargo/config.toml').write_text('[build]\nrustc-wrapper="changed"\n')
+            with self.assertRaisesRegex(ValueError,'Protected Rust'):rust_guest.verify_protected(runtime,expected)
+            shutil.rmtree(root/'.cargo');(root/'.cargo').symlink_to(runtime/'home',target_is_directory=True)
+            with self.assertRaisesRegex(ValueError,'ancestor config symlink'):rust_guest.verify_protected(runtime,expected)
+
+    def test_candidate_stage_input_drift_cannot_emit_success_or_repairable_finding(self):
+        for changed in ('toolchain/rustc','vendor/lib.rs','home/config.toml','ancestor-config'):
+            with self.subTest(changed=changed),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);source=root/'source';source.mkdir();runtime=root/'rust';runtime.mkdir()
+                for name in ('toolchain','vendor','home'):(runtime/name).mkdir()
+                for name in ('toolchain/rustc','vendor/lib.rs','config.toml','home/config.toml'):
+                    (runtime/name).write_text('verified input')
+                protected=rust_guest.protected_inventory(runtime)
+                expected=contract();owned='owned-core';bridge='owned-bridge'
+                graph=dict(version=1,resolve={'nodes':[]},workspace_members=[owned,bridge],packages=[
+                    dict(id=owned,name='actor-core',manifest_path=str(source/'core/Cargo.toml'),targets=[{'name':'actor_core','doctest':True}]),
+                    dict(id=bridge,name='actor-bridge',manifest_path=str(source/'bridge/Cargo.toml'),targets=[])])
+                events=[]
+                def command(stage,*args,**kwargs):
+                    log=root/(stage+'.log')
+                    if stage=='rust-metadata':log.write_text(json.dumps(graph))
+                    else:
+                        log.write_text('formatter success')
+                        if changed=='ancestor-config':
+                            (root/'.cargo').mkdir();(root/'.cargo/config.toml').write_text('candidate wrapper')
+                        else:
+                            (runtime/changed).write_text('candidate changed protected input')
+                    return log
+                with patch.object(rust_guest,'guard'),self.assertRaisesRegex(ValueError,'Protected Rust'):
+                    rust_guest.check(expected,source,{},lambda *_:None,command,events.append,
+                                     {'CARGO_HOME':str(runtime/'home')},protected)
+                self.assertEqual([item['name'] for item in events],['rust-preflight'])
+
+    def test_tool_vendor_and_configuration_drift_refuse_but_cache_is_mutable(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            for name in ('toolchain','vendor','home'):(root/name).mkdir()
+            for name in ('toolchain/rustc','vendor/lib.rs','config.toml','home/config.toml'):
+                (root/name).write_text('identified bytes')
+            expected=rust_guest.protected_inventory(root)
+            (root/'home/cache').write_text('mutable cache')
+            rust_guest.verify_protected(root,expected)
+            for name in ('toolchain/rustc','vendor/lib.rs','home/config.toml'):
+                with self.subTest(name=name):
+                    (root/name).write_text('changed bytes')
+                    with self.assertRaisesRegex(ValueError,'Protected Rust'):rust_guest.verify_protected(root,expected)
+                    (root/name).write_text('identified bytes')
+            (root/'home/config').write_text('shadow configuration')
+            with self.assertRaises(ValueError):rust_guest.verify_protected(root,expected)
+
+    def test_compiler_warning_cannot_invent_unit_or_doctest_counts(self):
+        fake='test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s'
+        diagnostic=json.dumps({'reason':'compiler-message','message':{'rendered':fake}})+'\n'
+        for doc in (False,True):
+            with self.subTest(doc=doc),self.assertRaisesRegex(ValueError,'Missing/empty'):
+                rust_guest.counts(diagnostic+harness(doc=doc,passed=0,ignored=1),1,
+                                  {'owned':'actor-core'},{'actor_core':'actor-core'} if doc else None)
+            self.assertEqual(rust_guest.counts(harness(doc=doc),1,{'owned':'actor-core'},
+                                              {'actor_core':'actor-core'} if doc else None),1)
+
+    def test_unknown_test_executable_and_missing_completion_refuse(self):
+        text=harness().replace('(/build/test-core)','(/build/unknown)')
+        with self.assertRaises(ValueError):rust_guest.counts(text,1,{'owned':'actor-core'})
+        text=harness().replace('test result: ok.','omitted completion:')
+        with self.assertRaises(ValueError):rust_guest.counts(text,1,{'owned':'actor-core'})
 
 
 class RustWorker(unittest.TestCase):
@@ -136,7 +243,7 @@ class RustWorker(unittest.TestCase):
         self.event(protocol,'rust-preflight',preflight(worker.RUST_CONTRACT))
         for name in rust.STAGES:self.event(protocol,name,completion(worker.RUST_CONTRACT))
         self.event(protocol,'rust-native-link',dict(contract_sha256=rust.digest(worker.RUST_CONTRACT),
-                   symbol='eqemu_rust_bridge_v1',binary_sha256='a'*64,source_unchanged=True))
+                   symbol='eqemu_rust_bridge_v1',binary_sha256='a'*64,source_unchanged=True,protected_unchanged=True))
 
     def test_order_unknown_duplicate_and_partial_coverage_refuse(self):
         worker,protocol=self.protocol()
@@ -168,12 +275,12 @@ class RustStages(unittest.TestCase):
         cfg=contract();cfg['manifest_path']='Cargo.toml';cfg['source_blobs']={'Cargo.toml':'a'*40,'Cargo.lock':'b'*40,'rust-toolchain.toml':'c'*40}
         owned='path+file:///source/core#actor-core@0.1.0'
         graph=dict(version=1,resolve={'nodes':[]},workspace_members=[owned,'bridge'],
-                   packages=[dict(id=owned,name='actor-core',manifest_path=str(source/'core/Cargo.toml')),
+                   packages=[dict(id=owned,name='actor-core',manifest_path=str(source/'core/Cargo.toml'),targets=[{'name':'actor_core','doctest':True}]),
                              dict(id='bridge',name='actor-bridge',manifest_path=str(source/'bridge/Cargo.toml'))])
         events=[];self.events=events;calls=[];env={'CARGO_HOME':str(root/'rust/home')}
         def command(name,args,**kwargs):
             calls.append((name,args,kwargs));log=root/'logs'/(name+'.log');log.parent.mkdir(exist_ok=True)
-            body=json.dumps(graph) if name=='rust-metadata' else 'test result: ok. 1 passed; 0 failed; 0 ignored;\n'
+            body=json.dumps(graph) if name=='rust-metadata' else harness(owned) if name=='rust-tests' else harness(owned,doc=True)
             if name=='rust-clippy':
                 body='\n'.join(json.dumps(dict(reason='compiler-artifact',package_id=x)) for x in (owned,'bridge'))
             if name==stage_fault:
@@ -182,8 +289,8 @@ class RustStages(unittest.TestCase):
             log.write_text(body);return log
         def verify(*args):
             if mutate and len(calls)>1:raise ValueError('Materialized source mismatch')
-        with patch.object(rust_guest,'guard'):
-            rust_guest.check(cfg,source,{},verify,command,events.append,env)
+        with patch.object(rust_guest,'guard'),patch.object(rust_guest,'verify_protected'):
+            rust_guest.check(cfg,source,{},verify,command,events.append,env,{})
         return events,calls
 
     def setUp(self):
@@ -211,7 +318,7 @@ class RustStages(unittest.TestCase):
     def test_missing_zero_and_failed_test_completions_refuse(self):
         for text in ('','test result: ok. 0 passed; 0 failed; 0 ignored;',
                      'test result: ok. 1 passed; 1 failed; 0 ignored;'):
-            with self.assertRaises(ValueError):rust_guest.counts(text,1)
+            with self.assertRaises(ValueError):rust_guest.counts(text,1,{'owned':'actor-core'})
         with self.assertRaises(ValueError):rust_guest.artifacts('',{'selected'})
 
 

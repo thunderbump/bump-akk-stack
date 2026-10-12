@@ -154,8 +154,8 @@ def build():
   import sys
   sys.path.insert(0, '/opt/eqemu-proof')
   import rust_guest
-  rust_guest.prepare(profile['rust'],WORK/'rust-inputs.tar',WORK,command,ENV)
-  rust_guest.check(profile['rust'],src,json.loads((WORK/'source-authority.json').read_text()),verify_materialized,command,emit,ENV)
+  rust_protected=rust_guest.prepare(profile['rust'],WORK/'rust-inputs.tar',WORK,command,ENV)
+  rust_guest.check(profile['rust'],src,json.loads((WORK/'source-authority.json').read_text()),verify_materialized,command,emit,ENV,rust_protected)
  config=['cmake','-S',str(src),'-B',str(WORK/'build'),'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER=/usr/bin/gcc','-DCMAKE_CXX_COMPILER=/usr/bin/g++','-DCMAKE_TOOLCHAIN_FILE='+str(vp/'scripts/buildsystems/vcpkg.cmake'),'-DVCPKG_TARGET_TRIPLET=x64-linux','-DVCPKG_HOST_TRIPLET=x64-linux','-DVCPKG_INSTALL_OPTIONS=--no-downloads;--binarysource=clear']
  config+=['-DEQEMU_BUILD_'+n+'=ON' for n in ['SERVER','TESTS','LOGIN','LUA','PERL','CLIENT_FILES']]
  command('configure',config,timeout=14400)
@@ -167,10 +167,11 @@ def build():
  command('server-build',['cmake','--build',str(WORK/'build'),'--parallel','1'],timeout=14400)
  verify_materialized(src,json.loads((WORK/'source-authority.json').read_text()))
  if 'rust' in profile:
-  rust_guest.native_link(profile['rust'],WORK/'build/bin/zone',command,emit)
+  rust_guest.native_link(profile['rust'],WORK/'build/bin/zone',command,emit,WORK/'rust',rust_protected)
  real_utility_suite()
  if 'rust' in profile:
   verify_materialized(src,json.loads((WORK/'source-authority.json').read_text()))
+  rust_guest.verify_protected(WORK/'rust',rust_protected)
  measure_outputs()
  binaries={}
  for n in ['world','zone','shared_memory','loginserver','ucs','queryserv','eqlaunch','tests','tests_runner_controls','tests_reporting_controls']:

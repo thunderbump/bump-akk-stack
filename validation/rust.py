@@ -1,8 +1,10 @@
 """Fixed offline Rust contract and evidence. Importing never executes candidate code."""
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
+import stat
 import tarfile
 import time
 import tomllib
@@ -13,6 +15,50 @@ UNPACK_LIMIT = 2 * 1024**3
 FILE_LIMIT = 30000
 STAGES = ('rust-fmt', 'rust-clippy', 'rust-tests', 'rust-doctests')
 REQUIRED = ('rust-preflight', *STAGES, 'rust-native-link')
+
+
+def inventory(root, byte_limit=16*1024**2, file_limit=1000, links=False, include=None):
+    """Bound paths and stat sizes before streaming bytes. Never materialize rglob output."""
+    root = Path(root).resolve(strict=True)
+    stack = [root]; entries = []; total = 0; visited = 0
+    while stack:
+        directory = stack.pop()
+        with os.scandir(directory) as children:
+            for child in children:
+                visited += 1
+                if visited > file_limit:
+                    raise ValueError('Rust inventory file/count budget')
+                file = Path(child.path); name = str(file.relative_to(root))
+                if include is not None and name not in include and not any(item.startswith(name+'/') for item in include):
+                    continue
+                info = child.stat(follow_symlinks=False)
+                if stat.S_ISLNK(info.st_mode):
+                    if not links or not file.resolve(strict=True).is_relative_to(root):
+                        raise ValueError('Rust inventory symlink')
+                    entries.append(dict(path=name,link=os.readlink(file)))
+                    continue
+                if stat.S_ISDIR(info.st_mode):
+                    stack.append(file)
+                    continue
+                if not stat.S_ISREG(info.st_mode) or info.st_size > min(byte_limit,512*1024**2) or total+info.st_size > byte_limit:
+                    raise ValueError('Rust inventory byte/type budget')
+                total += info.st_size
+                sha256 = hashlib.sha256()
+                blob = hashlib.sha1(b'blob '+str(info.st_size).encode()+b'\0')
+                fd = os.open(file,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+                with os.fdopen(fd,'rb') as stream:
+                    actual = os.fstat(stream.fileno())
+                    if not stat.S_ISREG(actual.st_mode) or actual.st_size != info.st_size:
+                        raise ValueError('Rust inventory changed before read')
+                    remaining = info.st_size
+                    while remaining:
+                        block = stream.read(min(1024**2,remaining))
+                        if not block:raise ValueError('Rust inventory short read')
+                        remaining -= len(block);sha256.update(block);blob.update(block)
+                    if stream.read(1):raise ValueError('Rust inventory grew during read')
+                entries.append(dict(path=name,mode='100755' if info.st_mode&0o111 else '100644',
+                                    bytes=info.st_size,sha256=sha256.hexdigest(),blob=blob.hexdigest()))
+    return {'entries':sorted(entries,key=lambda entry:entry['path']),'gitlinks':{}}
 
 
 def unique(pairs):
@@ -141,37 +187,48 @@ def observation(name, value, expected):
     if not isinstance(value, dict) or value.get('contract_sha256') != base['contract_sha256']:
         raise ValueError('Rust observation identity')
     if name == 'rust-preflight':
-        keys = {*base, 'release', 'host', 'target', 'metadata_sha256', 'bundle_sha256', 'source_unchanged'}
+        keys = {*base, 'release', 'host', 'target', 'metadata_sha256', 'bundle_sha256', 'source_unchanged', 'protected_sha256'}
         if (set(value) != keys or value['release'] != expected['release'] or value['host'] != HOST
                 or value['target'] != HOST or value['bundle_sha256'] != expected['bundle']['sha256']
                 or value['source_unchanged'] is not True
+                or not isinstance(value['protected_sha256'], str) or not re.fullmatch('[a-f0-9]{64}', value['protected_sha256'])
                 or not isinstance(value['metadata_sha256'], str) or not re.fullmatch('[a-f0-9]{64}', value['metadata_sha256'])):
             raise ValueError('Rust preflight evidence')
     elif name in STAGES:
-        keys = {*base, 'exit_code', 'selected', 'completed', 'failed', 'source_unchanged'}
+        keys = {*base, 'exit_code', 'selected', 'completed', 'failed', 'source_unchanged', 'protected_unchanged'}
         if (set(value) != keys or type(value['exit_code']) is not int or value['exit_code'] != 0
                 or any(type(value[k]) is not int for k in ('selected', 'completed', 'failed'))
                 or not 0 < value['selected'] <= 100000 or value['completed'] != value['selected']
-                or value['failed'] != 0 or value['source_unchanged'] is not True):
+                or value['failed'] != 0 or value['source_unchanged'] is not True or value['protected_unchanged'] is not True):
             raise ValueError('Rust stage completion')
         minimum = expected['minimum_doctests'] if name == 'rust-doctests' else expected['minimum_tests'] if name == 'rust-tests' else 1
         if value['completed'] < minimum:
             raise ValueError('Insufficient Rust test coverage')
     elif name == 'rust-native-link':
-        if (set(value) != {*base, 'symbol', 'binary_sha256', 'source_unchanged'}
+        if (set(value) != {*base, 'symbol', 'binary_sha256', 'source_unchanged', 'protected_unchanged'}
                 or value['symbol'] != expected['link_symbol'] or value['source_unchanged'] is not True
+                or value['protected_unchanged'] is not True
                 or not isinstance(value['binary_sha256'], str)
                 or not re.fullmatch('[a-f0-9]{64}', value['binary_sha256'])):
             raise ValueError('Rust native link evidence')
     elif name == 'rust-failure':
-        keys = {*base, 'stage', 'exit_code', 'finding', 'source_unchanged'}
-        if (set(value) != keys or value['stage'] not in STAGES or type(value['exit_code']) is not int
-                or not 0 < value['exit_code'] <= 255 or value['source_unchanged'] is not True
-                or value['finding'] not in ('format', 'lint', 'compile', 'test')):
+        keys = {*base, 'stage', 'exit_code', 'finding', 'source_unchanged', 'protected_unchanged'}
+        if value.get('stage')=='rust-native-link':
+            keys |= {'tool_exit_code','binary_sha256'}
+            if (type(value.get('tool_exit_code')) is not int or value['tool_exit_code']!=0
+                    or not isinstance(value.get('binary_sha256'),str)
+                    or not re.fullmatch('[a-f0-9]{64}',value['binary_sha256'])):
+                raise ValueError('Rust missing-symbol tool evidence')
+        if (set(value) != keys or value['stage'] not in (*STAGES,'rust-native-link') or type(value['exit_code']) is not int
+                or not 0 < value['exit_code'] <= 255 or value['source_unchanged'] is not True or value['protected_unchanged'] is not True
+                or value['finding'] not in ('format', 'lint', 'compile', 'test', 'link')):
             raise ValueError('Rust candidate failure evidence')
-        if ((value['stage'] == 'rust-fmt') != (value['finding'] == 'format')
+        if (value['stage']=='rust-fmt' and value['finding'] not in ('format','compile')
+                or value['finding']=='format' and value['stage']!='rust-fmt'
                 or value['finding'] == 'lint' and value['stage'] != 'rust-clippy'):
             raise ValueError('Rust failure stage/finding mismatch')
+        if (value['stage']=='rust-native-link') != (value['finding']=='link'):
+            raise ValueError('Rust native failure mismatch')
     else:
         raise ValueError('Unknown Rust observation')
     return value
@@ -186,4 +243,6 @@ def candidate_failure(worker, error):
         item = observation('rust-failure', observed['rust-failure'], expected)
     except (KeyError, TypeError, ValueError):
         return False
+    if item['stage']=='rust-native-link':
+        return error.startswith('rust-native-link: missing required symbol\n')
     return error.startswith(item['stage'] + ': exit ' + str(item['exit_code']) + '\n')

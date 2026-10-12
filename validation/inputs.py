@@ -284,7 +284,8 @@ def prepare(profile, repositories, store, output):
                     declared = contract(profile['rust'])
                     manifests = {name for name in observed if name.endswith('/Cargo.toml') or name in ('Cargo.toml','rust-toolchain.toml')
                                  or name.endswith('/Cargo.lock') or name == 'Cargo.lock'
-                                 or name == '.cargo/config.toml' or name.endswith('/.cargo/config.toml')}
+                                 or name in ('.cargo/config','.cargo/config.toml')
+                                 or name.endswith('/.cargo/config') or name.endswith('/.cargo/config.toml')}
                     if not manifests <= set(declared['source_blobs']):
                         raise ValueError('Undeclared Rust manifest/configuration')
                 if any(observed.get(path) != blob for path, blob in profile['dependency_blobs'].items()):

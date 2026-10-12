@@ -9,14 +9,14 @@
     "disable.py": "cce431b80baebc5102182e37027fc90e9f5c3fa8e959343da2ae463b9b3ed8b2",
     "host.py": "b46dbb2cce0835eb0fcbe52e464632b473d38220d24ce472362115c688db382f",
     "host_support.py": "2c99ed83fac1735b300bf99c32482ebf68d169544000ceed2fcdabb934835b69",
-    "inputs.py": "5910bfa0fd344ad85052dd8bea6d90f0a9a7ea1ed548c150ccb9eada8b9ea6f7",
+    "inputs.py": "69badc1109dfc989fc57510a93319cb0881d1bca972ab85cb63102a59ddcb337",
     "install.py": "879a7cd70fbddd90655b8c23cdb3b720d051ba842fb1a5f2d4f4eca2f85574f6",
     "installer_support.py": "77a81756eb7e24e4e7af62658e98cc023fc59428a23c1564238d76b96378c4fc",
     "profile.json": "99e26a21ad4fadb1f68ac88240b925d3a65629124b8eae115edb80422c0d9a95",
     "recipes/consumer-guest.py": "807fd40d90727355fbf0c999c992ef4e1e5a91508b8a12cc6d1f90a2c82d57f6",
     "recipes/consumer-user.json": "673fd9153185b0f401afc135a50059b2895725aca1e84303fccff01380064c81",
     "recipes/consumer-worker.py.in": "f3b04a67a26889ac1cde09852176ff91190971308a16d75b08931df7e9f8a939",
-    "recipes/producer-guest.py": "56641c1d98287b8342220faf37f2cd98a2b30a89ee4114de372d47e00b1f8d99",
+    "recipes/producer-guest.py": "b634772d53ef55626e64ba3652a78dd2894e5b6588ff150da3a3372c34eeec38",
     "recipes/producer-user.json": "fdd849f3ac35f8f93b4eecd824a0b05bb919e6621530167d4c3b528d5e59939b",
     "recipes/producer-worker.py.in": "7a9b3b285ced83fd1cbe870144da567442cfbd98e00d81d61cdcffc9483bb6b4",
     "recipes/recipe-binding.json": "26a6e2b658b9cca1632e25a9d881f0b966f1d7091a2a4eb3d9b718909132ea48",
@@ -24,8 +24,8 @@
     "render.py": "6b6924ecc3bd7066f967c8d4c9b59b5f374cbb35d5a338ca59092ef018874480",
     "runtime-fixture.json": "20d20ca20dcfa54df2ea11055438ab268f42577309fa85a038532aa0167bb224",
     "rust-toolchain.json": "9e6af0515ff0e823546c080f3466622f993992c1e3c17ace7add9ce6303fe772",
-    "rust.py": "9211e82e4cfc5b231fd9f94704d3645994625cedfe7d066f5c4d558907a4682d",
-    "rust_guest.py": "f21788de4c1da61117257247e2914e4012a050016734ef0c76b03e7013b623a8"
+    "rust.py": "82508c64ae8ac968a44b3eee4fd245afd048ea0eaba9113ded1767e44ca66494",
+    "rust_guest.py": "e0daa2baae3816624ccac1380b381cfd7a863f0cdc88d0362fffc557577fb432"
   },
   "version": 1
 }
