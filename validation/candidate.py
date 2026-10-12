@@ -97,7 +97,9 @@ def execute(source, profile_name=PROFILE, control=None, retain=False, reuse=None
     facts = None; build_id = None; submitted = False; result = None; error = None; secondary = None
     upload_created = False
     deadline = time.monotonic()+WORK_SECONDS
+    rust_enabled = False
     try:
+        rust_enabled = bool(json.loads((HERE/'profile.json').read_text()).get('rust'))
         if os.geteuid()==0:
             raise ValueError('Run validation as the normal AFK user')
         if not upload.parent.is_dir():
@@ -168,7 +170,8 @@ def execute(source, profile_name=PROFILE, control=None, retain=False, reuse=None
         code = 128+interrupted if interrupted else 2 if error or result is None else result['exit_code']
         print(json.dumps(dict(event='final',profile=profile_name,run_id=identifier if submitted else None,
             candidate_revision=facts['candidate'] if facts else None,build_identity=build_id,
-            accepted=code==0,coverage=['reused-compile' if reuse else 'compile','utility-tests','fresh-consumer']+(['actor-lifecycle'] if profile_name=='actor-lifecycle-v1' else []),
+            accepted=code==0,coverage=['reused-compile' if reuse else 'compile','utility-tests','fresh-consumer']+
+                (['rust-fmt','rust-clippy','rust-tests','rust-doctests','native-link'] if rust_enabled else [])+(['actor-lifecycle'] if profile_name=='actor-lifecycle-v1' else []),
             retained_artifact=(result or {}).get('retained_artifact'),qualification_control=control,reused_from=reuse,
             cleanup_complete=result['cleanup_complete'] if result else None,
             exit_code=code,error=error or (result or {}).get('error'),secondary_error=secondary,
@@ -215,7 +218,8 @@ def installed_identity(package=HERE):
              'profile.json', 'producer-user.json', 'consumer-user.json', 'producer-guest.py',
              'consumer-guest.py', 'producer-worker.py.in', 'consumer-worker.py.in',
              'suite.py.in', 'recipe-binding.json', 'host-inputs.json', 'client-config.json',
-             'actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py'}
+             'actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py',
+             'rust.py', 'rust_guest.py', 'rust-toolchain.json'}
     if (not isinstance(manifest, dict) or set(manifest) != {'version', 'files'}
             or type(manifest['version']) is not int or manifest['version'] != 1
             or not isinstance(manifest['files'], dict) or set(manifest['files']) != names):
@@ -238,6 +242,11 @@ def installed_identity(package=HERE):
             or not isinstance(client, dict) or set(client) != {'input_store', 'websocketpp'}
             or any(not isinstance(v, str) or not Path(v).is_absolute() for v in client.values())):
         raise ValueError('Installed declared input contract shape')
+    if 'rust' in profile:
+        from rust import contract
+        rust = contract(profile['rust'])
+        if profile['dependencies'].get('rust') != rust['bundle']:
+            raise ValueError('Installed Rust dependency mismatch')
     dependencies = dict(profile['dependencies'])
     dependencies['runtime'] = json.loads(checked['runtime-fixture.json'], object_pairs_hook=unique)['iso']
     declared = [('base.qcow2', 'base'), ('fixture.iso', 'media')]

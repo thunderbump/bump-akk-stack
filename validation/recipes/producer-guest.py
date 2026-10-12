@@ -149,6 +149,13 @@ def build():
  else:raise RuntimeError('Nonzero command was accepted')
  emit({'kind':'preflight','before_status':before,'after_status':after,'solver_sha256':sha(solver),'ports':len(actual),'negative_control':True,'tools':tools})
  DEADLINE=time.monotonic()+14400
+ profile=json.loads(P('/opt/eqemu-proof/candidate-profile.json').read_text())
+ if 'rust' in profile:
+  import sys
+  sys.path.insert(0, '/opt/eqemu-proof')
+  import rust_guest
+  rust_protected=rust_guest.prepare(profile['rust'],WORK/'rust-inputs.tar',WORK,command,ENV)
+  rust_guest.check(profile['rust'],src,json.loads((WORK/'source-authority.json').read_text()),verify_materialized,command,emit,ENV,rust_protected)
  config=['cmake','-S',str(src),'-B',str(WORK/'build'),'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER=/usr/bin/gcc','-DCMAKE_CXX_COMPILER=/usr/bin/g++','-DCMAKE_TOOLCHAIN_FILE='+str(vp/'scripts/buildsystems/vcpkg.cmake'),'-DVCPKG_TARGET_TRIPLET=x64-linux','-DVCPKG_HOST_TRIPLET=x64-linux','-DVCPKG_INSTALL_OPTIONS=--no-downloads;--binarysource=clear']
  config+=['-DEQEMU_BUILD_'+n+'=ON' for n in ['SERVER','TESTS','LOGIN','LUA','PERL','CLIENT_FILES']]
  command('configure',config,timeout=14400)
@@ -158,7 +165,13 @@ def build():
   if not m or 'NOTFOUND' in m[1] or not P(m[1]).exists():raise RuntimeError('Perl detection missing '+key)
  runner_controls()
  command('server-build',['cmake','--build',str(WORK/'build'),'--parallel','1'],timeout=14400)
+ verify_materialized(src,json.loads((WORK/'source-authority.json').read_text()))
+ if 'rust' in profile:
+  rust_guest.native_link(profile['rust'],WORK/'build/bin/zone',command,emit,WORK/'rust',rust_protected)
  real_utility_suite()
+ if 'rust' in profile:
+  verify_materialized(src,json.loads((WORK/'source-authority.json').read_text()))
+  rust_guest.verify_protected(WORK/'rust',rust_protected)
  measure_outputs()
  binaries={}
  for n in ['world','zone','shared_memory','loginserver','ucs','queryserv','eqlaunch','tests','tests_runner_controls','tests_reporting_controls']:
@@ -320,6 +333,8 @@ def verify_materialized(root, source):
 
 
 def materialize_candidate(src):
+    import sys
+    sys.path.insert(0, '/opt/eqemu-proof')
     spec = importlib.util.spec_from_file_location('candidate_inputs', '/opt/eqemu-proof/candidate_inputs.py')
     verifier = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(verifier)
@@ -336,8 +351,11 @@ def materialize_candidate(src):
             with tarfile.open(mount/source['archive']['path'], mode='r:') as archive:
                 archive.extractall(target, filter='data')
             verify_materialized(target, source)
+        (WORK/'source-authority.json').write_text(json.dumps(manifest['sources']['eqemu']))
         # Check the parent again after populating its separately verified gitlink.
         verify_materialized(src, manifest['sources']['eqemu'])
+        if 'rust' in profile:
+            shutil.copyfile(mount/'rust-inputs.tar', WORK/'rust-inputs.tar')
     finally:
         command('candidate-unmount', ['umount', str(mount)])
     emit({'kind': 'observation', 'name': 'candidate', 'value': CANDIDATE_FACTS})

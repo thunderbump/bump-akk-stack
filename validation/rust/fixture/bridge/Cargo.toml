@@ -1,0 +1,14 @@
+[package]
+name = "eqemu-rust-proof-bridge"
+edition.workspace = true
+version.workspace = true
+
+[lib]
+crate-type = ["staticlib"]
+
+[dependencies]
+eqemu-rust-proof-core = { path = "../core" }
+cxx = "=1.0.194"
+
+[build-dependencies]
+cxx-build = "=1.0.194"

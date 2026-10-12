@@ -76,6 +76,10 @@ def candidate_failure(worker, consumer=False):
     error = guest.get('error', '')
     controls = 'reporting-controls|runner-(?:pass|fail|empty|setup-exception|body-exception|teardown-exception)'
     stages = 'upstream-tests|' + controls if consumer else 'configure|server-build|runner-control-build|upstream-tests|' + controls
+    if not consumer and guest.get('ok') is False and isinstance(error, str):
+        from rust import candidate_failure as rust_failure
+        if not re.search(r'(?i)out of memory|cannot allocate memory|no space left|killed signal|deadline|log limit', error) and rust_failure(worker,error):
+            return True
     return (guest.get('ok') is False and isinstance(error, str)
             and (re.match(r'^(' + stages + r'): exit [1-9][0-9]*\n', error)
                  or re.match(r'^upstream-tests: exit -(4|6|7|8|11)\n', error))

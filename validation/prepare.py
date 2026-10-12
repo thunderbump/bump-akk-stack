@@ -15,7 +15,8 @@ from common import HERE, load, sha
 
 RUNTIME = ('common.py', 'render.py', 'host.py', 'candidate.py', 'install.py',
            'disable.py', 'host_support.py', 'installer_support.py', 'inputs.py', 'profile.json',
-           'actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py')
+           'actor.py', 'actor_runtime.py', 'runtime-fixture.json', 'debugger.py', 'debugger-gdb.py',
+           'rust.py', 'rust_guest.py', 'rust-toolchain.json')
 RECIPES = ('producer-user.json', 'consumer-user.json', 'producer-guest.py', 'consumer-guest.py', 'producer-worker.py.in',
            'consumer-worker.py.in', 'suite.py.in', 'recipe-binding.json')
 
@@ -46,7 +47,7 @@ def verified_sources(package=HERE):
     return manifest
 
 
-def prepare(output, input_store, websocketpp, package=HERE, actor=False):
+def prepare(output, input_store, websocketpp, package=HERE, actor=False, rust_contract=None):
     if os.geteuid() == 0:
         raise ValueError('Prepare as the normal user')
     output = Path(output).absolute()
@@ -61,6 +62,12 @@ def prepare(output, input_store, websocketpp, package=HERE, actor=False):
     manifest = verified_sources(package)
     inputs = load('preparation_inputs', package/'inputs.py')
     profile = json.loads((package/'profile.json').read_text())
+    if rust_contract is not None:
+        from rust import contract, verify_bundle
+        profile['rust'] = contract(rust_contract)
+        profile['dependencies']['rust'] = rust_contract['bundle']
+        profile['dependency_blobs'].update(rust_contract['source_blobs'])
+        verify_bundle(store/rust_contract['bundle']['path'], json.loads((package/'rust-toolchain.json').read_text()))
     inputs.check_dependencies(profile, store)
     fixture = json.loads((package/'runtime-fixture.json').read_text())
     if actor:
@@ -92,6 +99,8 @@ def prepare(output, input_store, websocketpp, package=HERE, actor=False):
         for name, digest in manifest['files'].items():
             if sha(output/Path(name).name) != digest:
                 raise ValueError('Recipe changed during copy: '+name)
+        if rust_contract is not None:
+            (output/'profile.json').write_text(json.dumps(profile, indent=2)+'\n')
         installed = {'version': 1, 'files': {p.name: sha(p) for p in sorted(output.iterdir())}}
         (output/'manifest.json').write_text(json.dumps(installed, indent=2, sort_keys=True)+'\n')
     except BaseException:
@@ -106,5 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--input-store', type=Path, required=True)
     parser.add_argument('--websocketpp', type=Path, required=True)
     parser.add_argument('--with-actor', action='store_true', help='Verify and declare fixed actor runtime media')
+    parser.add_argument('--rust-contract', type=Path, help='Reviewed pinned Rust workspace/input declaration')
     args = parser.parse_args()
-    print(json.dumps(prepare(args.output, args.input_store, args.websocketpp, actor=args.with_actor)))
+    print(json.dumps(prepare(args.output, args.input_store, args.websocketpp, actor=args.with_actor,
+                            rust_contract=json.loads(args.rust_contract.read_text()) if args.rust_contract else None)))

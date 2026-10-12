@@ -1,0 +1,4 @@
+[package]
+name = "eqemu-rust-proof-core"
+edition.workspace = true
+version.workspace = true

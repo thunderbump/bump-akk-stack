@@ -235,6 +235,12 @@ def verify(directory, expected_manifest, profile, expected_input=None):
     if manifest['input_id'] != digest(inputs) or (expected_input is not None and manifest['input_id'] != expected_input):
         raise ValueError('Input binding mismatch; stale build/artifact input identity')
     names = {'manifest.json'}
+    if 'rust' in profile:
+        names.add('rust-inputs.tar')
+        from rust import contract
+        item = contract(profile['rust'])['bundle']
+        if file_record(directory/'rust-inputs.tar', item['bytes']) != {k:item[k] for k in ('bytes','sha256')}:
+            raise ValueError('Rust source package input mismatch')
     for source in manifest['sources'].values():
         name = relative(source['archive']['path'])
         names.add(name)
@@ -273,6 +279,15 @@ def prepare(profile, repositories, store, output):
                 raise ValueError('Submodule pin mismatch')
             if name == 'eqemu':
                 observed = {e['path']: e['blob'] for e in entries}
+                if 'rust' in profile:
+                    from rust import contract
+                    declared = contract(profile['rust'])
+                    manifests = {name for name in observed if name.endswith('/Cargo.toml') or name in ('Cargo.toml','rust-toolchain.toml')
+                                 or name.endswith('/Cargo.lock') or name == 'Cargo.lock'
+                                 or name in ('.cargo/config','.cargo/config.toml')
+                                 or name.endswith('/.cargo/config') or name.endswith('/.cargo/config.toml')}
+                    if not manifests <= set(declared['source_blobs']):
+                        raise ValueError('Undeclared Rust manifest/configuration')
                 if any(observed.get(path) != blob for path, blob in profile['dependency_blobs'].items()):
                     raise ValueError('Unsupported dependency closure')
             view.clean(wanted['commit'], entries, links)
@@ -302,6 +317,13 @@ def prepare(profile, repositories, store, output):
             wanted = profile['submodules'][name.removeprefix('checkout-')] if name.startswith('checkout-') else profile['sources'][name]
             view.clean(wanted['commit'], entries, links)
         check_dependencies(profile, store)
+        if 'rust' in profile:
+            from rust import contract, record
+            declared = contract(profile['rust'])
+            item = record(declared['bundle'])
+            shutil.copyfile(store/item['path'], package/'rust-inputs.tar')
+            if file_record(package/'rust-inputs.tar', item['bytes']) != {k:item[k] for k in ('bytes','sha256')}:
+                raise ValueError('Rust bundle changed during copy')
         manifest = {'schema_version': 1, 'profile': profile, 'sources': sources,
                     'preparer_sha256': file_record(Path(__file__), 1024**2)['sha256'],
                     'scope': 'prepared source input only; build recipe integration and acceptance pending'}
