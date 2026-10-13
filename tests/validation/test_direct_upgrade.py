@@ -100,6 +100,27 @@ class DirectUpgrade(unittest.TestCase):
                 self.assertEqual(direct.decode(paths.state.read_bytes())['version'],str(new))
                 self.assertTrue(direct.decode(paths.state.read_bytes())['enabled'])
 
+    def test_restrictive_umask_and_owned_forward_retry_publish_readable_release(self):
+        for point in ('stage-file','release'):
+            with self.subTest(point=point),self.fixture() as (paths,decl,_,new,_):
+                previous=os.umask(0o077)
+                try:
+                    def failure(name):
+                        if name==point:raise RuntimeError('controlled fault')
+                    with self.assertRaises(RuntimeError):direct.apply(decl,paths,failure)
+                    owned=new if new.exists() else paths.lib/('.direct-upgrade-'+decl['new_manifest'][:16])
+                    self.assertEqual(owned.stat().st_mode&0o777,0o755)
+                    # Recover a known-owned partial attempt made by the old umask-sensitive code.
+                    owned.chmod(0o700)
+                    def readable_health(version,digest):
+                        self.assertEqual(version.stat().st_mode&0o777,0o755)
+                        self.assertTrue(all(path.stat().st_mode&0o444==0o444 for path in version.iterdir()))
+                        direct.package(version,digest,direct.NAMES,paths.uid)
+                    with patch.object(direct,'health',side_effect=readable_health):direct.apply(decl,paths)
+                    self.assertEqual(new.stat().st_mode&0o777,0o755)
+                    self.assertTrue(direct.decode(paths.state.read_bytes())['enabled'])
+                finally:os.umask(previous)
+
     def test_tamper_or_active_run_refuses_before_disabling_and_import(self):
         for kind in ('package','extra','symlink','active','media','policy'):
             with self.subTest(kind=kind),self.fixture() as (paths,decl,_,new,package):

@@ -134,6 +134,22 @@ def sync_dir(path):
     finally:os.close(fd)
 
 
+def readable_release(path,uid):
+    """Normalize only this attempt's owned release, including forward-retry staging."""
+    safe(path,uid,True)
+    fd=os.open(path,os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
+    try:
+        opened=os.fstat(fd);named=path.lstat()
+        identity=lambda value:(value.st_dev,value.st_ino,value.st_uid,value.st_gid,stat.S_IFMT(value.st_mode))
+        if identity(opened)!=identity(named) or opened.st_uid!=uid or opened.st_mode&0o022:
+            raise ValueError('Owned release directory changed')
+        os.fchmod(fd,0o755);os.fsync(fd)
+        after=os.fstat(fd);named=path.lstat()
+        if identity(after)!=identity(opened) or identity(named)!=identity(after) or stat.S_IMODE(named.st_mode)!=0o755:
+            raise ValueError('Owned readable release directory changed')
+    finally:os.close(fd)
+
+
 def write(path,data,mode):
     fd=os.open(path,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,mode)
     with os.fdopen(fd,'wb') as stream:
@@ -361,7 +377,7 @@ def apply(declaration,paths=None,fault=lambda _:None):
             audit['phase']='disabled';save_audit(auditfile,audit,paths.uid)
             if not new.exists():
                 if not stage.exists():stage.mkdir(mode=0o755)
-                safe(stage,paths.uid,True)
+                readable_release(stage,paths.uid)
                 if not set(p.name for p in stage.iterdir())<=NAMES|{'manifest.json'}:raise ValueError('Foreign upgrade stage files')
                 for name,data in {**files,'manifest.json':raw}.items():
                     path=stage/name
@@ -372,7 +388,7 @@ def apply(declaration,paths=None,fault=lambda _:None):
                     else:write(path,data,0o644)
                     fault('stage-file')
                 package(stage,newhash,NAMES,paths.uid);os.rename(stage,new);sync_dir(paths.lib)
-            package(new,newhash,NAMES,paths.uid);health(new,newhash)
+            package(new,newhash,NAMES,paths.uid);readable_release(new,paths.uid);health(new,newhash)
             compatible,_=quiescent(paths,new,ids)
             if compatible!=preservation:raise ValueError('New reader preservation drift')
             fault('release')
@@ -397,6 +413,7 @@ def apply(declaration,paths=None,fault=lambda _:None):
 
 def main():
     if os.geteuid()!=0 or len(sys.argv)!=1 or DECLARATION is None:raise ValueError('Use the fixed reviewed root-side upgrade launcher')
+    os.umask(0o077)
     print(json.dumps(apply(DECLARATION)))
 
 
