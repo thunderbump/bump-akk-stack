@@ -105,3 +105,29 @@ Run controls against that exact clean source checkout with `--profile actor-life
 Release the original with `eqemu-validate --release-artifact <positive-run-id>`. This exact-owner operation starts no jobs and verifies quiescent/absent workers, original custody and artifact bytes. Active or uncertain control consumers block release. Expired artifacts remain owned and inspectable until this explicit release; no unrelated resource is pruned. The one-artifact and eight-run limits remain fixed. A positive run plus three fresh control runs needs four available receipt slots; `.4.2` must establish that headroom through separately reviewed exact-owned archival.
 
 Cheap source tests and static preparation establish this adapter's wiring. They do not establish that the future native command boots without world or passes actor assertions. Actual runtime qualification remains `.4.2` after `.7.1` supplies the command.
+
+## Direct Rust activation
+
+The direct upgrade preparer now targets the installed source-isolation repair
+manifest `37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6`.
+Ordinary preparation still requires a byte-identical dormant profile. Use
+`validation/prepare.py --rust-contract <reviewed-contract.json>` to prepare a
+sealed enabled package, then freeze its exact profile in the root operator:
+
+```sh
+python3 -B validation/upgrade/prepare.py \
+  --package <sealed-package> --output <fresh-operators-directory> --activate-rust
+```
+
+The operator permits only the declared Rust bundle and dependency blobs over the
+unchanged native profile. Native media, runtime adapters, client configuration,
+receipts and AFK configuration remain unchanged. The existing qualified Rust VM
+proof and live quiescence gates still apply. Partial failures leave admission
+disabled and recover forward using the same checked command; there is no
+automatic rollback. Preparation and activation do not launch validation jobs.
+
+Activation is installation, not Rust acceptance. The source-only actor workspace
+has no native CMake link yet. The next source card must build its static library
+and link `eqemu_rust_bridge_v1` into the final zone. The enabled validator retains
+that exact-zone requirement; a standalone component proof cannot satisfy it.
+Actor movement and gameplay remain separate.
