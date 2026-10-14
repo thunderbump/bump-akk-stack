@@ -11,7 +11,8 @@ import sys
 import tempfile
 import time
 
-OLD = '13ab61457e2174e8004fd9ce2b5a524b5631c9aa0b75b61b836ed9fa843cef87'
+OLD = '37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6'
+ACTIVATION_PROFILE_SHA256 = None
 PROOF_UUID = '5ca42214-8aed-4335-bdde-f9f7074a57c8'
 PROOF_REPORT = '52389eefbf0e393ec6d7059f0d99b578d8652e94e17a3319fa205479d16ab3f0'
 PROOF_CLEANUP = '57aacb2faeceb92d65f32da91204012088340a4c8c434330ee4b34ecc5a4d7a3'
@@ -325,6 +326,24 @@ def save_audit(path,value,uid):
     else:write(path,data,0o600);sync_dir(path.parent)
 
 
+def profile_change(files, oldfiles):
+    """Allow only a frozen Rust declaration over the unchanged native profile."""
+    raw=files['profile.json'];profile=decode(raw)
+    if ACTIVATION_PROFILE_SHA256 is None:
+        if raw!=oldfiles['profile.json'] or 'rust' in profile or 'rust' in profile.get('dependencies',{}):
+            raise ValueError('Upgrade must keep Rust dormant')
+        return
+    if sha(raw)!=ACTIVATION_PROFILE_SHA256:raise ValueError('Reviewed Rust activation profile changed')
+    old=decode(oldfiles['profile.json'])
+    if 'rust' in old or 'rust' in old.get('dependencies',{}):raise ValueError('Activation requires dormant old profile')
+    declared=profile.pop('rust')
+    if profile['dependencies'].pop('rust')!=declared['bundle']:raise ValueError('Rust bundle declaration mismatch')
+    for name,blob in declared['source_blobs'].items():
+        if profile['dependency_blobs'].get(name)!=blob:raise ValueError('Rust dependency declaration mismatch')
+        if name not in old['dependency_blobs']:del profile['dependency_blobs'][name]
+    if profile!=old:raise ValueError('Rust activation changed native profile')
+
+
 def apply(declaration,paths=None,fault=lambda _:None):
     if (set(declaration)!={'version','old_manifest','new_manifest','proof_report','proof_uuid','package','mode'}
             or type(declaration['version']) is not int or declaration['version']!=1
@@ -338,10 +357,9 @@ def apply(declaration,paths=None,fault=lambda _:None):
     safe(paths.base,paths.uid,True);safe(paths.lib,paths.uid,True);safe(old,paths.uid,True)
     raw,files=package(Path(declaration['package']),newhash)
     _,oldfiles=package(old,OLD,OLD_NAMES,paths.uid)
-    for name in ('profile.json','host-inputs.json','client-config.json','actor.py','actor_runtime.py','debugger.py','debugger-gdb.py','runtime-fixture.json'):
+    for name in ('host-inputs.json','client-config.json','actor.py','actor_runtime.py','debugger.py','debugger-gdb.py','runtime-fixture.json'):
         if files[name]!=oldfiles[name]:raise ValueError('Upgrade widened dormant/native input contract: '+name)
-    profile=decode(files['profile.json'])
-    if 'rust' in profile or 'rust' in profile.get('dependencies',{}):raise ValueError('Upgrade must keep Rust dormant')
+    profile_change(files,oldfiles)
     if read(paths.policy,65536,paths.uid)!=RULE:raise ValueError('Existing fixed helper policy changed')
     safe(paths.base/'request.lock',paths.uid)
     lock_fd=os.open(paths.base/'request.lock',os.O_RDWR|os.O_NOFOLLOW)

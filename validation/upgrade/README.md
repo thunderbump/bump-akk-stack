@@ -1,8 +1,9 @@
 # Direct validator upgrade
 
 Prepare the native/actor/debugger package with `validation/prepare.py --with-actor`
-and no Rust contract. This keeps Rust execution dormant until the actor workspace
-and locked dependency contract exist. No host Rust tool installation is needed.
+without a Rust contract for a dormant upgrade. To activate the pinned actor
+workspace, also pass `--rust-contract /reviewed/contract.json`. No host Rust
+tool installation or execution is needed.
 
 Freeze the reviewed package into two fixed operator programs:
 
@@ -12,8 +13,13 @@ python3 -B validation/upgrade/prepare.py --package /prepared/package --output /n
 
 Preparation executes no root command or VM. Review its declaration, program and
 wrapper hashes. This revision upgrades only installed manifest
-`13ab61457e2174e8004fd9ce2b5a524b5631c9aa0b75b61b836ed9fa843cef87`,
-retaining its native/actor/debugger profile and dormant Rust contract.
+`37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6`.
+Without `--activate-rust`, the profile must remain byte-identical and dormant.
+For an enabled package, add `--activate-rust` to the preparer. The operator then
+freezes its exact profile hash and permits only the declared Rust bundle and
+dependency blobs over the unchanged native profile. Activation does not qualify
+Rust: the subsequent source card must link the static bridge into the final zone
+and pass the enabled fixture. The exact-zone native-link check remains required.
 `reviewed-check.sh` performs read-only root preflight;
 `reviewed-apply.sh` performs the direct upgrade. Both use the checked-byte,
 private root staging bootstrap. The declaration pins the current installed

@@ -33,7 +33,7 @@ def seal(directory,files):
 
 class DirectUpgrade(unittest.TestCase):
     @contextlib.contextmanager
-    def fixture(self):
+    def fixture(self,activation=False):
         with tempfile.TemporaryDirectory() as tmp,contextlib.ExitStack() as stack:
             root=Path(tmp);paths=direct.Paths(root,os.getuid())
             for path in (paths.base,paths.lib,paths.client.parent,paths.helper.parent,paths.policy.parent,
@@ -53,6 +53,17 @@ class DirectUpgrade(unittest.TestCase):
             files=dict(oldfiles)
             for name in direct.NAMES-direct.OLD_NAMES:files[name]=(ROOT/'validation'/name).read_bytes()
             files['producer-worker.py.in']+=b'\n# reviewed staging revision\n'
+            if activation:
+                profile=direct.decode(files['profile.json'])
+                declared=dict(version=1,release='1.99.0',target='x86_64-unknown-linux-gnu',
+                    bundle=dict(path='rust/inputs.tar',bytes=1,sha256='a'*64),manifest_path='rust/Cargo.toml',
+                    packages=['actor-core','actor-bridge'],test_packages=['actor-core'],features=[],
+                    source_blobs={'rust/Cargo.toml':'a'*40,'rust/Cargo.lock':'b'*40,'rust-toolchain.toml':'c'*40},
+                    minimum_tests=1,minimum_doctests=1,link_symbol='eqemu_rust_bridge_v1')
+                profile['rust']=declared;profile['dependencies']['rust']=declared['bundle']
+                profile['dependency_blobs'].update(declared['source_blobs'])
+                files['profile.json']=direct.canonical(profile)
+                stack.enter_context(patch.object(direct,'ACTIVATION_PROFILE_SHA256',direct.sha(files['profile.json'])))
             package=root/'package';newhash=seal(package,files);new=paths.lib/newhash[:16]
             for path,data in direct.wrappers(paths,old).items():path.write_bytes(data);path.chmod(0o755)
             paths.state.write_bytes(direct.canonical({'enabled':True,'version':str(old),'manifest_sha256':oldhash}));paths.state.chmod(0o600)
@@ -74,6 +85,46 @@ class DirectUpgrade(unittest.TestCase):
             declaration={'version':1,'old_manifest':oldhash,'new_manifest':newhash,'proof_report':direct.PROOF_REPORT,
                          'proof_uuid':direct.PROOF_UUID,'package':str(package),'mode':'apply'}
             yield paths,declaration,old,new,package
+
+    def test_rust_activation_preserves_native_inputs_and_can_finish_forward(self):
+        for point in (None,'release','identity'):
+            with self.subTest(point=point),self.fixture(activation=True) as (paths,decl,old,new,_):
+                before=direct.preserved(paths,direct.run_ids(paths))
+                if point:
+                    def fail(name):
+                        if name==point:raise RuntimeError('controlled activation fault')
+                    with self.assertRaises(RuntimeError):direct.apply(decl,paths,fail)
+                    self.assertFalse(direct.decode(paths.state.read_bytes())['enabled'])
+                direct.apply(decl,paths)
+                self.assertEqual(direct.preserved(paths,direct.run_ids(paths)),before)
+                self.assertIn('rust',direct.decode((new/'profile.json').read_bytes()))
+                self.assertTrue(old.exists());self.assertTrue(direct.decode(paths.state.read_bytes())['enabled'])
+
+    def test_even_frozen_activation_refuses_native_changes_and_blob_overwrite(self):
+        with self.fixture(activation=True) as (_,decl,old,_,package):
+            _,files=direct.package(package,decl['new_manifest']);_,oldfiles=direct.package(old,direct.OLD)
+            for kind in ('native','blob','bundle','unreviewed'):
+                profile=direct.decode(files['profile.json'])
+                if kind=='native':profile['native_widening']=True
+                if kind=='blob':profile['dependency_blobs'][next(iter(oldfiles and direct.decode(oldfiles['profile.json'])['dependency_blobs']))]='f'*40
+                if kind=='bundle':profile['dependencies']['rust']['bytes']=2
+                changed={**files,'profile.json':direct.canonical(profile)}
+                digest=direct.sha(changed['profile.json']) if kind!='unreviewed' else '0'*64
+                with patch.object(direct,'ACTIVATION_PROFILE_SHA256',digest),self.assertRaises(ValueError):
+                    direct.profile_change(changed,oldfiles)
+            with patch.object(direct,'ACTIVATION_PROFILE_SHA256',None),self.assertRaises(ValueError):
+                direct.profile_change(files,oldfiles)
+
+    def test_activation_preparer_freezes_profile_and_rejects_dormant_package(self):
+        with self.fixture(activation=True) as (paths,decl,_,_,package):
+            receipt=prepare.prepare(package,paths.root/'activation-operators',activate_rust=True)
+            self.assertTrue(receipt['rust_activation']);self.assertFalse(receipt['installed'])
+            expected=direct.sha((package/'profile.json').read_bytes())
+            self.assertEqual(receipt['profile_sha256'],expected)
+            self.assertIn('ACTIVATION_PROFILE_SHA256 = '+repr(expected),(paths.root/'activation-operators/apply.py').read_text())
+        with self.fixture() as (paths,_,_,_,package):
+            with self.assertRaises(KeyError):prepare.prepare(package,paths.root/'refused-activation',activate_rust=True)
+            self.assertFalse((paths.root/'refused-activation').exists())
 
     def test_success_switches_only_release_wrappers_and_selection(self):
         with self.fixture() as (paths,decl,old,new,_):

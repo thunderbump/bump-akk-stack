@@ -127,7 +127,8 @@ class HostAdmission(unittest.TestCase):
             'fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97',
             'a1eec9b33bbca1ba1d3c4b8911a1827ca1b1dd4d2ef72657699a0569201ba83a',
             '5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055',
-            '13ab61457e2174e8004fd9ce2b5a524b5631c9aa0b75b61b836ed9fa843cef87'))
+            '13ab61457e2174e8004fd9ce2b5a524b5631c9aa0b75b61b836ed9fa843cef87',
+            '37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6'))
         for slot in (0, 1):
             with self.subTest(slot=slot), self.retired(pin_slot=slot) as (root,record,version,suite):
                 before={str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()}
