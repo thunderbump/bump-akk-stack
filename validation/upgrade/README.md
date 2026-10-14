@@ -11,7 +11,10 @@ python3 -B validation/upgrade/prepare.py --package /prepared/package --output /n
 ```
 
 Preparation executes no root command or VM. Review its declaration, program and
-wrapper hashes. `reviewed-check.sh` performs read-only root preflight;
+wrapper hashes. This revision upgrades only installed manifest
+`13ab61457e2174e8004fd9ce2b5a524b5631c9aa0b75b61b836ed9fa843cef87`,
+retaining its native/actor/debugger profile and dormant Rust contract.
+`reviewed-check.sh` performs read-only root preflight;
 `reviewed-apply.sh` performs the direct upgrade. Both use the checked-byte,
 private root staging bootstrap. The declaration pins the current installed
 release, replacement manifest and successful Rust provisioning proof.

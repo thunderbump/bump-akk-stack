@@ -132,7 +132,9 @@ def build():
  tools={'system-zlib':zlib_version}
  for name,args in [('compiler',['g++','--version']),('cmake',['cmake','--version']),('ninja',['ninja','--version']),('perl',['perl','-MIPC::Cmd','-MExtUtils::Embed','-e','print "$^V\\n"']),('make',['make','--version']),('autoreconf',['autoreconf','--version']),('pkgconfig',['pkg-config','--version']),('vcpkg',[str(vp/'vcpkg'),'version'])]:
   tools[name]=command('tool-'+name,args).read_text()[:600]
- solver=command('vcpkg-plan',[str(vp/'vcpkg'),'install','--dry-run','--triplet=x64-linux','--host-triplet=x64-linux','--binarysource=clear','--no-downloads'],cwd=src,timeout=300,cap=2*1024**2)
+ # Planning also writes a compiler hash cache; keep it outside verified source.
+ installed=WORK/'build/vcpkg_installed'
+ solver=command('vcpkg-plan',[str(vp/'vcpkg'),'install','--dry-run','--triplet=x64-linux','--host-triplet=x64-linux','--binarysource=clear','--no-downloads','--x-install-root='+str(installed)],cwd=src,timeout=300,cap=2*1024**2)
  plan=json.loads((MEDIA/'provenance/static-input-plan.json').read_text());expected={p['port']:p for p in plan['ports']}
  actual={}
  for l in solver.read_text().splitlines():
@@ -156,7 +158,7 @@ def build():
   import rust_guest
   rust_protected=rust_guest.prepare(profile['rust'],WORK/'rust-inputs.tar',WORK,command,ENV)
   rust_guest.check(profile['rust'],src,json.loads((WORK/'source-authority.json').read_text()),verify_materialized,command,emit,ENV,rust_protected)
- config=['cmake','-S',str(src),'-B',str(WORK/'build'),'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER=/usr/bin/gcc','-DCMAKE_CXX_COMPILER=/usr/bin/g++','-DCMAKE_TOOLCHAIN_FILE='+str(vp/'scripts/buildsystems/vcpkg.cmake'),'-DVCPKG_TARGET_TRIPLET=x64-linux','-DVCPKG_HOST_TRIPLET=x64-linux','-DVCPKG_INSTALL_OPTIONS=--no-downloads;--binarysource=clear']
+ config=['cmake','-S',str(src),'-B',str(WORK/'build'),'-G','Ninja','-DCMAKE_BUILD_TYPE=RelWithDebInfo','-DCMAKE_EXPORT_COMPILE_COMMANDS=ON','-DCMAKE_C_COMPILER=/usr/bin/gcc','-DCMAKE_CXX_COMPILER=/usr/bin/g++','-DCMAKE_TOOLCHAIN_FILE='+str(vp/'scripts/buildsystems/vcpkg.cmake'),'-DVCPKG_TARGET_TRIPLET=x64-linux','-DVCPKG_HOST_TRIPLET=x64-linux','-DVCPKG_INSTALLED_DIR='+str(installed),'-DVCPKG_INSTALL_OPTIONS=--no-downloads;--binarysource=clear']
  config+=['-DEQEMU_BUILD_'+n+'=ON' for n in ['SERVER','TESTS','LOGIN','LUA','PERL','CLIENT_FILES']]
  command('configure',config,timeout=14400)
  cache=(WORK/'build/CMakeCache.txt').read_text()

@@ -121,12 +121,13 @@ class HostAdmission(unittest.TestCase):
             patches.enter_context(patch.object(self.host,'unstarted_absent',return_value=True))
             yield root,record,version,suite
 
-    def test_only_three_declared_prior_release_pins_are_supported(self):
+    def test_only_declared_prior_release_pins_are_supported(self):
         self.assertEqual(self.host.PRIOR_MANIFESTS, (
             'b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a',
             'fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97',
             'a1eec9b33bbca1ba1d3c4b8911a1827ca1b1dd4d2ef72657699a0569201ba83a',
-            '5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055'))
+            '5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055',
+            '13ab61457e2174e8004fd9ce2b5a524b5631c9aa0b75b61b836ed9fa843cef87'))
         for slot in (0, 1):
             with self.subTest(slot=slot), self.retired(pin_slot=slot) as (root,record,version,suite):
                 before={str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()}
