@@ -355,7 +355,7 @@ class RustPackaging(unittest.TestCase):
             profile=dict(rust=declared,sources={'eqemu':wanted},submodule_sources={},submodules={},
                          dependencies={'rust':declared['bundle']},dependency_blobs=declared['source_blobs'])
             inputs=common.load('rust_input_package',ROOT/'validation/inputs.py')
-            receipt=inputs.prepare(profile,{'eqemu':source},store,root/'output')
+            receipt=inputs.prepare(profile,{'eqemu':source},str(store),root/'output')
             inputs.verify(root/'output',receipt['manifest_sha256'],profile,receipt['input_id'])
             self.assertFalse(marker.exists())
             (root/'output/rust-inputs.tar').chmod(0o600)

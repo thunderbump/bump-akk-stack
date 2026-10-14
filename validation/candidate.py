@@ -150,7 +150,8 @@ def execute(source, profile_name=PROFILE, control=None, retain=False, reuse=None
             if result['terminal']:
                 break
             time.sleep(POLL_SECONDS)
-    except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as exc:
+    except Exception as exc:
+        # Internal setup/command defects are infrastructure failures, never candidate exit 1.
         error = str(exc)[:2000]
     finally:
         if submitted and (result is None or not result['terminal']):
@@ -159,7 +160,7 @@ def execute(source, profile_name=PROFILE, control=None, retain=False, reuse=None
                 if build_id is None and isinstance(cancelled,dict):
                     build_id = cancelled.get('build_id')
                 result = checked(cancelled,identifier,facts,build_id,profile_name)
-            except (OSError,ValueError,RuntimeError,subprocess.SubprocessError) as exc:
+            except Exception as exc:
                 secondary = str(exc)[:2000]; result = None
         if upload_created:
             try:

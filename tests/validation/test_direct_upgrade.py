@@ -126,6 +126,14 @@ class DirectUpgrade(unittest.TestCase):
             with self.assertRaises(KeyError):prepare.prepare(package,paths.root/'refused-activation',activate_rust=True)
             self.assertFalse((paths.root/'refused-activation').exists())
 
+    def test_ordinary_repair_preserves_byte_identical_enabled_rust_profile(self):
+        with self.fixture(activation=True) as (_,decl,_,_,package):
+            _,files=direct.package(package,decl['new_manifest'])
+            with patch.object(direct,'ACTIVATION_PROFILE_SHA256',None):
+                direct.profile_change(files,files)
+                changed=dict(files);changed['profile.json']+=b' '
+                with self.assertRaises(ValueError):direct.profile_change(changed,files)
+
     def test_success_switches_only_release_wrappers_and_selection(self):
         with self.fixture() as (paths,decl,old,new,_):
             before=direct.preserved(paths,direct.run_ids(paths));oldbytes={p.name:p.read_bytes() for p in old.iterdir()}

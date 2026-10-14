@@ -108,9 +108,9 @@ Cheap source tests and static preparation establish this adapter's wiring. They 
 
 ## Direct Rust activation
 
-The direct upgrade preparer now targets the installed source-isolation repair
-manifest `37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6`.
-Ordinary preparation still requires a byte-identical dormant profile. Use
+The direct upgrade preparer now targets the installed Rust-enabled
+manifest `810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24`.
+Ordinary preparation preserves the byte-identical installed profile, including enabled Rust. Use
 `validation/prepare.py --rust-contract <reviewed-contract.json>` to prepare a
 sealed enabled package, then freeze its exact profile in the root operator:
 
@@ -131,3 +131,9 @@ has no native CMake link yet. The next source card must build its static library
 and link `eqemu_rust_bridge_v1` into the final zone. The enabled validator retains
 that exact-zone requirement; a standalone component proof cannot satisfy it.
 Actor movement and gameplay remain separate.
+
+Rust source preparation accepts the JSON input-store string used by the public
+command and normalizes it to a resolved Path before copying the sealed bundle.
+Internal preparation or command exceptions return infrastructure exit2 with a
+matching final event and bounded diagnostics; they cannot masquerade as
+candidate exit1 and trigger source repair. No candidate or media contract changes.

@@ -13,8 +13,8 @@ python3 -B validation/upgrade/prepare.py --package /prepared/package --output /n
 
 Preparation executes no root command or VM. Review its declaration, program and
 wrapper hashes. This revision upgrades only installed manifest
-`37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6`.
-Without `--activate-rust`, the profile must remain byte-identical and dormant.
+`810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24`.
+Without `--activate-rust`, the profile must remain byte-identical, including its existing Rust selection.
 For an enabled package, add `--activate-rust` to the preparer. The operator then
 freezes its exact profile hash and permits only the declared Rust bundle and
 dependency blobs over the unchanged native profile. Activation does not qualify
