@@ -42,9 +42,14 @@ def run(args, timeout=30, check=True, data=None):
 
 def virsh(*args, **kw):return run(['/usr/bin/virsh','-c','qemu:///system',*args],**kw)
 def digest(path):
-    h=hashlib.sha256()
+    h=hashlib.sha256();offset=0;pending=0
     with path.open('rb') as f:
-        for block in iter(lambda:f.read(1024*1024),b''):h.update(block)
+        for block in iter(lambda:f.read(BLOCK),b''):
+            h.update(block);pending+=len(block)
+            if pending>=WRITE_WINDOW:
+                os.posix_fadvise(f.fileno(),offset,pending,os.POSIX_FADV_DONTNEED)
+                offset+=pending;pending=0
+        if pending:os.posix_fadvise(f.fileno(),offset,pending,os.POSIX_FADV_DONTNEED)
     return h.hexdigest()
 
 
@@ -297,14 +302,8 @@ def worker():
         for target,(rel,length,sha) in FILES.items():
             source=INPUTS/rel;dest=DATA/target
             if source.is_symlink() or not source.is_file() or source.stat().st_size!=length:raise RuntimeError('Invalid fixed input '+target)
-            # Fixed size loop also prevents an expanding source from filling storage.
-            with source.open('rb') as src,dest.open('xb') as dst:
-                remain=length
-                while remain:
-                    chunk=src.read(min(remain,1024**2))
-                    if not chunk:raise RuntimeError('Short input')
-                    dst.write(chunk);remain-=len(chunk)
-                if src.read(1):raise RuntimeError('Input grew')
+            # Reuse the bounded artifact copier; independently hash destination below.
+            copy_blob(source,dest,length,sha,time.monotonic()+600)
             if digest(dest)!=sha:raise RuntimeError('Input digest mismatch '+target)
             report['inputs'][target]=sha;dest.chmod(0o444)
         prepare_artifact()

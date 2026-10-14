@@ -241,7 +241,13 @@ def prior_report(root, record):
             or any(not isinstance(value, str) or not re.fullmatch('[a-f0-9]{64}', value)
                    for value in [recipe['build_id'],recipe['launcher_sha256'],*recipe['workers'].values()])):
         raise ValueError('Invalid prior recipe seals')
-    profile = candidate_profile(S.read_json(version/'profile.json'), facts['candidate'], facts['tree'])
+    from actor import PROFILES
+    profile_name = record.get('profile', PROFILE)
+    if profile_name not in PROFILES:
+        raise ValueError('Unsupported prior validation profile')
+    fixture = S.read_json(version/'runtime-fixture.json') if profile_name == 'actor-lifecycle-v1' else None
+    profile = candidate_profile(S.read_json(version/'profile.json'), facts['candidate'], facts['tree'],
+                                profile_name, fixture)
     expected = seal(dict(profile=profile,input_id=facts['input_id'],
                          manifest_sha256=facts['manifest_sha256'],recipe=manifest['files']))
     if recipe['build_id'] != expected or record.get('setup_failed_clean'):
@@ -249,7 +255,7 @@ def prior_report(root, record):
     receipt = S.read_json(root/'result.json')
     if (not isinstance(receipt, dict) or type(receipt.get('version')) is not int
             or receipt.get('version') != 1 or receipt.get('run_id') != identifier
-            or receipt.get('profile') != PROFILE or receipt.get('candidate') != facts
+            or receipt.get('profile') != profile_name or receipt.get('candidate') != facts
             or receipt.get('build_id') != expected or receipt.get('terminal') is not True
             or receipt.get('cleanup_complete') is not True
             or type(receipt.get('exit_code')) is not int or receipt['exit_code'] not in (0,1,2)

@@ -148,6 +148,25 @@ class HostAdmission(unittest.TestCase):
             write.assert_not_called()
             self.assertTrue(result['terminal']);self.assertTrue(result['cleanup_complete'])
             self.assertEqual(before,{str(p):p.read_bytes() for p in root.rglob('*') if p.is_file()})
+
+    def test_prior_actor_profile_uses_its_sealed_fixture_and_recorded_profile(self):
+        with self.retired() as (root,record,version,suite):
+            profile=json.loads((version/'profile.json').read_text());profile['dependencies']={}
+            fixture={'iso':{'path':'fixture.iso','bytes':1,'sha256':'a'*64},'manifest_sha256':'b'*64}
+            (version/'profile.json').write_text(json.dumps(profile));(version/'runtime-fixture.json').write_text(json.dumps(fixture))
+            manifest={'version':1,'files':{p.name:common.sha(p) for p in version.iterdir() if p.name!='manifest.json'}}
+            (version/'manifest.json').write_text(json.dumps(manifest));digest=common.sha(version/'manifest.json')
+            changed=version.parent/digest[:16];version.rename(changed);version=changed
+            record.update(version=str(version),profile='actor-lifecycle-v1')
+            facts=record['candidate']
+            selected=common.candidate_profile(profile,facts['candidate'],facts['tree'],'actor-lifecycle-v1',fixture)
+            record['recipe']['build_id']=common.seal(dict(profile=selected,input_id=facts['input_id'],
+                manifest_sha256=facts['manifest_sha256'],recipe=manifest['files']))
+            receipt=json.loads((root/'result.json').read_text());receipt.update(profile='actor-lifecycle-v1',build_id=record['recipe']['build_id'])
+            (root/'result.json').write_text(json.dumps(receipt))
+            with patch.object(self.host,'PRIOR_MANIFESTS',(digest,)),patch.object(self.host,'report_record',return_value={'cleanup_complete':True}) as reader:
+                self.assertTrue(self.host.prior_report(root,record)['cleanup_complete'])
+            self.assertFalse(reader.call_args.kwargs['persist'])
             # Public operations still refuse the same historical release.
             with self.assertRaisesRegex(ValueError,'ownership'):self.host.owner(root.name,record['uid'])
 
