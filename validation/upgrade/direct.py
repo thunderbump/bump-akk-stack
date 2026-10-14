@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 
-OLD = '5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055'
+OLD = '13ab61457e2174e8004fd9ce2b5a524b5631c9aa0b75b61b836ed9fa843cef87'
 PROOF_UUID = '5ca42214-8aed-4335-bdde-f9f7074a57c8'
 PROOF_REPORT = '52389eefbf0e393ec6d7059f0d99b578d8652e94e17a3319fa205479d16ab3f0'
 PROOF_CLEANUP = '57aacb2faeceb92d65f32da91204012088340a4c8c434330ee4b34ecc5a4d7a3'
@@ -20,7 +20,7 @@ NAMES = {'common.py','render.py','host.py','candidate.py','install.py','disable.
          'debugger.py','debugger-gdb.py','rust.py','rust_guest.py','rust-toolchain.json','producer-user.json',
          'consumer-user.json','producer-guest.py','consumer-guest.py','producer-worker.py.in','consumer-worker.py.in',
          'suite.py.in','recipe-binding.json','host-inputs.json','client-config.json'}
-OLD_NAMES = NAMES-{'rust.py','rust_guest.py','rust-toolchain.json'}
+OLD_NAMES = NAMES
 RULE = b'%eqemu-test ALL=(root) NOPASSWD: NOSETENV: /usr/local/sbin/eqemu-build-request ""\n'
 ENV = {'PATH':'/usr/sbin:/usr/bin:/sbin:/bin','LANG':'C.UTF-8'}
 DECLARATION = None

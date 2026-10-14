@@ -17,6 +17,11 @@ python3 -B validation/prepare.py \
 
 The input store layout and fixed dependency identities are in `profile.json`. Preparation checks each dependency's byte count and SHA-256, verifies websocketpp's pinned commit/tree and clean bytes/index, and verifies `recipe-manifest.json` before importing maintained helper code. It copies the checked-in cloud-init payloads and worker/suite templates from `recipes/`; no historical workstation or proof directory is required. Recipe edits require updating the corresponding fixed manifest digest during the same reviewed PR. Changes in the dependency closure require a supported profile update.
 
+The guest uses one explicit vcpkg install root under its build directory for both
+dependency planning and CMake. Even `vcpkg install --dry-run` writes a compiler
+hash cache. Generated dependency state stays outside candidate source; the exact
+source verifier continues rejecting extra or modified files.
+
 Transferred source inventories remain capped at 10,000 files. Initialized pinned submodule inventories use a separate 20,000-file cleanliness budget because the approved vcpkg checkout contains 13,083 files; these local inventories are not transferred or included in the source manifest. Both retain the 256 MiB source-byte bound, 16 MiB index bound and raw-byte/index/HEAD/untracked refusal checks. The source manifest remains capped at 1 MiB.
 
 The recipes originate from the [prepared package receipt](https://github.com/thunderbump/bump-akk-stack/blob/f631f689b857629bdf17ce506a6166a0bbaa4005/validation/receipts/preparation.json), whose package manifest identity is `b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a`. Maintained templates remove the prior proof prerequisite and use explicit runtime input locations. Recipe generation binds the current candidate and build identity, then discards the owned transfer artifact after the consumer finishes. Historical receipts and standalone AFK settings are excluded from this package.
