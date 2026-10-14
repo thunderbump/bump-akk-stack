@@ -106,31 +106,32 @@ Release the original with `eqemu-validate --release-artifact <positive-run-id>`.
 
 Cheap source tests and static preparation establish this adapter's wiring. They do not establish that the future native command boots without world or passes actor assertions. Actual runtime qualification remains `.4.2` after `.7.1` supplies the command.
 
-## Direct Rust activation
+## Direct Rust profile-preserving repair
 
-The direct upgrade preparer now targets the installed Rust-enabled
-manifest `810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24`.
-Ordinary preparation preserves the byte-identical installed profile, including enabled Rust. Use
-`validation/prepare.py --rust-contract <reviewed-contract.json>` to prepare a
-sealed enabled package, then freeze its exact profile in the root operator:
+The direct upgrade preparer targets installed Rust-enabled manifest
+`810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24`.
+Prepare the replacement with `validation/prepare.py --with-actor --rust-contract
+<same-reviewed-contract.json>`, then freeze the ordinary repair operator:
 
 ```sh
 python3 -B validation/upgrade/prepare.py \
-  --package <sealed-package> --output <fresh-operators-directory> --activate-rust
+  --package <sealed-package> --output <fresh-operators-directory>
 ```
 
-The operator permits only the declared Rust bundle and dependency blobs over the
-unchanged native profile. Native media, runtime adapters, client configuration,
-receipts and AFK configuration remain unchanged. The existing qualified Rust VM
-proof and live quiescence gates still apply. Partial failures leave admission
-disabled and recover forward using the same checked command; there is no
-automatic rollback. Preparation and activation do not launch validation jobs.
+The replacement profile must be byte-identical to the installed enabled profile.
+This repair changes no Rust bundle, dependency blob, package/test selection or
+native media declaration. Do not use `--activate-rust` for this already-enabled
+release: that separate first-activation mode requires a dormant old profile and
+cannot rebind an enabled contract. Runtime adapters, client configuration,
+receipts and AFK configuration remain unchanged. The qualified Rust VM proof and
+live quiescence gates still apply. Partial failures leave admission disabled and
+recover forward using the same checked command; there is no automatic rollback.
+Preparation and repair do not launch validation jobs.
 
-Activation is installation, not Rust acceptance. The source-only actor workspace
-has no native CMake link yet. The next source card must build its static library
-and link `eqemu_rust_bridge_v1` into the final zone. The enabled validator retains
-that exact-zone requirement; a standalone component proof cannot satisfy it.
-Actor movement and gameplay remain separate.
+Installation remains separate from Rust qualification. The candidate must link
+`eqemu_rust_bridge_v1` into the actual final zone and pass the enabled fixture.
+A standalone component proof cannot satisfy that exact-zone requirement. Actor
+movement and gameplay remain separate.
 
 Rust source preparation accepts the JSON input-store string used by the public
 command and normalizes it to a resolved Path before copying the sealed bundle.

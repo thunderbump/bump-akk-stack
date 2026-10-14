@@ -1,11 +1,9 @@
 # Direct validator upgrade
 
-Prepare the native/actor/debugger package with `validation/prepare.py --with-actor`
-without a Rust contract for a dormant upgrade. To activate the pinned actor
-workspace, also pass `--rust-contract /reviewed/contract.json`. No host Rust
-tool installation or execution is needed.
-
-Freeze the reviewed package into two fixed operator programs:
+Prepare the replacement native/actor/debugger package with
+`validation/prepare.py --with-actor --rust-contract /reviewed/current-contract.json`.
+Use the exact installed Rust contract. No host Rust tool installation or execution
+is needed. Freeze the reviewed package into two fixed operator programs:
 
 ```sh
 python3 -B validation/upgrade/prepare.py --package /prepared/package --output /new/upgrade
@@ -14,12 +12,10 @@ python3 -B validation/upgrade/prepare.py --package /prepared/package --output /n
 Preparation executes no root command or VM. Review its declaration, program and
 wrapper hashes. This revision upgrades only installed manifest
 `810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24`.
-Without `--activate-rust`, the profile must remain byte-identical, including its existing Rust selection.
-For an enabled package, add `--activate-rust` to the preparer. The operator then
-freezes its exact profile hash and permits only the declared Rust bundle and
-dependency blobs over the unchanged native profile. Activation does not qualify
-Rust: the subsequent source card must link the static bridge into the final zone
-and pass the enabled fixture. The exact-zone native-link check remains required.
+The ordinary repair requires a byte-identical profile, including the existing
+Rust selection. Do not add `--activate-rust`: that separate first-activation mode
+requires a dormant old release and cannot rebind this enabled contract. Repair
+does not qualify Rust; the exact-zone native-link fixture remains required.
 `reviewed-check.sh` performs read-only root preflight;
 `reviewed-apply.sh` performs the direct upgrade. Both use the checked-byte,
 private root staging bootstrap. The declaration pins the current installed
