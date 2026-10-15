@@ -1,0 +1,45 @@
+[Unit]
+Description=Unprivileged EQEmu validation connection
+CollectMode=inactive-or-failed
+
+[Service]
+User=@USER@
+Group=@USER@
+SupplementaryGroups=kvm
+ExecStart=/usr/bin/python3 -I @CODE@/validation/worker/runtime.py serve --config /etc/eqemu-validator/config.json
+ExecStopPost=/usr/bin/python3 -I @CODE@/validation/worker/runtime.py cleanup --config /etc/eqemu-validator/config.json
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+WorkingDirectory=@STATE@
+UMask=0077
+NoNewPrivileges=yes
+CapabilityBoundingSet=
+AmbientCapabilities=
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=@STATE@
+PrivateTmp=yes
+PrivateNetwork=yes
+RestrictAddressFamilies=AF_UNIX
+DevicePolicy=closed
+DeviceAllow=/dev/kvm rw
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectKernelLogs=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+RestrictSUIDSGID=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+AppArmorProfile=eqemu-validator
+MemoryMax=2G
+MemorySwapMax=0
+TasksMax=64
+CPUQuota=200%
+LimitNOFILE=256
+RuntimeMaxSec=360
+TimeoutStopSec=15
+KillMode=control-group
+SendSIGKILL=yes
