@@ -304,11 +304,15 @@ def check(expected, source, authority, verify_source, command, emit, env, protec
 def native_link(expected, binary, command, emit, root, protected):
     """Require the Rust bridge ABI entry point in the actual final executable."""
     guard()
-    symbols = command('rust-native-symbols', ['/usr/bin/nm', '--defined-only', str(binary)],
-                      timeout=30, cap=8*1024**2).read_text()
+    # Consume the full table while retaining only exact-name rows. pipefail keeps
+    # a failed nm fatal even if it printed the marker before failing.
+    query = '"$1" --defined-only -- "$2" | /usr/bin/awk -v symbol="$3" \'$3 == symbol { print }\''
+    symbols = command('rust-native-symbols', ['/bin/bash', '-o', 'pipefail', '-c', query,
+                      'rust-native-symbols', '/usr/bin/nm', str(binary), expected['link_symbol']],
+                      timeout=30, cap=4096).read_text()
     verify_protected(root,protected)
     lines = [line for line in symbols.splitlines() if line]
-    if not lines or any(not re.fullmatch(r'[0-9a-fA-F]+ [a-zA-Z?] .+',line) for line in lines):
+    if any(not re.fullmatch(r'[0-9a-fA-F]+ [a-zA-Z?] .+',line) for line in lines):
         raise ValueError('Unknown native symbol-tool output')
     if not re.search(r'^[0-9a-fA-F]+ [Tt] '+re.escape(expected['link_symbol'])+r'$', symbols, re.M):
         emit({'kind':'observation','name':'rust-failure','value':dict(contract_sha256=rust.digest(expected),

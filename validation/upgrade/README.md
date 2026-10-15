@@ -11,7 +11,7 @@ python3 -B validation/upgrade/prepare.py --package /prepared/package --output /n
 
 Preparation executes no root command or VM. Review its declaration, program and
 wrapper hashes. This revision upgrades only installed manifest
-`810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24`.
+`bef324e52c445c8d77ff7ac6ffe2b142b3f0f0ffd6adf60f17c16aa000b6ed21`.
 The ordinary repair requires a byte-identical profile, including the existing
 Rust selection. Do not add `--activate-rust`: that separate first-activation mode
 requires a dormant old release and cannot rebind this enabled contract. Repair

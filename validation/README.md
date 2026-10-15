@@ -30,7 +30,7 @@ Run the prepared `install.py` once with sudo after administrator review and sepa
 
 Each request verifies the current user's existing NSS membership in `eqemu-test`. If the process inherited stale supplementary groups, only the fixed no-argument sudo helper runs through `sg eqemu-test`; its JSON input remains on stdin. Nonmembers refuse without a prompt or membership/policy change.
 
-Admission can inspect retained terminal receipts from exactly three prior package manifests: `b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a` `fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97`, and `a1eec9b33bbca1ba1d3c4b8911a1827ca1b1dd4d2ef72657699a0569201ba83a`. The administrator-owned prior release must remain installed with all original files and profile seals intact. The helper verifies candidate/build identity, sealed generated recipes, saved completion and live resource absence without rewriting receipts, removing media or stopping old units. Active, unknown or unverifiable prior releases block admission. Public status and cancel remain bound to the current release.
+Admission can inspect retained terminal receipts from only the eight explicit prior package manifests in `host.py::PRIOR_MANIFESTS`. The administrator-owned prior release must remain installed with all original files and profile seals intact. The helper verifies candidate/build identity, sealed generated recipes, saved completion and live resource absence without rewriting receipts, removing media or stopping old units. Active, unknown or unverifiable prior releases block admission. Public status and cancel remain bound to the current release.
 
 The fixed profile retains a 180 GiB admission / 100 GiB emergency reserve, 32 GiB guest root, 4 GiB transfer artifact, one compile job and 18,000-second supervisor. Eight retained runs block admission pending exact-owned archival. Source uploads and generated media are bounded. No saved-world or NAS data is involved.
 
@@ -109,7 +109,7 @@ Cheap source tests and static preparation establish this adapter's wiring. They 
 ## Direct Rust profile-preserving repair
 
 The direct upgrade preparer targets installed Rust-enabled manifest
-`810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24`.
+`bef324e52c445c8d77ff7ac6ffe2b142b3f0f0ffd6adf60f17c16aa000b6ed21`.
 Prepare the replacement with `validation/prepare.py --with-actor --rust-contract
 <same-reviewed-contract.json>`, then freeze the ordinary repair operator:
 
@@ -138,3 +138,10 @@ command and normalizes it to a resolved Path before copying the sealed bundle.
 Internal preparation or command exceptions return infrastructure exit2 with a
 matching final event and bounded diagnostics; they cannot masquerade as
 candidate exit1 and trigger source repair. No candidate or media contract changes.
+
+Native Rust link inspection consumes the complete `nm --defined-only` stream,
+retaining only exact bridge-name rows within a 4096-byte output bound. A defined
+text symbol in the actual final zone and its SHA-256 remain required. Tool
+failure or timeout cannot produce passing link evidence. Generated producer,
+consumer and launcher entry points disable bytecode before helper imports,
+including under `python -I`, so imports preserve the sealed package inventory.

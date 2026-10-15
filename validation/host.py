@@ -29,7 +29,8 @@ PRIOR_MANIFESTS = (PRIOR_MANIFEST, 'fc320a5152c47403f85332c35f14cf61482a3b1b95d5
                    '5f0f76f3b6cb4d7a427efc24672171ea75681fcba9940f03f528779cf3237055',
                    '13ab61457e2174e8004fd9ce2b5a524b5631c9aa0b75b61b836ed9fa843cef87',
                    '37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6',
-                   '810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24')
+                   '810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24',
+                   'bef324e52c445c8d77ff7ac6ffe2b142b3f0f0ffd6adf60f17c16aa000b6ed21')
 LIB = Path('/usr/local/lib/eqemu-build')
 
 

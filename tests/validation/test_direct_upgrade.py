@@ -134,6 +134,18 @@ class DirectUpgrade(unittest.TestCase):
                 changed=dict(files);changed['profile.json']+=b' '
                 with self.assertRaises(ValueError):direct.profile_change(changed,files)
 
+    def test_ordinary_preparation_targets_installed_bef_without_profile_activation(self):
+        with self.fixture(activation=True) as (paths,_,_,_,package):
+            receipt=prepare.prepare(package,paths.root/'repair-operators')
+            self.assertFalse(receipt['rust_activation'])
+            self.assertIsNone(receipt['profile_sha256'])
+            for mode,operator in receipt['operators'].items():
+                self.assertEqual(operator['declaration']['old_manifest'],
+                    'bef324e52c445c8d77ff7ac6ffe2b142b3f0f0ffd6adf60f17c16aa000b6ed21')
+                self.assertEqual(operator['declaration']['mode'],mode)
+                source=(paths.root/'repair-operators'/(mode+'.py')).read_text()
+                self.assertIn('ACTIVATION_PROFILE_SHA256 = None',source)
+
     def test_success_switches_only_release_wrappers_and_selection(self):
         with self.fixture() as (paths,decl,old,new,_):
             before=direct.preserved(paths,direct.run_ids(paths));oldbytes={p.name:p.read_bytes() for p in old.iterdir()}

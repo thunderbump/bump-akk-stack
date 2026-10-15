@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Fixed build export and fresh consumer proof. --check starts no VM; default needs sudo."""
 import argparse,fcntl,hashlib,importlib.util,json,os,pathlib,shutil,signal,stat,subprocess,sys,time,uuid
+sys.dont_write_bytecode = True
 P=pathlib.Path
 BASE=P('/var/lib/eqemu-vm-proof');ROOT=BASE/'candidate-build-01';SCRIPT=ROOT/'suite.py'
 LOCAL=P('/nonexistent/eqemu-build-recipes')

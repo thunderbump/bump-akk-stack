@@ -7,6 +7,7 @@ Internal modes run only from the root-owned copied script under systemd.
 """
 import argparse, ctypes, ctypes.util, hashlib, json, os, pathlib, pwd
 import re, shutil, signal, socket, stat, subprocess, sys, time, uuid
+sys.dont_write_bytecode = True
 import xml.etree.ElementTree as ET
 P=pathlib.Path
 BASE=P('/var/lib/eqemu-vm-proof')

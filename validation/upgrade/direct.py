@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 
-OLD = '810730e94fe14f123c36ab9ad26bfc4543a4f23918b3bef48fc0e1f76f9feb24'
+OLD = 'bef324e52c445c8d77ff7ac6ffe2b142b3f0f0ffd6adf60f17c16aa000b6ed21'
 ACTIVATION_PROFILE_SHA256 = None
 PROOF_UUID = '5ca42214-8aed-4335-bdde-f9f7074a57c8'
 PROOF_REPORT = '52389eefbf0e393ec6d7059f0d99b578d8652e94e17a3319fa205479d16ab3f0'
