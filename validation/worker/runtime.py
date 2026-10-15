@@ -26,7 +26,7 @@ from guest import user_data
 CONFIG = Path('/etc/eqemu-validator/config.json')
 QEMU = '/usr/bin/qemu-system-x86_64'
 QEMU_IMG = '/usr/bin/qemu-img'
-CLOUD_LOCALDS = '/usr/bin/cloud-localds'
+GENISOIMAGE = '/usr/bin/genisoimage'
 SECONDS = 300
 LOG_LIMIT = 1024**2
 BASE_LIMIT = 2 * 1024**3
@@ -111,7 +111,7 @@ def ready(value):
         observed['invocation_id'] = invocation(); checks['systemd_invocation'] = True
     except ValueError:
         checks['systemd_invocation'] = False
-    for name, tool in (('qemu', QEMU), ('qemu_img', QEMU_IMG), ('cloud_localds', CLOUD_LOCALDS)):
+    for name, tool in (('qemu', QEMU), ('qemu_img', QEMU_IMG), ('genisoimage', GENISOIMAGE)):
         checks[name] = os.path.isfile(tool) and os.access(tool, os.X_OK)
     try:
         fd = os.open('/dev/kvm', os.O_RDWR | os.O_CLOEXEC)
@@ -360,7 +360,8 @@ def smoke(value, connection, control='pass'):
         (scratch / 'user-data').write_text(user_data(run_id, control))
         (scratch / 'meta-data').write_text('instance-id: eqemu-smoke-' + run_id + '\n')
         tool([QEMU_IMG, 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', str(base), str(scratch / 'disk.qcow2'), '8G'], deadline)
-        tool([CLOUD_LOCALDS, str(scratch / 'seed.iso'), str(scratch / 'user-data'), str(scratch / 'meta-data')], deadline)
+        tool([GENISOIMAGE, '-output', str(scratch / 'seed.iso'), '-volid', 'cidata', '-joliet', '-rock',
+              str(scratch / 'user-data'), str(scratch / 'meta-data')], deadline)
         args = [QEMU, '-no-user-config', '-nodefaults', '-machine', 'q35,accel=kvm', '-cpu', 'host', '-smp', '2', '-m', '1024',
                 '-nic', 'none', '-display', 'none', '-monitor', 'none', '-serial', 'stdio', '-no-reboot',
                 '-sandbox', 'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny',

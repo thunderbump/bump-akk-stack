@@ -18,7 +18,7 @@ SOCKET = '/run/eqemu-validator.sock'
 TEMPLATES = Path(__file__).with_name('templates')
 TOOLS = ('/usr/sbin/useradd', '/usr/bin/systemctl', '/usr/bin/systemd-analyze', '/usr/sbin/apparmor_parser',
          '/usr/bin/python3', '/usr/bin/qemu-system-x86_64', '/usr/bin/qemu-img',
-         '/usr/bin/cloud-localds')
+         '/usr/bin/genisoimage')
 
 
 class Host:

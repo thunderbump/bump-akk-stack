@@ -72,7 +72,7 @@ class Runtime(unittest.TestCase):
         self.tools = self.root/'tools'; self.tools.mkdir()
         tool = self.tools/'prepare'
         tool.write_text('#!'+sys.executable+'\nimport pathlib,sys\n'
-                        'args=sys.argv[1:]\npath=pathlib.Path(args[-2] if args[0]=="create" else args[0])\npath.touch()\n')
+                        'args=sys.argv[1:]\npath=pathlib.Path(args[-2] if args[0]=="create" else args[1])\npath.touch()\n')
         tool.chmod(0o700)
         qemu = self.tools/'qemu'
         qemu.write_text('#!'+sys.executable+'\n'+'''import json,os,pathlib,re,sys,time
@@ -84,7 +84,7 @@ match=re.search(r"EQEMU_WORKER_RESULT (.+)' >/dev/ttyS0",script)
 if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
 ''')
         qemu.chmod(0o700)
-        for name, value in [('QEMU_IMG',str(tool)),('CLOUD_LOCALDS',str(tool)),('QEMU',str(qemu)),('SECONDS',2)]:
+        for name, value in [('QEMU_IMG',str(tool)),('GENISOIMAGE',str(tool)),('QEMU',str(qemu)),('SECONDS',2)]:
             p=patch.object(runtime,name,value);p.start();self.addCleanup(p.stop)
         for name, replacement in [('ready',lambda _:dict(exit_code=0)),('root_file',lambda path:Path(path)),
                                   ('service_processes',lambda:[os.getpid()])]:
@@ -143,6 +143,17 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         self.assertEqual(argv[argv.index('-sandbox')+1],
                          'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny')
         self.assertEqual(result['exit_code'],0)
+
+    def test_seed_build_uses_iso_builder_directly_in_owned_scratch(self):
+        with patch.object(runtime, 'tool', wraps=runtime.tool) as tool:
+            result = self.run_control('pass')
+        calls = [call.args[0] for call in tool.call_args_list]
+        self.assertEqual(len(calls), 2)
+        scratch = self.state / result['run_id'] / 'scratch'
+        self.assertEqual(calls[1][1:], [
+            '-output', str(scratch / 'seed.iso'), '-volid', 'cidata', '-joliet', '-rock',
+            str(scratch / 'user-data'), str(scratch / 'meta-data'),
+        ])
 
     def test_output_overflow_and_duplicate_or_malformed_completion_never_pass(self):
         for output in ('x'*(runtime.LOG_LIMIT+1), 'EQEMU_WORKER_RESULT {}\n',
@@ -277,7 +288,7 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
             +'cfg=json.loads(sys.argv[1])\nruntime.config=lambda _:cfg\nruntime.ready=lambda _:dict(exit_code=0)\n'
             +'runtime.root_file=lambda value:Path(value)\n'
             +'runtime.QEMU='+repr(runtime.QEMU)+'\nruntime.QEMU_IMG='+repr(runtime.QEMU_IMG)+'\n'
-            +'runtime.CLOUD_LOCALDS='+repr(runtime.CLOUD_LOCALDS)+'\nruntime.SECONDS=3\n'
+            +'runtime.GENISOIMAGE='+repr(runtime.GENISOIMAGE)+'\nruntime.SECONDS=3\n'
             +"raise SystemExit(runtime.main(['serve']))\n")
         process=subprocess.Popen([sys.executable,'-I',str(script),json.dumps(self.value)],
                                  stdin=self.server,stdout=subprocess.DEVNULL,stderr=subprocess.PIPE)
