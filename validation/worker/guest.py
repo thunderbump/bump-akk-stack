@@ -6,7 +6,7 @@ def user_data(nonce, control):
     result = json.dumps({'version': 1, 'nonce': nonce, 'scope': 'worker-smoke',
                          'exit_code': 1 if control == 'assertion' else 0}, separators=(',', ':'))
     script = '#!/bin/sh\nset -eu\n'
-    if control == 'deadline':
+    if control in ('deadline', 'controller-death'):
         script += 'sleep 600\n'
     elif control != 'missing-result':
         script += "printf '%s\\n' 'EQEMU_WORKER_RESULT " + result + "' >/dev/ttyS0\n"

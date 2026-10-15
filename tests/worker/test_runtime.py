@@ -47,7 +47,8 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         qemu.chmod(0o700)
         for name, value in [('QEMU_IMG',str(tool)),('CLOUD_LOCALDS',str(tool)),('QEMU',str(qemu)),('SECONDS',2)]:
             p=patch.object(runtime,name,value);p.start();self.addCleanup(p.stop)
-        for name, replacement in [('ready',lambda _:dict(exit_code=0)),('root_file',lambda path:Path(path))]:
+        for name, replacement in [('ready',lambda _:dict(exit_code=0)),('root_file',lambda path:Path(path)),
+                                  ('service_processes',lambda:[os.getpid()])]:
             p=patch.object(runtime,name,replacement);p.start();self.addCleanup(p.stop)
         self.server, self.client = socket.socketpair()
         self.addCleanup(self.server.close);self.addCleanup(self.client.close)
@@ -90,7 +91,10 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         self.assertEqual(json.loads((self.state/'last-result.json').read_text()),result)
 
     def test_qemu_argv_forces_kvm_no_nic_and_owns_no_service_socket(self):
-        with patch.object(runtime,'supervise',return_value=0) as supervise:
+        def simulate_started(*args):
+            args[-1](12345)
+            return 0
+        with patch.object(runtime,'supervise',side_effect=simulate_started) as supervise:
             result=self.run_control('pass')
         argv=supervise.call_args.args[0]
         self.assertIn('q35,accel=kvm',argv)
@@ -124,6 +128,48 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         self.assertEqual(recovery['exit_code'],2)
         self.assertFalse(recovery['cleanup_complete'])
         self.assertTrue(recovery['scratch_removed'])
+
+    def test_stop_hook_retains_scratch_if_another_service_process_remains(self):
+        with patch.object(runtime,'supervise',side_effect=runtime.CleanupError('owned group remains')):
+            runtime.smoke(self.value,self.server)
+        active=json.loads((self.state/'active.json').read_text())
+        with patch.object(runtime,'service_processes',return_value=[os.getpid(),os.getpid()+1]):
+            self.assertEqual(runtime.cleanup(self.value),2)
+        self.assertTrue((self.state/active['run_id']/'scratch').exists())
+        result=json.loads((self.state/'last-result.json').read_text())
+        self.assertFalse(result['cleanup_complete'])
+        self.assertFalse(result['scratch_removed'])
+        self.assertFalse(result['only_cleanup_process_remains'])
+        self.assertTrue((self.state/'active.json').exists())
+
+    def test_controller_death_records_actual_child_before_sigkill(self):
+        # Suppress only the destructive self-kill: the child and marker are real.
+        original_kill=os.kill
+        snapshots=[]
+        def record_kill(pid,signum):
+            self.assertEqual((pid,signum),(os.getpid(),signal.SIGKILL))
+            active=json.loads((self.state/'active.json').read_text())
+            original_kill(active['qemu_pid'],0)
+            snapshots.append(active)
+            raise RuntimeError('trusted test intercepted controller SIGKILL')
+        with patch.object(runtime.os,'kill',side_effect=record_kill):
+            result=self.run_control('controller-death')
+        self.assertEqual(len(snapshots),1)
+        self.assertEqual(snapshots[0]['control'],'controller-death')
+        self.assertIsInstance(snapshots[0]['qemu_pid'],int)
+        self.assertTrue(result['vm_started'])
+        self.assertIn('intercepted',result['error'])
+        self.assertEqual(result['exit_code'],2)
+
+    def test_last_result_observation_does_not_change_persisted_or_active_state(self):
+        report=self.run_control('pass')
+        before={p.name:p.read_bytes() for p in self.state.iterdir() if p.is_file()}
+        self.client.sendall(b'{"version":1,"operation":"last-result"}\n')
+        result=runtime.request(self.server,self.value)
+        self.assertEqual(result['result'],report)
+        self.assertEqual(result['operation'],'last-result')
+        self.assertEqual(result['exit_code'],0)
+        self.assertEqual(before,{p.name:p.read_bytes() for p in self.state.iterdir() if p.is_file()})
 
     def test_read_only_check_stop_hook_preserves_empty_state_and_older_invocation(self):
         self.assertEqual(runtime.cleanup(self.value),0)

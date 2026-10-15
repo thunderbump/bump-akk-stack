@@ -2,6 +2,7 @@
 import argparse
 import copy
 import importlib.util
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -11,8 +12,10 @@ import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[2]
+sys.path.insert(0,str(ROOT/'validation/worker'))
 spec=importlib.util.spec_from_file_location('worker_setup',ROOT/'validation/worker/setup.py')
 setup=importlib.util.module_from_spec(spec);spec.loader.exec_module(setup)
 
@@ -28,11 +31,12 @@ class FakeHost(setup.Host):
 
     def info(self,path):
         info=list(path.lstat())
-        if str(path) in self.owners:info[4],info[5]=self.owners[str(path)]
+        inode=path.lstat().st_ino
+        if inode in self.owners:info[4],info[5]=self.owners[inode]
         if path==self.path('/dev/kvm'):info[0]=stat.S_IFCHR|0o660;info[5]=3000
         return os.stat_result(info)
 
-    def chown(self,path,uid,gid):self.owners[str(path)]=(uid,gid)
+    def chown(self,path,uid,gid):self.owners[path.lstat().st_ino]=(uid,gid)
     def user(self,name):return self.users.get(name)
     def group(self,name):
         if isinstance(name,int):return next((g for g in self.groups_by_name.values() if g.gr_gid==name),None)
@@ -47,7 +51,7 @@ class FakeHost(setup.Host):
             self.groups_by_name[name]=SimpleNamespace(gr_name=name,gr_gid=gid,gr_mem=[])
         if args[1:] == ['--version']:return 'systemd 259 (259.1)\n'
         if args[1:2]==['list-units']:return ''
-        if args[0]=='/usr/sbin/apparmor_parser':
+        if args[0]=='/usr/sbin/apparmor_parser' and '--skip-kernel-load' not in args:
             self.path('/sys/kernel/security/apparmor/profiles').write_text('eqemu-validator (enforce)\n')
         if args[1:2]==['is-active']:return 'active\n'
         return ''
@@ -174,7 +178,10 @@ class WorkerSetup(unittest.TestCase):
         self.assertNotIn(' ux',profile);self.assertIn(self.args.base_image+' r,',profile)
         before=self.snapshot();calls=len(self.host.calls);self.apply()
         self.assertEqual(self.snapshot(),before)
-        self.assertEqual(self.host.calls[calls:],[['/usr/bin/systemctl','--version']])
+        calls_after=self.host.calls[calls:]
+        self.assertEqual(calls_after[0],['/usr/bin/systemctl','--version'])
+        self.assertEqual(calls_after[-3:],[['/usr/sbin/apparmor_parser','--replace','/etc/apparmor.d/eqemu-validator'],
+            ['/usr/bin/systemctl','daemon-reload'],['/usr/bin/systemctl','enable','--now','eqemu-validator.socket']])
         self.host.path(self.args.code_dir+'/validation/worker/runtime.py').write_text('# reviewed code update\n')
         self.args.apply=False;self.args.check=True
         self.assertEqual(setup.setup(self.host,self.args)['mode'],'check')
@@ -201,6 +208,162 @@ class WorkerSetup(unittest.TestCase):
                 self.assertEqual(self.snapshot(),before);self.assertEqual(self.host.calls,[])
         self.host.path('/etc/os-release').write_text('ID=other\nVERSION_ID=26.04\n');before=self.snapshot()
         with self.assertRaisesRegex(ValueError,'Ubuntu'):self.apply()
+        self.assertEqual(self.snapshot(),before)
+
+    def stage_inputs(self):
+        source=self.host.path('/reviewed-source')
+        for name in setup.staging.FILES:
+            path=source/name;path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_bytes(('reviewed '+name+'\n').encode());path.chmod(0o644)
+        image=self.host.path('/source-image');image.write_bytes(b'public image bytes');image.chmod(0o400)
+        self.host.chown(image,self.host.user('submitter').pw_uid,4002)
+        self.args.account_only=False;self.args.stage=True;self.args.base_source=str(image)
+        self.args.base_sha256=hashlib.sha256(image.read_bytes()).hexdigest()
+        replacement=patch.object(setup.staging,'SOURCE',source);replacement.start()
+        self.addCleanup(replacement.stop)
+        return source,image
+
+    def test_stage_then_full_setup_preserves_account_marker_and_reruns_without_writes(self):
+        self.apply();marker=self.host.path(setup.CONFIG).read_bytes()
+        source,image=self.stage_inputs();previous=os.umask(0o077)
+        try:report=self.apply()
+        finally:os.umask(previous)
+        self.assertTrue(report['staged_inputs']);self.assertFalse(report['runtime_ready'])
+        self.assertEqual(self.host.path(setup.CONFIG).read_bytes(),marker)
+        base=self.host.path(self.args.base_image)
+        self.assertEqual(base.read_bytes(),image.read_bytes())
+        self.assertEqual(stat.S_IMODE(base.stat().st_mode),0o644)
+        self.assertEqual(self.host.info(base).st_uid,self.host.admin_uid)
+        code=self.host.path(self.args.code_dir)
+        for name in setup.staging.FILES:
+            self.assertEqual((code/name).read_bytes(),(source/name).read_bytes())
+            self.assertEqual(self.host.info(code/name).st_uid,self.host.user('submitter').pw_uid)
+        before=self.snapshot();calls=len(self.host.calls);self.apply()
+        self.assertEqual(self.snapshot(),before)
+        calls_after=self.host.calls[calls:]
+        self.assertEqual(calls_after[0],['/usr/bin/systemctl','--version'])
+        self.assertEqual(calls_after[-3:],[['/usr/sbin/apparmor_parser','--replace','/etc/apparmor.d/eqemu-validator'],
+            ['/usr/bin/systemctl','daemon-reload'],['/usr/bin/systemctl','enable','--now','eqemu-validator.socket']])
+        self.assertEqual(list(code.parent.glob('.eqemu-code-*')),[])
+        self.assertEqual(list(base.parent.glob('.eqemu-base-*')),[])
+        self.args.stage=False;self.args.base_source=None;self.args.base_sha256=None
+        self.args.apply=False;self.args.check=True
+        self.assertEqual(setup.setup(self.host,self.args)['mode'],'check')
+
+    def test_stage_fresh_full_setup_and_dry_run(self):
+        self.stage_inputs();before=self.snapshot()
+        result=setup.setup(self.host,self.args)
+        self.assertEqual(result['mode'],'dry-run');self.assertEqual(self.snapshot(),before)
+        self.assertFalse(any(c[0]=='/usr/sbin/useradd' for c in self.host.calls))
+        result=self.apply();self.assertTrue(result['account_configured'])
+        self.assertEqual(sum(c[0]=='/usr/sbin/useradd' for c in self.host.calls),1)
+
+    def test_bad_stage_image_or_source_symlink_refuses_before_mutation(self):
+        source,image=self.stage_inputs()
+        for problem in ('hash','image-symlink','code-symlink','image-fifo'):
+            with self.subTest(problem=problem):
+                original=image.read_bytes();name=source/setup.staging.FILES[0]
+                code=name.read_bytes()
+                if problem=='hash':image.chmod(0o600);image.write_bytes(b'wrong public image')
+                elif problem=='image-symlink':image.unlink();image.symlink_to(source/setup.staging.FILES[1])
+                elif problem=='code-symlink':name.unlink();name.symlink_to(source/setup.staging.FILES[1])
+                else:image.unlink();os.mkfifo(image,0o600)
+                before=self.snapshot_without_special_files()
+                with self.assertRaises((OSError,ValueError)):self.apply()
+                self.assertEqual(self.snapshot_without_special_files(),before)
+                self.assertFalse(any(c[0]=='/usr/sbin/useradd' for c in self.host.calls))
+                if image.is_symlink() or not image.is_file():image.unlink()
+                if image.exists():image.chmod(0o600)
+                image.write_bytes(original);image.chmod(0o400)
+                self.host.chown(image,self.host.user('submitter').pw_uid,4002)
+                if name.is_symlink():name.unlink();name.write_bytes(code)
+
+    def snapshot_without_special_files(self):
+        return {str(p.relative_to(self.host.root)):(p.lstat().st_mode,
+                    p.read_bytes() if stat.S_ISREG(p.lstat().st_mode) else None)
+                for p in self.host.root.rglob('*')}
+
+    def test_stage_collision_and_writable_parent_refuse_before_policy_or_account(self):
+        source,image=self.stage_inputs();code=self.host.path(self.args.code_dir)
+        code.mkdir(mode=0o755);self.host.chown(code,self.host.user('submitter').pw_uid,4002)
+        (code/'unknown').write_bytes(b'preserve')
+        before=self.snapshot()
+        with self.assertRaisesRegex(ValueError,'unknown entries'):self.apply()
+        self.assertEqual(self.snapshot(),before)
+        (code/'unknown').unlink();code.rmdir();code.parent.chmod(0o777)
+        before=self.snapshot()
+        with self.assertRaisesRegex(ValueError,'protected destination'):self.apply()
+        self.assertEqual(self.snapshot(),before)
+        self.assertFalse(any(c[0]=='/usr/sbin/useradd' for c in self.host.calls))
+
+    def test_stage_refuses_existing_changed_code_unknown_file_and_image_without_writes(self):
+        self.stage_inputs();self.apply();code=self.host.path(self.args.code_dir)
+        runtime=code/'validation/worker/runtime.py';original=runtime.read_bytes()
+        for target,content,message in ((runtime,b'changed','differs'),
+                (code/'unknown',b'preserve','unknown entries'),
+                (self.host.path(self.args.base_image),b'changed','public base differs')):
+            with self.subTest(target=target):
+                old=target.read_bytes() if target.exists() else None
+                target.write_bytes(content);before=self.snapshot()
+                with self.assertRaisesRegex(ValueError,message):self.apply()
+                self.assertEqual(self.snapshot(),before)
+                if old is None:target.unlink()
+                else:target.write_bytes(old)
+        self.assertEqual(runtime.read_bytes(),original)
+
+    def test_stage_missing_dependencies_refuse_before_staging_anything(self):
+        self.stage_inputs();self.host.path('/usr/bin/qemu-img').unlink();before=self.snapshot()
+        with self.assertRaisesRegex(ValueError,'Missing worker packages'):self.apply()
+        self.assertEqual(self.snapshot(),before)
+        self.assertFalse(self.host.path(self.args.code_dir).exists())
+        self.assertFalse(self.host.path(self.args.base_image).exists())
+
+    def test_policy_parse_failure_refuses_before_staging_or_account_mutation(self):
+        self.stage_inputs();before=self.snapshot();original=self.host.run
+        def reject(args):
+            if args[0]=='/usr/bin/systemd-analyze':raise ValueError('invalid rendered policy')
+            return original(args)
+        self.host.run=reject
+        with self.assertRaisesRegex(ValueError,'invalid rendered policy'):self.apply()
+        self.assertEqual(self.snapshot(),before)
+        self.assertFalse(any(c[0]=='/usr/sbin/useradd' for c in self.host.calls))
+
+    def test_failed_policy_activation_is_repaired_by_full_apply_rerun(self):
+        self.stage_inputs();original=self.host.run
+        def reject(args):
+            if args[:2]==['/usr/sbin/apparmor_parser','--replace']:
+                raise ValueError('injected failed kernel profile load')
+            return original(args)
+        self.host.run=reject
+        with self.assertRaisesRegex(ValueError,'failed kernel'):self.apply()
+        marker=self.host.path(setup.CONFIG).read_bytes()
+        self.assertTrue(self.host.path('/etc/systemd/system/eqemu-validator.socket').exists())
+        self.host.run=original;self.apply()
+        self.assertEqual(self.host.path(setup.CONFIG).read_bytes(),marker)
+        self.assertEqual(self.host.calls[-1],['/usr/bin/systemctl','enable','--now','eqemu-validator.socket'])
+        self.assertEqual(sum(c[0]=='/usr/sbin/useradd' for c in self.host.calls),1)
+
+    def test_independent_staged_image_hash_detects_bad_destination_copy(self):
+        self.stage_inputs();original=setup.staging.digest
+        def corrupt(stream,destination=None):
+            result=original(stream,destination)
+            if destination is not None:destination.write(b'bad destination bytes')
+            return result
+        with patch.object(setup.staging,'digest',corrupt):
+            with self.assertRaisesRegex(ValueError,'Copied public base SHA256'):self.apply()
+        self.assertFalse(self.host.path(self.args.base_image).exists())
+        self.assertFalse(self.host.path(self.args.code_dir).exists())
+        self.assertFalse(self.host.path(setup.CONFIG).exists())
+        self.assertFalse(any(c[0]=='/usr/sbin/useradd' for c in self.host.calls))
+        self.assertEqual(list(self.host.path(self.args.base_image).parent.glob('.eqemu-base-*')),[])
+
+    def test_full_apply_refuses_live_worker_before_root_changes(self):
+        self.stage_inputs();original=self.host.run;before=self.snapshot()
+        def live(args):
+            if args[1:2]==['list-units']:return 'eqemu-validator@active.service loaded active running\n'
+            return original(args)
+        self.host.run=live
+        with self.assertRaisesRegex(ValueError,'Worker connections must be absent'):self.apply()
         self.assertEqual(self.snapshot(),before)
 
     def test_script_finds_its_assets_outside_checkout_and_help_has_no_side_effects(self):

@@ -39,6 +39,15 @@ class Client(unittest.TestCase):
             self.assertEqual(self.exchange((json.dumps(report)+'\n').encode(),
                              dict(version=1,operation='smoke',control='assertion'))['exit_code'],code)
 
+    def test_last_result_observation_preserves_nested_smoke_failure(self):
+        report=dict(version=1,scope='worker-observation',operation='last-result',exit_code=0,
+                    result={'exit_code':2,'cleanup_complete':False})
+        self.assertEqual(self.exchange((json.dumps(report)+'\n').encode(),
+                         dict(version=1,operation='last-result')),report)
+        self.assertEqual(self.received['operation'],'last-result')
+        with self.assertRaisesRegex(RuntimeError,'Incomplete last-result'):
+            self.exchange(b'{"version":1,"exit_code":0}\n',dict(version=1,operation='last-result'))
+
     def test_missing_large_malformed_and_incomplete_success_refuse(self):
         for data in (b'',b'{}\n',b'x'*(client.REPORT_LIMIT+1)+b'\n',
                      b'{"version":1,"exit_code":0}\n'):

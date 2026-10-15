@@ -30,7 +30,7 @@ CLOUD_LOCALDS = '/usr/bin/cloud-localds'
 SECONDS = 300
 LOG_LIMIT = 1024**2
 BASE_LIMIT = 2 * 1024**3
-CONTROLS = ('pass', 'assertion', 'missing-result', 'deadline')
+CONTROLS = ('pass', 'assertion', 'missing-result', 'deadline', 'controller-death')
 
 
 class CleanupError(RuntimeError):
@@ -81,14 +81,23 @@ def config(path=CONFIG):
     return value
 
 
-def resource_state():
-    """Observe the actual service cgroup, including children, rather than unit text."""
+def service_cgroup():
+    """Locate this invocation's actual cgroup, shared by its child processes."""
     location = Path('/proc/self/cgroup').read_text().strip().splitlines()
     row = next(line for line in location if line.startswith('0::'))
     relative = row[3:].lstrip('/')
     if '..' in Path(relative).parts:
         raise ValueError('Unexpected cgroup path')
-    root = Path('/sys/fs/cgroup') / relative
+    return Path('/sys/fs/cgroup') / relative
+
+
+def service_processes():
+    return sorted(int(pid) for pid in (service_cgroup() / 'cgroup.procs').read_text().split())
+
+
+def resource_state():
+    """Observe the actual service cgroup, including children, rather than unit text."""
+    root = service_cgroup()
     values = {name: (root / name).read_text().strip() for name in ('memory.max', 'memory.swap.max', 'pids.max', 'cpu.max')}
     status = dict(line.split(':', 1) for line in Path('/proc/self/status').read_text().splitlines() if ':' in line)
     values.update(no_new_privileges=status['NoNewPrivs'].strip(), effective_capabilities=status['CapEff'].strip())
@@ -191,17 +200,34 @@ def cleanup(value):
         active = Path(value['state_dir']) / 'active.json'
         if active.exists():
             record = read_json(active)
-            if (set(record) != {'run_id', 'invocation_id'} or record['invocation_id'] != invocation()
+            if (set(record) != {'run_id', 'invocation_id', 'control', 'qemu_pid'}
+                    or record['invocation_id'] != invocation()
+                    or record['control'] not in CONTROLS
+                    or (record['qemu_pid'] is not None and (type(record['qemu_pid']) is not int or record['qemu_pid'] <= 0))
                     or not re.fullmatch('[a-f0-9]{32}', record['run_id'])):
                 raise ValueError('Unexpected active job record')
             job = Path(value['state_dir']) / record['run_id']
-            if job.exists():
-                if job.is_symlink() or not job.is_dir() or job.stat().st_uid != os.geteuid():
-                    raise ValueError('Unexpected active job directory')
-                scratch_cleanup(job)
-            atomic_json(Path(value['state_dir']) / 'last-result.json', {'version': 1, 'scope': 'worker-smoke', 'run_id': record['run_id'],
-                        'exit_code': 2, 'error': 'Controller stopped before final completion',
-                        'cleanup_complete': False, 'scratch_removed': True})
+            report = {'version': 1, 'operation': 'smoke', 'scope': 'worker-smoke', 'run_id': record['run_id'],
+                      'control': record['control'], 'qemu_pid': record['qemu_pid'],
+                      'vm_started': record['qemu_pid'] is not None, 'exit_code': 2,
+                      'error': 'Controller stopped before final completion',
+                      'cleanup_complete': False, 'scratch_removed': False}
+            try:
+                processes = service_processes()
+                report['service_processes'] = processes
+                report['only_cleanup_process_remains'] = processes == [os.getpid()]
+                if not report['only_cleanup_process_remains']:
+                    raise CleanupError('Service cgroup still contains another process')
+                if job.exists():
+                    if job.is_symlink() or not job.is_dir() or job.stat().st_uid != os.geteuid():
+                        raise ValueError('Unexpected active job directory')
+                    scratch_cleanup(job)
+                report['scratch_removed'] = True
+            except (OSError, ValueError, CleanupError) as error:
+                report['cleanup_error'] = str(error)[:1000]
+            atomic_json(Path(value['state_dir']) / 'last-result.json', report)
+            if not report['scratch_removed']:
+                return 2  # Retain the active marker and scratch when process absence is uncertain.
             if (job / 'serial.log').exists():
                 os.replace(job / 'serial.log', Path(value['state_dir']) / 'last-serial.log')
             if job.exists():
@@ -258,12 +284,16 @@ def stop_process(process):
         raise CleanupError('Owned process cleanup could not be confirmed') from error
 
 
-def supervise(args, scratch, log, connection, deadline, nonce):
+def supervise(args, scratch, log, connection, deadline, nonce, on_started=None):
     process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                cwd=scratch, start_new_session=True, close_fds=True,
                                env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': str(scratch)})
     output = bytearray()
     try:
+        if on_started is not None:
+            if process.poll() is not None:
+                raise RuntimeError('QEMU exited before ownership was recorded')
+            on_started(process.pid)
         os.set_blocking(process.stdout.fileno(), False)
         with selectors.DefaultSelector() as selector, log.open('xb') as stream:
             selector.register(process.stdout, selectors.EVENT_READ)
@@ -315,7 +345,8 @@ def smoke(value, connection, control='pass'):
             raise RuntimeError('Worker readiness failed')
         if shutil.disk_usage(state).free < 10 * 1024**3:
             raise RuntimeError('Smoke needs 10 GiB free space')
-        atomic_json(active, {'run_id': run_id, 'invocation_id': invocation()})
+        active_record = {'run_id': run_id, 'invocation_id': invocation(), 'control': control, 'qemu_pid': None}
+        atomic_json(active, active_record)
         job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
         deadline = time.monotonic() + SECONDS
         base = root_file(value['base_image'])
@@ -330,8 +361,16 @@ def smoke(value, connection, control='pass'):
                 '-sandbox', 'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny',
                 '-drive', 'file=' + str(scratch / 'disk.qcow2') + ',if=virtio,format=qcow2,cache=none',
                 '-drive', 'file=' + str(scratch / 'seed.iso') + ',media=cdrom,readonly=on,format=raw']
-        report['vm_started'] = True
-        report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id)
+        def started(pid):
+            report['vm_started'] = True
+            report['qemu_pid'] = pid
+            active_record['qemu_pid'] = pid
+            atomic_json(active, active_record)
+            if control == 'controller-death':
+                # Explicit qualification control: bypass Python finally, exercising systemd's
+                # cgroup kill and ExecStopPost rather than the controller's normal cleanup.
+                os.kill(os.getpid(), signal.SIGKILL)
+        report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started)
     except Exception as error:
         report['error'] = str(error)[:1000]
         report['exit_code'] = 2
@@ -378,6 +417,9 @@ def request(connection, value):
         raise ValueError('Unsupported worker request')
     if data == {'version': 1, 'operation': 'check'}:
         return ready(value)
+    if data == {'version': 1, 'operation': 'last-result'}:
+        return {'version': 1, 'operation': 'last-result', 'scope': 'worker-observation',
+                'exit_code': 0, 'result': read_json(Path(value['state_dir']) / 'last-result.json')}
     if set(data) != {'version', 'operation', 'control'} or data['operation'] != 'smoke' or data['control'] not in CONTROLS:
         raise ValueError('Unsupported worker operation')
     connection.settimeout(None)  # MSG_DONTWAIT EOF probes must not inherit the request-read timeout.

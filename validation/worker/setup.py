@@ -9,11 +9,14 @@ import re
 import stat
 import subprocess
 import sys
+import tempfile
+
+import staging
 
 CONFIG = '/etc/eqemu-validator/config.json'
 SOCKET = '/run/eqemu-validator.sock'
 TEMPLATES = Path(__file__).with_name('templates')
-TOOLS = ('/usr/sbin/useradd', '/usr/bin/systemctl', '/usr/sbin/apparmor_parser',
+TOOLS = ('/usr/sbin/useradd', '/usr/bin/systemctl', '/usr/bin/systemd-analyze', '/usr/sbin/apparmor_parser',
          '/usr/bin/python3', '/usr/bin/qemu-system-x86_64', '/usr/bin/qemu-img',
          '/usr/bin/cloud-localds')
 
@@ -132,6 +135,21 @@ def assets(args, submitter_group):
     return result
 
 
+def verify_policy(host, files):
+    """Parse exactly the rendered policy without loading it or changing host units."""
+    with tempfile.TemporaryDirectory(prefix='eqemu-worker-policy-') as temporary:
+        paths = {}
+        for target, data in files.items():
+            path = Path(temporary)/Path(target).name
+            path.write_bytes(data)
+            paths[target] = str(path)
+        host.run(['/usr/sbin/apparmor_parser','--skip-kernel-load','--skip-cache',
+                  paths['/etc/apparmor.d/eqemu-validator']])
+        host.run(['/usr/bin/systemd-analyze','verify','--generators=no','--man=no',
+                  paths['/etc/systemd/system/eqemu-validator.socket'],
+                  paths['/etc/systemd/system/eqemu-validator@.service']])
+
+
 def inspect(host, args):
     """Finish all refusal checks before account, file or service mutation."""
     for name in (args.user,args.submitter):
@@ -189,6 +207,7 @@ def inspect(host, args):
     if not worker and (not parent.is_file() or not os.access(parent,os.X_OK)):
         raise ValueError('Missing account setup dependency: useradd')
     if not os.access(host.path('/usr/sbin/nologin'),os.X_OK):raise ValueError('Missing non-login shell: nologin')
+    stage = staging.prepare(host,args,submitter)
     files = {} if args.account_only else assets(args,submitter_group.gr_name)
     dependencies = []
     if not args.account_only:
@@ -196,20 +215,21 @@ def inspect(host, args):
             target=host.path(tool)
             if not target.is_file() or not os.access(target,os.X_OK):dependencies.append(tool)
         if dependencies:raise ValueError('Missing worker packages/tools: '+', '.join(dependencies))
-        ancestors(host,host.path(code))
-        for suffix in ('','validation','validation/worker','scripts'):
+        if stage is None or stage['code_exists']:
+            ancestors(host,host.path(code))
+        for suffix in (() if stage is not None and not stage['code_exists'] else ('','validation','validation/worker','scripts')):
             info=safe(host,host.path(code/suffix),uid=submitter.pw_uid,directory=True)
             if info.st_mode & 0o005 != 0o005:raise ValueError('Code directories must be worker-readable/traversable')
-        for suffix in ('validation/worker/runtime.py','validation/worker/guest.py',
-                       'validation/worker/client.py','scripts/check-validation-worker'):
+        for suffix in (() if stage is not None and not stage['code_exists'] else staging.FILES):
             runtime=host.path(code/suffix)
             info=safe(host,runtime,uid=submitter.pw_uid)
             if not info.st_mode & 0o004 or not info.st_size:
                 raise ValueError('Required worker asset must be readable and nonempty: '+suffix)
             if suffix.startswith('scripts/') and not info.st_mode & 0o001:
                 raise ValueError('Ordinary check command must be executable')
-        image = public_path(host,args.base_image,uid=host.admin_uid)
-        if not 0 < image.stat().st_size <= 2*1024**3:raise ValueError('Public base image must be 1 byte to 2 GiB')
+        if stage is None or stage['base_exists']:
+            image = public_path(host,args.base_image,uid=host.admin_uid)
+            if not 0 < image.stat().st_size <= 2*1024**3:raise ValueError('Public base image must be 1 byte to 2 GiB')
         kvm = host.info(host.path('/dev/kvm'));group=host.group('kvm')
         if not stat.S_ISCHR(kvm.st_mode) or not group or kvm.st_gid != group.gr_gid or kvm.st_mode & 0o060 != 0o060:
             raise ValueError('KVM requires the existing kvm device group with read/write access')
@@ -220,21 +240,23 @@ def inspect(host, args):
         version=host.run(['/usr/bin/systemctl','--version']).splitlines()[0]
         match=re.match(r'systemd ([0-9]+)\b',version)
         if not match or int(match[1])<259:raise ValueError('Worker policy requires systemd 259 or newer')
+        verify_policy(host,files)
         for target,data in files.items():
             path=host.path(target);ancestors(host,path)
             if present(path):
                 safe(host,path,uid=host.admin_uid)
                 if prior is None or path.read_bytes()!=data:
                     raise ValueError('Conflicting existing worker policy: '+target)
-        if any(not present(host.path(target)) for target in files):
+        if not args.check:
             units=host.run(['/usr/bin/systemctl','list-units','--all','--no-legend','--plain','eqemu-validator@*.service'])
             if units.strip():raise ValueError('Worker connections must be absent before initial policy installation')
-            if present(host.path(SOCKET)):raise ValueError('Refusing an existing submission socket before policy installation')
+            if (any(not present(host.path(target)) for target in files) and present(host.path(SOCKET))):
+                raise ValueError('Refusing an existing submission socket before policy installation')
             profiles=host.path('/sys/kernel/security/apparmor/profiles').read_text().splitlines()
             if (any(line.startswith('eqemu-validator (') for line in profiles)
                     and not present(host.path('/etc/apparmor.d/eqemu-validator'))):
                 raise ValueError('Refusing to replace an unknown loaded AppArmor profile')
-    return worker,submitter,files
+    return worker,submitter,files,stage
 
 
 def write(host, path, data, mode=0o644):
@@ -250,7 +272,7 @@ def write(host, path, data, mode=0o644):
 
 
 def setup(host, args):
-    worker,submitter,files=inspect(host,args)
+    worker,submitter,files,stage=inspect(host,args)
     configured = worker is not None and present(host.path(CONFIG))
     if args.check:
         if not configured:raise ValueError('Worker account has not been set up')
@@ -262,6 +284,7 @@ def setup(host, args):
                 raise ValueError('Worker socket is inactive')
     if args.apply:
         if os.geteuid()!=0 and host.root==Path('/'):raise ValueError('--apply requires root')
+        if stage is not None:staging.publish(host,args,submitter,stage)
         if not worker:
             host.run(['/usr/sbin/useradd','--system','--user-group','--no-create-home',
                       '--home-dir',args.state_dir,'--shell','/usr/sbin/nologin',
@@ -276,9 +299,8 @@ def setup(host, args):
         if not present(host.path(CONFIG)):config_dir.chmod(0o755)
         data=(json.dumps(configuration(args,worker),sort_keys=True,indent=2)+'\n').encode()
         write(host,host.path(CONFIG),data)
-        new_policy=any(not present(host.path(target)) for target in files)
         for target,data in files.items():write(host,host.path(target),data)
-        if new_policy:
+        if files:
             host.run(['/usr/sbin/apparmor_parser','--replace','/etc/apparmor.d/eqemu-validator'])
             host.run(['/usr/bin/systemctl','daemon-reload'])
             host.run(['/usr/bin/systemctl','enable','--now','eqemu-validator.socket'])
@@ -289,6 +311,8 @@ def setup(host, args):
                 next_step='Full setup, read-only worker check and explicit smoke remain pending' if args.account_only
                           else 'Ordinary worker check and explicit smoke remain pending; no VM was started',
                 dependency_scope='account-only' if args.account_only else 'full-worker',
+                staged_inputs=stage is not None,
+                public_base_sha256=stage['image_sha256'] if stage else None,
                 owned_policy_files=sorted(files),socket=SOCKET)
 
 
@@ -299,6 +323,9 @@ def main(argv=None):
     parser.add_argument('--submitter',required=True,help='Existing local account allowed to submit')
     parser.add_argument('--code-dir',default='/srv/eqemu-validator-code',help='Reviewed submitter-owned checkout outside home directories')
     parser.add_argument('--base-image',default='/var/lib/eqemu-validator-inputs/base.qcow2',help='Root-staged public image outside worker state')
+    parser.add_argument('--stage',action='store_true',help='Stage this checkout’s finite runtime and the explicitly hashed public image before full setup')
+    parser.add_argument('--base-source',help='Existing ordinary public cloud image to copy as data; no download')
+    parser.add_argument('--base-sha256',help='Required SHA256 of --base-source when staging')
     mode=parser.add_mutually_exclusive_group()
     mode.add_argument('--apply',action='store_true',help='Create the account and install policy; requires root')
     mode.add_argument('--check',action='store_true',help='Read-only verification of installed setup')
