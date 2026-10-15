@@ -29,11 +29,16 @@ class Transfer(unittest.TestCase):
         def coalesced(fd, count):
             block = original_read(fd, count)
             if count == 65536 and block:
-                while len(block) < len(data):
-                    extra = original_read(fd, count - len(block))
-                    if not extra: break
-                    block += extra
+                os.set_blocking(fd, True)
+                try:
+                    while len(block) < len(data):
+                        extra = original_read(fd, count - len(block))
+                        if not extra: break
+                        block += extra
+                finally:
+                    os.set_blocking(fd, False)
             return block
+        self.addCleanup(setattr, build_guest, 'DEADLINE', build_guest.DEADLINE)
         build_guest.DEADLINE = time.monotonic() + 10
         with patch.object(build_guest.os, 'read', side_effect=coalesced), self.assertRaises(RuntimeError) as caught:
             build_guest.command('trusted-large-read-fixture',
