@@ -22,6 +22,25 @@ import test_runtime
 
 
 class Transfer(unittest.TestCase):
+    def test_early_infrastructure_diagnostic_survives_large_read(self):
+        # Coalesce real pipe reads to exercise platforms with a larger pipe buffer.
+        data = b'failed to select a version for the requirement cxx\n' + b'x' * 20000
+        original_read = os.read
+        def coalesced(fd, count):
+            block = original_read(fd, count)
+            if count == 65536 and block:
+                while len(block) < len(data):
+                    extra = original_read(fd, count - len(block))
+                    if not extra: break
+                    block += extra
+            return block
+        build_guest.DEADLINE = time.monotonic() + 10
+        with patch.object(build_guest.os, 'read', side_effect=coalesced), self.assertRaises(RuntimeError) as caught:
+            build_guest.command('trusted-large-read-fixture',
+                                [sys.executable, '-c', 'import os; os.write(1,' + repr(data) + '); raise SystemExit(101)'],
+                                candidate=True)
+        self.assertIs(type(caught.exception), RuntimeError)
+
     def test_streaming_hash_and_disconnect(self):
         with tempfile.TemporaryDirectory() as tmp:
             for mode in ('pass', 'changed', 'disconnect'):

@@ -64,8 +64,9 @@ def command(name, args, *, cwd=None, candidate=False, seconds=900):
                     total += len(block)
                     if total > 32 * 1024**2:
                         raise RuntimeError(name + ': output limit exceeded')
-                    tail.extend(block); del tail[:-8192]
+                    tail.extend(block)
                     infrastructure_failure |= bool(INFRASTRUCTURE.search(tail.decode(errors='replace')))
+                    del tail[:-8192]
                     # Console is the retained diagnostic channel. No artifact/export protocol.
                     offset = 0
                     while offset < len(block):
