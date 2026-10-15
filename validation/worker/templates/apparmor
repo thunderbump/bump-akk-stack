@@ -1,0 +1,29 @@
+# Root-controlled policy inherited by Python, tools and QEMU. No unconfined exec.
+#include <tunables/global>
+profile eqemu-validator flags=(attach_disconnected,mediate_deleted) {
+  #include <abstractions/base>
+  /{,usr/}bin/** rix,
+  /{,usr/}lib{,32,64}/** mr,
+  /usr/share/** r,
+  /etc/{passwd,group,nsswitch.conf,localtime,ld.so.cache,os-release} r,
+  /etc/eqemu-validator/config.json r,
+  @CODE@/ r,
+  @CODE@/** r,
+  @BASE@ r,
+  @STATE@/ rw,
+  @STATE@/** rwk,
+  /tmp/ rw,
+  /tmp/** rwk,
+  /dev/kvm rw,
+  /dev/{null,zero,random,urandom} rw,
+  owner /proc/*/{status,cgroup,stat,statm,maps,cmdline,auxv} r,
+  owner /proc/*/attr/current r,
+  owner /proc/*/fd/ r,
+  /proc/{cpuinfo,meminfo,sys/kernel/random/boot_id} r,
+  /sys/fs/cgroup/** r,
+  /sys/devices/system/cpu/** r,
+  /sys/kernel/mm/transparent_hugepage/hpage_pmd_size r,
+  network unix,
+  signal (send,receive) peer=eqemu-validator,
+  signal (receive) peer=unconfined,
+}

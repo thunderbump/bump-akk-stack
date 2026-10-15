@@ -1,0 +1,14 @@
+[Unit]
+Description=Local EQEmu validation worker submissions
+
+[Socket]
+ListenStream=@SOCKET@
+SocketUser=root
+SocketGroup=@SUBMITTER_GROUP@
+SocketMode=0660
+Accept=yes
+MaxConnections=1
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target
