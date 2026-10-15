@@ -87,7 +87,7 @@ class WorkerSetup(unittest.TestCase):
         (code/'validation/worker').mkdir(parents=True)
         (code/'scripts').mkdir()
         for name in ('validation/worker/runtime.py','validation/worker/guest.py',
-                     'validation/worker/client.py','scripts/check-validation-worker'):
+                     'validation/worker/client.py','validation/worker/build_guest.py','scripts/check-validation-worker'):
             (code/name).write_text('"""Synthetic reviewed runtime bytes, not executed."""\n')
         for path in (code,*code.rglob('*')):
             self.host.chown(path,self.host.users['submitter'].pw_uid,4002)
@@ -171,7 +171,7 @@ class WorkerSetup(unittest.TestCase):
         profile=self.host.path('/etc/apparmor.d/eqemu-validator').read_text()
         self.assertIn('SocketGroup=submitter',socket);self.assertIn('MaxConnections=1',socket)
         for text in ('User=eqemu-validator','StandardInput=socket','PrivateNetwork=yes',
-                     'ProtectHome=yes','MemoryMax=2G','MemorySwapMax=0','KillMode=control-group',
+                     'ProtectHome=yes','MemoryMax=6G','MemorySwapMax=0','KillMode=control-group',
                      'AppArmorProfile=eqemu-validator','ExecStopPost=','DeviceAllow=/dev/kvm rw'):
             self.assertIn(text,service)
         self.assertNotIn('PrivateDevices=yes',service)

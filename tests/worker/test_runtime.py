@@ -93,7 +93,7 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         self.addCleanup(self.server.close);self.addCleanup(self.client.close)
 
     def run_control(self, control):
-        result=runtime.smoke(self.value,self.server,control)
+        result=runtime.run_vm(self.value,self.server,control)
         self.assertFalse((self.state/'active.json').exists())
         self.assertFalse(any(p.is_dir() for p in self.state.iterdir()))
         self.assertEqual(json.loads((self.state/'last-result.json').read_text()),result)
@@ -120,7 +120,7 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
 
     def test_client_death_cancels_process_and_persists_final_report(self):
         result={}
-        thread=threading.Thread(target=lambda:result.update(runtime.smoke(self.value,self.server,'deadline')))
+        thread=threading.Thread(target=lambda:result.update(runtime.run_vm(self.value,self.server,'deadline')))
         thread.start()
         time.sleep(.15);self.client.close();thread.join(3)
         self.assertFalse(thread.is_alive())
@@ -184,7 +184,7 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
 
     def test_uncertain_process_cleanup_cannot_claim_clean_result(self):
         with patch.object(runtime,'supervise',side_effect=runtime.CleanupError('owned group remains')):
-            result=runtime.smoke(self.value,self.server)
+            result=runtime.run_vm(self.value,self.server)
         self.assertEqual(result['exit_code'],2)
         self.assertFalse(result['cleanup_complete'])
         self.assertTrue((self.state/'active.json').exists())
@@ -197,7 +197,7 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
 
     def test_stop_hook_retains_scratch_if_another_service_process_remains(self):
         with patch.object(runtime,'supervise',side_effect=runtime.CleanupError('owned group remains')):
-            runtime.smoke(self.value,self.server)
+            runtime.run_vm(self.value,self.server)
         active=json.loads((self.state/'active.json').read_text())
         with patch.object(runtime,'service_processes',return_value=[os.getpid(),os.getpid()+1]):
             self.assertEqual(runtime.cleanup(self.value),2)
@@ -277,7 +277,7 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
                         with patch.object(runtime.subprocess,'Popen',side_effect=spawn), \
                              patch.object(runtime.os,'killpg',side_effect=interrupt_kill), \
                              patch.object(runtime,'SECONDS',.15):
-                            result=runtime.smoke(self.value,self.server,'deadline')
+                            result=runtime.run_vm(self.value,self.server,'deadline')
                         self.assertTrue(captured,'trusted fake QEMU must actually start')
                         self.assertIsNone(captured[-1].poll(),'signal must interrupt before the real child is killed/reaped')
                         self.assertEqual(result['exit_code'],2)
@@ -339,7 +339,7 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         lock=runtime.acquire(self.value)
         try:
             with self.assertRaisesRegex(RuntimeError,'active'):
-                runtime.smoke(self.value,self.server)
+                runtime.run_vm(self.value,self.server)
         finally:os.close(lock)
         self.assertEqual([p.name for p in self.state.iterdir()],['worker.lock'])
 
