@@ -3,6 +3,7 @@ import json
 import os
 from pathlib import Path
 import pwd
+import signal
 import socket
 import subprocess
 import sys
@@ -140,6 +141,49 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         process.wait.side_effect=subprocess.TimeoutExpired('fake qemu',10)
         with patch.object(runtime.os,'killpg'), self.assertRaises(runtime.CleanupError):
             runtime.stop_process(process)
+
+    def test_signal_interrupting_real_child_cleanup_keeps_scratch_and_nonpass_receipt(self):
+        original_popen=subprocess.Popen
+        original_killpg=os.killpg
+        captured=[]
+        def spawn(*args,**kwargs):
+            process=original_popen(*args,**kwargs)
+            if args[0][0]==runtime.QEMU:captured.append(process)
+            return process
+        def interrupt_kill(group,signum):
+            if captured and group==captured[-1].pid and signum==signal.SIGKILL:
+                os.kill(os.getpid(),signal.SIGUSR1)
+            return original_killpg(group,signum)
+        def keyboard_interrupt(*_):raise KeyboardInterrupt()
+        def system_exit(*_):raise SystemExit(2)
+        previous=signal.getsignal(signal.SIGUSR1)
+        try:
+            for handler in (runtime.interrupted,keyboard_interrupt,system_exit):
+                with self.subTest(handler=handler.__name__):
+                    signal.signal(signal.SIGUSR1,handler)
+                    try:
+                        with patch.object(runtime.subprocess,'Popen',side_effect=spawn), \
+                             patch.object(runtime.os,'killpg',side_effect=interrupt_kill), \
+                             patch.object(runtime,'SECONDS',.15):
+                            result=runtime.smoke(self.value,self.server,'deadline')
+                        self.assertTrue(captured,'trusted fake QEMU must actually start')
+                        self.assertIsNone(captured[-1].poll(),'signal must interrupt before the real child is killed/reaped')
+                        self.assertEqual(result['exit_code'],2)
+                        self.assertFalse(result['cleanup_complete'])
+                        active=json.loads((self.state/'active.json').read_text())
+                        self.assertTrue((self.state/active['run_id']/'scratch').is_dir())
+                        self.assertEqual(json.loads((self.state/'last-result.json').read_text()),result)
+                    finally:
+                        # The production service owns rescue after uncertain cleanup. This trusted
+                        # test explicitly reaps its still-live child before exercising that hook.
+                        for process in captured:
+                            if process.poll() is None:
+                                original_killpg(process.pid,signal.SIGKILL)
+                            process.wait(timeout=3)
+                            if process.stdout is not None:process.stdout.close()
+                        captured.clear()
+                        runtime.cleanup(self.value)
+        finally:signal.signal(signal.SIGUSR1,previous)
 
     def test_socket_activated_child_controller_survives_client_death_for_cleanup(self):
         script=self.root/'controller.py'

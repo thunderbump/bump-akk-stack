@@ -252,7 +252,9 @@ def stop_process(process):
         raise CleanupError('Owned process group remains')
     except CleanupError:
         raise
-    except (OSError, subprocess.TimeoutExpired) as error:
+    except BaseException as error:
+        # Signal handlers and interpreter cancellation can interrupt kill/wait too.
+        # Until every cleanup step returns, callers must retain the owned scratch.
         raise CleanupError('Owned process cleanup could not be confirmed') from error
 
 
