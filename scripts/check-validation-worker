@@ -1,0 +1,8 @@
+#!/usr/bin/python3 -I
+"""Inspect the configured worker; --smoke explicitly starts its tiny disposable VM."""
+import sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'validation' / 'worker'))
+from client import main
+raise SystemExit(main())
