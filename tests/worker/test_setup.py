@@ -175,7 +175,7 @@ class WorkerSetup(unittest.TestCase):
                      'AppArmorProfile=eqemu-validator','ExecStopPost=','DeviceAllow=/dev/kvm rw'):
             self.assertIn(text,service)
         self.assertNotIn('PrivateDevices=yes',service)
-        self.assertNotIn(' ux',profile);self.assertIn(self.args.base_image+' r,',profile)
+        self.assertNotIn(' ux',profile);self.assertIn(self.args.base_image+' rk,',profile)
         before=self.snapshot();calls=len(self.host.calls);self.apply()
         self.assertEqual(self.snapshot(),before)
         calls_after=self.host.calls[calls:]
