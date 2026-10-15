@@ -365,6 +365,8 @@ def smoke(value, connection, control='pass'):
         tool([GENISOIMAGE, '-output', str(scratch / 'seed.iso'), '-volid', 'cidata', '-joliet', '-rock',
               str(scratch / 'user-data'), str(scratch / 'meta-data')], deadline)
         args = [QEMU, '-no-user-config', '-nodefaults', '-machine', 'q35,accel=kvm', '-cpu', 'host', '-smp', '2', '-m', '1024',
+                # Leave room beneath TasksMax for vCPUs, supervision and bounded I/O workers.
+                '-object', 'main-loop,id=main-loop,thread-pool-min=0,thread-pool-max=8',
                 '-nic', 'none', '-display', 'none', '-monitor', 'none', '-serial', 'stdio', '-no-reboot',
                 '-sandbox', 'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny',
                 '-drive', 'file=' + str(scratch / 'disk.qcow2') + ',if=virtio,format=qcow2,cache=none',

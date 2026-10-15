@@ -140,6 +140,8 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         self.assertEqual(argv[argv.index('-nic')+1],'none')
         self.assertEqual(argv[argv.index('-monitor')+1],'none')
         self.assertNotIn('-daemonize',argv)
+        self.assertEqual(argv[argv.index('-object')+1],
+                         'main-loop,id=main-loop,thread-pool-min=0,thread-pool-max=8')
         self.assertEqual(argv[argv.index('-sandbox')+1],
                          'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny')
         self.assertEqual(result['exit_code'],0)
