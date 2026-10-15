@@ -155,6 +155,20 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
             str(scratch / 'user-data'), str(scratch / 'meta-data'),
         ])
 
+    def test_qemu_failure_reports_bounded_stderr_and_keeps_owned_cleanup(self):
+        Path(runtime.QEMU).write_text('#!' + sys.executable + '\n'
+            'import sys,time\n'
+            'sys.stderr.write("x"*2000 + " QEMU_FATAL_CONTROL\\n")\n'
+            'sys.stderr.flush()\n'
+            'time.sleep(.1)\n'
+            'raise SystemExit(7)\n')
+        result = self.run_control('pass')
+        self.assertEqual(result['exit_code'], 2)
+        self.assertTrue(result['cleanup_complete'])
+        self.assertIn('7', result['error'])
+        self.assertIn('QEMU_FATAL_CONTROL', result['error'])
+        self.assertLessEqual(len(result['error']), 1000)
+
     def test_output_overflow_and_duplicate_or_malformed_completion_never_pass(self):
         for output in ('x'*(runtime.LOG_LIMIT+1), 'EQEMU_WORKER_RESULT {}\n',
                        'EQEMU_WORKER_RESULT {}\nEQEMU_WORKER_RESULT {}\n'):

@@ -316,8 +316,10 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None):
                     if len(output) + len(block) > LOG_LIMIT:
                         raise RuntimeError('Smoke serial output limit exceeded')
                     output.extend(block); stream.write(block); stream.flush()
-            if process.wait(timeout=5) != 0:
-                raise RuntimeError('QEMU failed')
+            code = process.wait(timeout=5)
+            if code != 0:
+                detail = output[-900:].decode(errors='replace').strip()
+                raise RuntimeError('QEMU exited ' + str(code) + ': ' + detail)
     finally:
         stop_process(process)
         process.stdout.close()
