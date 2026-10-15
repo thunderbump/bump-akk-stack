@@ -4,12 +4,26 @@ import json
 from pathlib import Path
 import socket
 import sys
+import time
 
 CONFIG = Path('/etc/eqemu-validator/config.json')
 REPORT_LIMIT = 16384
 
 
 def exchange(path, request, payload=None):
+    """Read-only probes may briefly race systemd's previous connection teardown."""
+    deadline = time.monotonic() + 2
+    while True:
+        try:
+            return exchange_once(path, request, payload)
+        except (ConnectionResetError, BrokenPipeError):
+            # Never retry a build/smoke request: it may already have started a VM.
+            if request['operation'] not in ('check', 'last-result') or time.monotonic() >= deadline:
+                raise
+            time.sleep(.1)
+
+
+def exchange_once(path, request, payload=None):
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
         connection.settimeout(18330 if request['operation'] == 'build' else 330 if request['operation'] == 'smoke' else 15)
         connection.connect(str(path))

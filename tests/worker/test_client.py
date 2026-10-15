@@ -6,6 +6,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest.mock import patch
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'validation/worker'))
@@ -13,6 +14,13 @@ import client
 
 
 class Client(unittest.TestCase):
+    def test_execution_requests_are_never_retried_after_connection_reset(self):
+        for operation in ('build', 'smoke'):
+            with self.subTest(operation=operation), patch.object(client, 'exchange_once', side_effect=ConnectionResetError) as once:
+                with self.assertRaises(ConnectionResetError):
+                    client.exchange('/unused', dict(version=1,operation=operation))
+                once.assert_called_once()
+
     def exchange(self,result,request=None):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'worker.sock'
@@ -26,6 +34,31 @@ class Client(unittest.TestCase):
                 thread=threading.Thread(target=respond);thread.start()
                 try:return client.exchange(path,request or {'version':1,'operation':'check'})
                 finally:thread.join(2)
+
+    def test_readiness_retries_a_connection_dropped_during_previous_service_cleanup(self):
+        report = dict(version=1,scope='worker-readiness',operation='check',exit_code=0,
+                      vm_started=False,checks={'kvm':True})
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp)/'busy.sock'
+            with socket.socket(socket.AF_UNIX,socket.SOCK_STREAM) as server:
+                server.bind(str(path));server.listen(2);server.settimeout(.8)
+                errors = []
+                def respond():
+                    try:
+                        first,_ = server.accept()
+                        first.close()  # Mirrors systemd MaxConnections dropping a new connection.
+                        second,_ = server.accept()
+                        with second:
+                            second.recv(4096)
+                            second.sendall((json.dumps(report)+'\n').encode())
+                    except Exception as error:
+                        errors.append(error)
+                thread=threading.Thread(target=respond);thread.start()
+                try:
+                    self.assertEqual(client.exchange(path,dict(version=1,operation='check')),report)
+                finally:
+                    thread.join(2)
+                self.assertFalse(errors,errors)
 
     def test_read_only_request_and_readiness_report(self):
         report=dict(version=1,scope='worker-readiness',operation='check',exit_code=0,vm_started=False,checks={'kvm':True})
