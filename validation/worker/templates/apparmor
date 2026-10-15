@@ -9,7 +9,7 @@ profile eqemu-validator flags=(attach_disconnected,mediate_deleted) {
   /etc/eqemu-validator/config.json r,
   @CODE@/ r,
   @CODE@/** r,
-  @BASE@ r,
+  @BASE@ rk,
   @STATE@/ rw,
   @STATE@/** rwk,
   /tmp/ rw,
