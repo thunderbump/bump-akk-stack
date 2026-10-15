@@ -254,6 +254,7 @@ def verify(directory, expected_manifest, profile, expected_input=None):
 
 def prepare(profile, repositories, store, output):
     """Publish one verified source package; failures remove only this call's scratch."""
+    store = Path(store).resolve(strict=True)
     output = Path(output).absolute()
     if output.exists() or output.is_symlink():
         raise ValueError('Output already exists; preserve the prepared input')

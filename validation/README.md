@@ -30,7 +30,7 @@ Run the prepared `install.py` once with sudo after administrator review and sepa
 
 Each request verifies the current user's existing NSS membership in `eqemu-test`. If the process inherited stale supplementary groups, only the fixed no-argument sudo helper runs through `sg eqemu-test`; its JSON input remains on stdin. Nonmembers refuse without a prompt or membership/policy change.
 
-Admission can inspect retained terminal receipts from exactly three prior package manifests: `b193e5db558ff5346177941ca531b4ab26228f9aad7bbc7942ab33cd3311498a` `fc320a5152c47403f85332c35f14cf61482a3b1b95d52d68ea557382aeaa8c97`, and `a1eec9b33bbca1ba1d3c4b8911a1827ca1b1dd4d2ef72657699a0569201ba83a`. The administrator-owned prior release must remain installed with all original files and profile seals intact. The helper verifies candidate/build identity, sealed generated recipes, saved completion and live resource absence without rewriting receipts, removing media or stopping old units. Active, unknown or unverifiable prior releases block admission. Public status and cancel remain bound to the current release.
+Admission can inspect retained terminal receipts from only the eight explicit prior package manifests in `host.py::PRIOR_MANIFESTS`. The administrator-owned prior release must remain installed with all original files and profile seals intact. The helper verifies candidate/build identity, sealed generated recipes, saved completion and live resource absence without rewriting receipts, removing media or stopping old units. Active, unknown or unverifiable prior releases block admission. Public status and cancel remain bound to the current release.
 
 The fixed profile retains a 180 GiB admission / 100 GiB emergency reserve, 32 GiB guest root, 4 GiB transfer artifact, one compile job and 18,000-second supervisor. Eight retained runs block admission pending exact-owned archival. Source uploads and generated media are bounded. No saved-world or NAS data is involved.
 
@@ -106,28 +106,42 @@ Release the original with `eqemu-validate --release-artifact <positive-run-id>`.
 
 Cheap source tests and static preparation establish this adapter's wiring. They do not establish that the future native command boots without world or passes actor assertions. Actual runtime qualification remains `.4.2` after `.7.1` supplies the command.
 
-## Direct Rust activation
+## Direct Rust profile-preserving repair
 
-The direct upgrade preparer now targets the installed source-isolation repair
-manifest `37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6`.
-Ordinary preparation still requires a byte-identical dormant profile. Use
-`validation/prepare.py --rust-contract <reviewed-contract.json>` to prepare a
-sealed enabled package, then freeze its exact profile in the root operator:
+The direct upgrade preparer targets installed Rust-enabled manifest
+`bef324e52c445c8d77ff7ac6ffe2b142b3f0f0ffd6adf60f17c16aa000b6ed21`.
+Prepare the replacement with `validation/prepare.py --with-actor --rust-contract
+<same-reviewed-contract.json>`, then freeze the ordinary repair operator:
 
 ```sh
 python3 -B validation/upgrade/prepare.py \
-  --package <sealed-package> --output <fresh-operators-directory> --activate-rust
+  --package <sealed-package> --output <fresh-operators-directory>
 ```
 
-The operator permits only the declared Rust bundle and dependency blobs over the
-unchanged native profile. Native media, runtime adapters, client configuration,
-receipts and AFK configuration remain unchanged. The existing qualified Rust VM
-proof and live quiescence gates still apply. Partial failures leave admission
-disabled and recover forward using the same checked command; there is no
-automatic rollback. Preparation and activation do not launch validation jobs.
+The replacement profile must be byte-identical to the installed enabled profile.
+This repair changes no Rust bundle, dependency blob, package/test selection or
+native media declaration. Do not use `--activate-rust` for this already-enabled
+release: that separate first-activation mode requires a dormant old profile and
+cannot rebind an enabled contract. Runtime adapters, client configuration,
+receipts and AFK configuration remain unchanged. The qualified Rust VM proof and
+live quiescence gates still apply. Partial failures leave admission disabled and
+recover forward using the same checked command; there is no automatic rollback.
+Preparation and repair do not launch validation jobs.
 
-Activation is installation, not Rust acceptance. The source-only actor workspace
-has no native CMake link yet. The next source card must build its static library
-and link `eqemu_rust_bridge_v1` into the final zone. The enabled validator retains
-that exact-zone requirement; a standalone component proof cannot satisfy it.
-Actor movement and gameplay remain separate.
+Installation remains separate from Rust qualification. The candidate must link
+`eqemu_rust_bridge_v1` into the actual final zone and pass the enabled fixture.
+A standalone component proof cannot satisfy that exact-zone requirement. Actor
+movement and gameplay remain separate.
+
+Rust source preparation accepts the JSON input-store string used by the public
+command and normalizes it to a resolved Path before copying the sealed bundle.
+Internal preparation or command exceptions return infrastructure exit2 with a
+matching final event and bounded diagnostics; they cannot masquerade as
+candidate exit1 and trigger source repair. No candidate or media contract changes.
+
+Native Rust link inspection consumes the complete `nm --defined-only` stream,
+retaining only exact bridge-name rows within a 4096-byte output bound. A defined
+text symbol in the actual final zone and its SHA-256 remain required. Tool
+failure or timeout cannot produce passing link evidence. Generated producer,
+consumer and launcher entry points disable bytecode before helper imports,
+including under `python -I`, so imports preserve the sealed package inventory.

@@ -11,7 +11,7 @@ import sys
 import tempfile
 import time
 
-OLD = '37eacfacbc1e6f55aa3a5b602a546c1c6900294c46a73892dd6105c57d991dc6'
+OLD = 'bef324e52c445c8d77ff7ac6ffe2b142b3f0f0ffd6adf60f17c16aa000b6ed21'
 ACTIVATION_PROFILE_SHA256 = None
 PROOF_UUID = '5ca42214-8aed-4335-bdde-f9f7074a57c8'
 PROOF_REPORT = '52389eefbf0e393ec6d7059f0d99b578d8652e94e17a3319fa205479d16ab3f0'
@@ -330,8 +330,8 @@ def profile_change(files, oldfiles):
     """Allow only a frozen Rust declaration over the unchanged native profile."""
     raw=files['profile.json'];profile=decode(raw)
     if ACTIVATION_PROFILE_SHA256 is None:
-        if raw!=oldfiles['profile.json'] or 'rust' in profile or 'rust' in profile.get('dependencies',{}):
-            raise ValueError('Upgrade must keep Rust dormant')
+        if raw!=oldfiles['profile.json']:
+            raise ValueError('Upgrade must preserve the installed profile')
         return
     if sha(raw)!=ACTIVATION_PROFILE_SHA256:raise ValueError('Reviewed Rust activation profile changed')
     old=decode(oldfiles['profile.json'])
