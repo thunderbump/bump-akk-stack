@@ -18,6 +18,45 @@ sys.path.insert(0, str(ROOT/'validation/worker'))
 import runtime
 
 
+class Readiness(unittest.TestCase):
+    def test_enforcing_profile_accepts_only_known_unconfined_stack_forms(self):
+        labels = {
+            'eqemu-validator (enforce)': True,
+            'eqemu-validator//&unconfined (enforce)': True,
+            'unconfined//&eqemu-validator (enforce)': True,
+            'unconfined': False,
+            'unconfined (enforce)': False,
+            'eqemu-validator (complain)': False,
+            'eqemu-validator//&unconfined (complain)': False,
+            'eqemu-validator//&unconfined (mixed)': False,
+            'eqemu-validator-extra (enforce)': False,
+            'eqemu-validator//child (enforce)': False,
+            'eqemu-validator//&other (enforce)': False,
+            'eqemu-validator//&unconfined//&other (enforce)': False,
+        }
+        limits = dict.fromkeys(('memory.max', 'pids.max'), '64')
+        limits.update({'memory.swap.max': '0', 'cpu.max': '200000 100000',
+                       'no_new_privileges': '1', 'effective_capabilities': '0'})
+        base = Mock()
+        base.stat.return_value.st_size = 1
+        value = {'base_image': '/public/base', 'submitter': 'submitter'}
+        with patch.object(runtime, 'invocation', return_value='a'*32), \
+                patch.object(runtime, 'resource_state', return_value=limits), \
+                patch.object(runtime, 'root_file', return_value=base), \
+                patch.object(runtime.os.path, 'isfile', return_value=True), \
+                patch.object(runtime.os, 'access', side_effect=lambda path, mode: path != '/home/submitter'), \
+                patch.object(runtime.os, 'open', return_value=42), \
+                patch.object(runtime.os, 'close'), \
+                patch.object(runtime.pwd, 'getpwnam', return_value=Mock(pw_dir='/home/submitter')):
+            for label, expected in labels.items():
+                with self.subTest(label=label), patch.object(runtime.Path, 'read_text', return_value=label):
+                    result = runtime.ready(value)
+                    self.assertEqual(result['observed']['apparmor'], label)
+                    self.assertIs(result['checks']['apparmor'], expected)
+                    self.assertEqual(result['exit_code'], 0 if expected else 2)
+                    self.assertFalse(result['vm_started'])
+
+
 class Runtime(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()

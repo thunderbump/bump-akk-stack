@@ -121,7 +121,12 @@ def ready(value):
         checks['kvm'] = False
     try:
         observed['apparmor'] = Path('/proc/self/attr/current').read_text().strip()
-        checks['apparmor'] = observed['apparmor'] == 'eqemu-validator (enforce)'
+        # An unconfined stack member does not remove the enforcing profile's restrictions.
+        checks['apparmor'] = observed['apparmor'] in (
+            'eqemu-validator (enforce)',
+            'eqemu-validator//&unconfined (enforce)',
+            'unconfined//&eqemu-validator (enforce)',
+        )
     except OSError:
         checks['apparmor'] = False
     try:
