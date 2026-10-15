@@ -22,6 +22,7 @@ class Runtime(unittest.TestCase):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name)
+        env=patch.dict(os.environ,INVOCATION_ID='a'*32);env.start();self.addCleanup(env.stop)
         self.state = self.root/'state'; self.state.mkdir(mode=0o700)
         self.base = self.root/'base'; self.base.write_bytes(b'trusted tiny base fixture')
         self.value = dict(version=1, user=pwd.getpwuid(os.geteuid()).pw_name,
@@ -122,6 +123,17 @@ if match:print('EQEMU_WORKER_RESULT '+match.group(1),flush=True)
         self.assertEqual(recovery['exit_code'],2)
         self.assertFalse(recovery['cleanup_complete'])
         self.assertTrue(recovery['scratch_removed'])
+
+    def test_read_only_check_stop_hook_preserves_empty_state_and_older_invocation(self):
+        self.assertEqual(runtime.cleanup(self.value),0)
+        self.assertEqual(list(self.state.iterdir()),[])
+        job=self.state/('b'*32);job.mkdir();(job/'scratch').mkdir()
+        runtime.atomic_json(self.state/'active.json',dict(run_id='b'*32,invocation_id='c'*32))
+        before={str(p):p.read_bytes() for p in self.state.rglob('*') if p.is_file()}
+        self.assertEqual(runtime.cleanup(self.value),0)
+        self.assertEqual(before,{str(p):p.read_bytes() for p in self.state.rglob('*') if p.is_file()})
+        self.assertTrue((job/'scratch').exists())
+        self.assertFalse((self.state/'worker.lock').exists())
 
     def test_actual_reaping_uncertainty_remains_distinct(self):
         process=Mock(pid=12345)

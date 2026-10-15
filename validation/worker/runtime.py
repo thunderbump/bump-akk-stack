@@ -98,6 +98,10 @@ def resource_state():
 def ready(value):
     observed = {'uid': os.geteuid(), 'gid': os.getegid(), 'user': pwd.getpwuid(os.geteuid()).pw_name}
     checks = {}
+    try:
+        observed['invocation_id'] = invocation(); checks['systemd_invocation'] = True
+    except ValueError:
+        checks['systemd_invocation'] = False
     for name, tool in (('qemu', QEMU), ('qemu_img', QEMU_IMG), ('cloud_localds', CLOUD_LOCALDS)):
         checks[name] = os.path.isfile(tool) and os.access(tool, os.X_OK)
     try:
@@ -165,8 +169,20 @@ def scratch_cleanup(job):
         scratch.rmdir()
 
 
+def invocation():
+    identity = os.environ.get('INVOCATION_ID', '')
+    if not re.fullmatch('[a-f0-9]{32}', identity):
+        raise ValueError('Worker requires its systemd invocation identity')
+    return identity
+
+
 def cleanup(value):
-    """ExecStopPost recovery removes only recorded scratch, never kills stale JSON PIDs."""
+    """ExecStopPost recovers this invocation only; checks never mutate older jobs."""
+    active = Path(value['state_dir']) / 'active.json'
+    if not active.exists():
+        return 0
+    if read_json(active).get('invocation_id') != invocation():
+        return 0
     try:
         lock = acquire(value)
     except RuntimeError:
@@ -175,7 +191,8 @@ def cleanup(value):
         active = Path(value['state_dir']) / 'active.json'
         if active.exists():
             record = read_json(active)
-            if set(record) != {'run_id'} or not re.fullmatch('[a-f0-9]{32}', record['run_id']):
+            if (set(record) != {'run_id', 'invocation_id'} or record['invocation_id'] != invocation()
+                    or not re.fullmatch('[a-f0-9]{32}', record['run_id'])):
                 raise ValueError('Unexpected active job record')
             job = Path(value['state_dir']) / record['run_id']
             if job.exists():
@@ -296,7 +313,7 @@ def smoke(value, connection, control='pass'):
             raise RuntimeError('Worker readiness failed')
         if shutil.disk_usage(state).free < 10 * 1024**3:
             raise RuntimeError('Smoke needs 10 GiB free space')
-        atomic_json(active, {'run_id': run_id})
+        atomic_json(active, {'run_id': run_id, 'invocation_id': invocation()})
         job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
         deadline = time.monotonic() + SECONDS
         base = root_file(value['base_image'])
