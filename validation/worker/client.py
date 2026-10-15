@@ -4,16 +4,34 @@ import json
 from pathlib import Path
 import socket
 import sys
+import time
 
 CONFIG = Path('/etc/eqemu-validator/config.json')
 REPORT_LIMIT = 16384
 
 
-def exchange(path, request):
+def exchange(path, request, payload=None):
+    """Read-only probes may briefly race systemd's previous connection teardown."""
+    deadline = time.monotonic() + 2
+    while True:
+        try:
+            return exchange_once(path, request, payload)
+        except (ConnectionResetError, BrokenPipeError):
+            # Never retry a build/smoke request: it may already have started a VM.
+            if request['operation'] not in ('check', 'last-result') or time.monotonic() >= deadline:
+                raise
+            time.sleep(.1)
+
+
+def exchange_once(path, request, payload=None):
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-        connection.settimeout(330 if request['operation'] == 'smoke' else 15)
+        connection.settimeout(18330 if request['operation'] == 'build' else 330 if request['operation'] == 'smoke' else 15)
         connection.connect(str(path))
         connection.sendall((json.dumps(request, separators=(',', ':')) + '\n').encode())
+        if payload is not None:
+            with Path(payload).open('rb') as stream:
+                while block := stream.read(1024**2):
+                    connection.sendall(block)
         data = bytearray()
         while b'\n' not in data:
             block = connection.recv(min(4096, REPORT_LIMIT + 1 - len(data)))
@@ -29,6 +47,11 @@ def exchange(path, request):
                 or type(result.get('exit_code')) is not int or result['exit_code'] not in (0, 1, 2)):
             raise RuntimeError('Malformed worker report')
         if result['exit_code'] in (0, 1):
+            if request['operation'] == 'build' and (result.get('scope') != 'worker-build'
+                    or result.get('operation') != 'build' or result.get('cleanup_complete') is not True
+                    or result.get('vm_started') is not True or result.get('candidate') != request['candidate']
+                    or result.get('tree') != request['tree'] or result.get('payload_sha256') != request['sha256']):
+                raise RuntimeError('Incomplete or mismatched build result')
             if request['operation'] == 'smoke' and (result.get('scope') != 'worker-smoke'
                     or result.get('operation') != 'smoke' or result.get('cleanup_complete') is not True
                     or result.get('vm_started') is not True or result.get('control') != request['control']):

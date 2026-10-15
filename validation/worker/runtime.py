@@ -1,5 +1,5 @@
 #!/usr/bin/python3 -I
-"""One offline smoke VM under a dedicated worker. No candidate commands run here."""
+"""One offline VM under a dedicated worker. Candidate code runs only in the guest."""
 import argparse
 import fcntl
 import hashlib
@@ -21,7 +21,7 @@ import uuid
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from guest import user_data
+from guest import user_data, build_user_data, BUILD_CHECKS
 
 CONFIG = Path('/etc/eqemu-validator/config.json')
 QEMU = '/usr/bin/qemu-system-x86_64'
@@ -29,13 +29,16 @@ QEMU_IMG = '/usr/bin/qemu-img'
 GENISOIMAGE = '/usr/bin/genisoimage'
 SECONDS = 300
 LOG_LIMIT = 1024**2
+BUILD_SECONDS = 18000
+PAYLOAD_LIMIT = 1024**3
 BASE_LIMIT = 2 * 1024**3
 CONTROLS = ('pass', 'assertion', 'missing-result', 'deadline', 'controller-death')
+OWNED_CONTROLS = (*CONTROLS, 'build')
 
 
 class CleanupError(RuntimeError):
     pass
-SCRATCH = ('disk.qcow2', 'seed.iso', 'user-data', 'meta-data')
+SCRATCH = ('disk.qcow2', 'seed.iso', 'user-data', 'meta-data', 'payload.iso')
 
 
 def read_json(path, limit=16384):
@@ -132,7 +135,7 @@ def ready(value):
     try:
         limits = resource_state(); observed['resources'] = limits
         quota, period = limits['cpu.max'].split()
-        checks['resources'] = (0 < int(limits['memory.max']) <= 2 * 1024**3 and limits['memory.swap.max'] == '0'
+        checks['resources'] = (0 < int(limits['memory.max']) <= 6 * 1024**3 and limits['memory.swap.max'] == '0'
                                and 0 < int(limits['pids.max']) <= 128 and 0 < int(quota) <= 2 * int(period)
                                and limits['no_new_privileges'] == '1' and int(limits['effective_capabilities'], 16) == 0)
     except (OSError, ValueError, KeyError, StopIteration):
@@ -173,12 +176,12 @@ def scratch_cleanup(job):
     scratch = job / 'scratch'
     if scratch.exists():
         if scratch.is_symlink() or scratch.stat().st_uid != os.geteuid():
-            raise RuntimeError('Unexpected smoke scratch ownership')
+            raise RuntimeError('Unexpected worker scratch ownership')
         if not {item.name for item in scratch.iterdir()} <= set(SCRATCH):
-            raise RuntimeError('Unexpected smoke scratch contents')
+            raise RuntimeError('Unexpected worker scratch contents')
         for item in scratch.iterdir():
             if item.is_symlink() or not item.is_file():
-                raise RuntimeError('Unexpected smoke scratch file')
+                raise RuntimeError('Unexpected worker scratch file')
             item.unlink()
         scratch.rmdir()
 
@@ -207,12 +210,13 @@ def cleanup(value):
             record = read_json(active)
             if (set(record) != {'run_id', 'invocation_id', 'control', 'qemu_pid'}
                     or record['invocation_id'] != invocation()
-                    or record['control'] not in CONTROLS
+                    or record['control'] not in OWNED_CONTROLS
                     or (record['qemu_pid'] is not None and (type(record['qemu_pid']) is not int or record['qemu_pid'] <= 0))
                     or not re.fullmatch('[a-f0-9]{32}', record['run_id'])):
                 raise ValueError('Unexpected active job record')
             job = Path(value['state_dir']) / record['run_id']
-            report = {'version': 1, 'operation': 'smoke', 'scope': 'worker-smoke', 'run_id': record['run_id'],
+            report = {'version': 1, 'operation': 'build' if record['control'] == 'build' else 'smoke',
+                      'scope': 'worker-build' if record['control'] == 'build' else 'worker-smoke', 'run_id': record['run_id'],
                       'control': record['control'], 'qemu_pid': record['qemu_pid'],
                       'vm_started': record['qemu_pid'] is not None, 'exit_code': 2,
                       'error': 'Controller stopped before final completion',
@@ -246,7 +250,7 @@ def cleanup(value):
 def tool(args, deadline):
     remaining = min(30, deadline - time.monotonic())
     if remaining <= 0:
-        raise RuntimeError('Smoke deadline exceeded')
+        raise RuntimeError('Worker deadline exceeded')
     # Tools share the same owned-session cleanup as QEMU; descendants cannot outlive a timeout.
     process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                                start_new_session=True, env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8'}, close_fds=True)
@@ -289,7 +293,7 @@ def stop_process(process):
         raise CleanupError('Owned process cleanup could not be confirmed') from error
 
 
-def supervise(args, scratch, log, connection, deadline, nonce, on_started=None):
+def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None):
     process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                cwd=scratch, start_new_session=True, close_fds=True,
                                env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': str(scratch)})
@@ -305,17 +309,19 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None):
             eof = False
             while not eof or process.poll() is None:
                 if time.monotonic() >= deadline:
-                    raise RuntimeError('Smoke deadline exceeded')
+                    raise RuntimeError('Worker deadline exceeded')
                 if disconnected(connection):
-                    raise RuntimeError('Client disconnected; smoke cancelled')
+                    raise RuntimeError('Client disconnected; worker cancelled')
                 for key, _ in selector.select(.1):
                     block = os.read(key.fd, 65536)
                     if not block:
                         eof = True; selector.unregister(key.fileobj)
                         continue
-                    if len(output) + len(block) > LOG_LIMIT:
-                        raise RuntimeError('Smoke serial output limit exceeded')
+                    if stream.tell() + len(block) > (64 * LOG_LIMIT if build_result is not None else LOG_LIMIT):
+                        raise RuntimeError('Worker serial output limit exceeded')
                     output.extend(block); stream.write(block); stream.flush()
+                    # Keep only the diagnostic tail in RAM; complete console output stays bounded on disk.
+                    del output[:-16384]
             code = process.wait(timeout=5)
             if code != 0:
                 detail = output[-900:].decode(errors='replace').strip()
@@ -324,53 +330,116 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None):
         stop_process(process)
         process.stdout.close()
     results = []
-    for line in output.decode(errors='replace').splitlines():
-        if line.startswith('EQEMU_WORKER_RESULT '):
-            results.append(json.loads(line.removeprefix('EQEMU_WORKER_RESULT ')))
+    with log.open('rb') as stream:
+        for line in stream:
+            if line.startswith(b'EQEMU_WORKER_RESULT '):
+                if len(line) > 8192:
+                    raise RuntimeError('Oversized guest completion')
+                results.append(json.loads(line.removeprefix(b'EQEMU_WORKER_RESULT ')))
     if len(results) != 1:
         raise RuntimeError('Missing or duplicate guest completion')
     result = results[0]
-    if (not isinstance(result, dict) or set(result) != {'version', 'nonce', 'scope', 'exit_code'}
-            or type(result['version']) is not int or result['version'] != 1 or result['nonce'] != nonce or result['scope'] != 'worker-smoke'
-            or type(result['exit_code']) is not int or result['exit_code'] not in (0, 1)):
+    if (not isinstance(result, dict) or (set(result) != {'version', 'nonce', 'scope', 'exit_code'} if build_result is None
+                                                else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities', 'selected_checks', 'completed_checks'})
+            or type(result.get('version')) is not int or result['version'] != 1 or result.get('nonce') != nonce or result.get('scope') != ('worker-smoke' if build_result is None else 'worker-build')
+            or type(result.get('exit_code')) is not int or result['exit_code'] not in ((0, 1) if build_result is None else (0, 1, 2))):
         raise RuntimeError('Malformed guest completion')
+    if build_result is not None:
+        completed = result.get('completed_checks')
+        if (result.get('selected_checks') != list(BUILD_CHECKS) or not isinstance(completed, list)
+                or not all(isinstance(name, str) for name in completed)
+                or len(completed) != len(set(completed)) or not set(completed) <= set(BUILD_CHECKS)
+                or (result['exit_code'] == 0 and completed != list(BUILD_CHECKS))):
+            raise RuntimeError('Incomplete or malformed build check evidence')
+        if not isinstance(result.get('stage'), str) or len(result['stage']) > 100:
+            raise RuntimeError('Build stage missing or oversized')
+        if 'error' in result and (not isinstance(result['error'], str) or len(result['error']) > 3500):
+            raise RuntimeError('Malformed build diagnostic')
+        if result['exit_code'] == 0 and (not isinstance(result.get('zone_sha256'), str)
+                or not re.fullmatch('[a-f0-9]{64}', result['zone_sha256']) or not isinstance(result.get('utilities'), dict)):
+            raise RuntimeError('Build completion missing zone or utility evidence')
+        build_result.update(result)
     return result['exit_code']
 
 
-def smoke(value, connection, control='pass'):
+def receive_payload(connection, target, expected, deadline):
+    """Stream opaque bytes into owned scratch; no host extraction or candidate execution."""
+    digest = hashlib.sha256(); remaining = expected['bytes']
+    connection.settimeout(5)
+    try:
+        with target.open('xb') as stream:
+            while remaining:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError('Input transfer deadline exceeded')
+                block = connection.recv(min(1024**2, remaining))
+                if not block:
+                    raise RuntimeError('Client disconnected during input transfer')
+                remaining -= len(block); digest.update(block); stream.write(block)
+        if digest.hexdigest() != expected['sha256']:
+            raise ValueError('Input payload SHA256 mismatch')
+    finally:
+        connection.settimeout(None)
+
+
+def implementation_identity(value):
+    """Digest the finite reviewed worker implementation, independent of candidate inputs."""
+    paths = ('validation/worker/runtime.py', 'validation/worker/guest.py',
+             'validation/worker/build_guest.py', 'validation/worker/client.py', 'scripts/check-validation-worker')
+    digests = {}
+    for name in paths:
+        with (Path(value['code_dir']) / name).open('rb') as stream:
+            digests[name] = hashlib.file_digest(stream, 'sha256').hexdigest()
+    return hashlib.sha256(json.dumps(digests, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def run_vm(value, connection, control='pass', build=None):
     lock = acquire(value)
     state = Path(value['state_dir']); active = state / 'active.json'
     run_id = uuid.uuid4().hex; job = state / run_id
     report = {'version': 1, 'operation': 'smoke', 'scope': 'worker-smoke', 'run_id': run_id,
               'control': control, 'exit_code': 2, 'cleanup_complete': False, 'vm_started': False,
               'worker_uid': os.geteuid(), 'coverage': ['tiny-cloud-init'], 'candidate': None}
+    if build is not None:
+        control = 'build'
+        report.update(operation='build', scope='worker-build', control='build',
+                      candidate=build['candidate'], tree=build['tree'], payload_sha256=build['sha256'],
+                      coverage=[], selected_checks=list(BUILD_CHECKS), completed_checks=[])
     try:
         if active.exists():
-            raise RuntimeError('Previous smoke requires service cleanup')
+            raise RuntimeError('Previous worker job requires service cleanup')
         probe = ready(value); report['readiness'] = probe
         if probe['exit_code'] != 0:
             raise RuntimeError('Worker readiness failed')
-        if shutil.disk_usage(state).free < 10 * 1024**3:
-            raise RuntimeError('Smoke needs 10 GiB free space')
+        if build is not None:
+            report['implementation_sha256'] = implementation_identity(value)
+            if int(resource_state()['memory.max']) < 6 * 1024**3:
+                raise RuntimeError('Server build needs the reviewed 6 GiB service resource update')
+        required_space = 50 if build is not None else 10
+        if shutil.disk_usage(state).free < required_space * 1024**3:
+            raise RuntimeError('Worker needs ' + str(required_space) + ' GiB free space')
         active_record = {'run_id': run_id, 'invocation_id': invocation(), 'control': control, 'qemu_pid': None}
         atomic_json(active, active_record)
         job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
-        deadline = time.monotonic() + SECONDS
+        deadline = time.monotonic() + (BUILD_SECONDS if build is not None else SECONDS)
         base = root_file(value['base_image'])
         with base.open('rb') as stream:
             report['base_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
-        (scratch / 'user-data').write_text(user_data(run_id, control))
+        if build is not None:
+            receive_payload(connection, scratch / 'payload.iso', build, time.monotonic() + 120)
+        (scratch / 'user-data').write_text(build_user_data(run_id) if build is not None else user_data(run_id, control))
         (scratch / 'meta-data').write_text('instance-id: eqemu-smoke-' + run_id + '\n')
-        tool([QEMU_IMG, 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', str(base), str(scratch / 'disk.qcow2'), '8G'], deadline)
+        tool([QEMU_IMG, 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', str(base), str(scratch / 'disk.qcow2'), '48G' if build is not None else '8G'], deadline)
         tool([GENISOIMAGE, '-output', str(scratch / 'seed.iso'), '-volid', 'cidata', '-joliet', '-rock',
               str(scratch / 'user-data'), str(scratch / 'meta-data')], deadline)
-        args = [QEMU, '-no-user-config', '-nodefaults', '-machine', 'q35,accel=kvm', '-cpu', 'host', '-smp', '2', '-m', '1024',
+        args = [QEMU, '-no-user-config', '-nodefaults', '-machine', 'q35,accel=kvm', '-cpu', 'host', '-smp', '2', '-m', '4096' if build is not None else '1024',
                 # Leave room beneath TasksMax for vCPUs, supervision and bounded I/O workers.
                 '-object', 'main-loop,id=main-loop,thread-pool-min=0,thread-pool-max=8',
                 '-nic', 'none', '-display', 'none', '-monitor', 'none', '-serial', 'stdio', '-no-reboot',
                 '-sandbox', 'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny',
                 '-drive', 'file=' + str(scratch / 'disk.qcow2') + ',if=virtio,format=qcow2,cache=none',
                 '-drive', 'file=' + str(scratch / 'seed.iso') + ',media=cdrom,readonly=on,format=raw']
+        if build is not None:
+            args += ['-drive', 'file=' + str(scratch / 'payload.iso') + ',media=cdrom,readonly=on,format=raw']
         def started(pid):
             report['vm_started'] = True
             report['qemu_pid'] = pid
@@ -380,7 +449,17 @@ def smoke(value, connection, control='pass'):
                 # Explicit qualification control: bypass Python finally, exercising systemd's
                 # cgroup kill and ExecStopPost rather than the controller's normal cleanup.
                 os.kill(os.getpid(), signal.SIGKILL)
-        report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started)
+        if build is None:
+            report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started)
+        else:
+            detail = {}
+            report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started, detail)
+            report['guest'] = detail
+            report['completed_checks'] = detail['completed_checks']
+            if report['implementation_sha256'] != implementation_identity(value):
+                raise RuntimeError('Worker implementation changed during the job')
+            if report['exit_code'] == 0:
+                report['coverage'] = ['rust-checks', 'server-build', 'native-utilities']
     except Exception as error:
         report['error'] = str(error)[:1000]
         report['exit_code'] = 2
@@ -414,7 +493,7 @@ def request(connection, value):
     connection.settimeout(5)
     raw = bytearray()
     while b'\n' not in raw:
-        block = connection.recv(4097 - len(raw))
+        block = connection.recv(1)
         if not block:
             raise ValueError('Missing worker request')
         raw.extend(block)
@@ -430,10 +509,18 @@ def request(connection, value):
     if data == {'version': 1, 'operation': 'last-result'}:
         return {'version': 1, 'operation': 'last-result', 'scope': 'worker-observation',
                 'exit_code': 0, 'result': read_json(Path(value['state_dir']) / 'last-result.json')}
+    if data.get('operation') == 'build':
+        if (set(data) != {'version', 'operation', 'candidate', 'tree', 'bytes', 'sha256'}
+                or not all(isinstance(data[key], str) and re.fullmatch('[a-f0-9]{40}', data[key]) for key in ('candidate', 'tree'))
+                or not isinstance(data['sha256'], str) or not re.fullmatch('[a-f0-9]{64}', data['sha256'])
+                or type(data['bytes']) is not int or not 0 < data['bytes'] <= PAYLOAD_LIMIT):
+            raise ValueError('Malformed build request')
+        connection.settimeout(None)
+        return run_vm(value, connection, build=data)
     if set(data) != {'version', 'operation', 'control'} or data['operation'] != 'smoke' or data['control'] not in CONTROLS:
         raise ValueError('Unsupported worker operation')
     connection.settimeout(None)  # MSG_DONTWAIT EOF probes must not inherit the request-read timeout.
-    return smoke(value, connection, data['control'])
+    return run_vm(value, connection, data['control'])
 
 
 def interrupted(signum, _):
