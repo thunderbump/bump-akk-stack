@@ -21,7 +21,7 @@ import uuid
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from guest import user_data, build_user_data
+from guest import user_data, build_user_data, BUILD_CHECKS
 
 CONFIG = Path('/etc/eqemu-validator/config.json')
 QEMU = '/usr/bin/qemu-system-x86_64'
@@ -340,11 +340,17 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
         raise RuntimeError('Missing or duplicate guest completion')
     result = results[0]
     if (not isinstance(result, dict) or (set(result) != {'version', 'nonce', 'scope', 'exit_code'} if build_result is None
-                                                else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities'})
+                                                else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities', 'selected_checks', 'completed_checks'})
             or type(result.get('version')) is not int or result['version'] != 1 or result.get('nonce') != nonce or result.get('scope') != ('worker-smoke' if build_result is None else 'worker-build')
             or type(result.get('exit_code')) is not int or result['exit_code'] not in ((0, 1) if build_result is None else (0, 1, 2))):
         raise RuntimeError('Malformed guest completion')
     if build_result is not None:
+        completed = result.get('completed_checks')
+        if (result.get('selected_checks') != list(BUILD_CHECKS) or not isinstance(completed, list)
+                or not all(isinstance(name, str) for name in completed)
+                or len(completed) != len(set(completed)) or not set(completed) <= set(BUILD_CHECKS)
+                or (result['exit_code'] == 0 and completed != list(BUILD_CHECKS))):
+            raise RuntimeError('Incomplete or malformed build check evidence')
         if not isinstance(result.get('stage'), str) or len(result['stage']) > 100:
             raise RuntimeError('Build stage missing or oversized')
         if 'error' in result and (not isinstance(result['error'], str) or len(result['error']) > 3500):
@@ -375,6 +381,17 @@ def receive_payload(connection, target, expected, deadline):
         connection.settimeout(None)
 
 
+def implementation_identity(value):
+    """Digest the finite reviewed worker implementation, independent of candidate inputs."""
+    paths = ('validation/worker/runtime.py', 'validation/worker/guest.py',
+             'validation/worker/build_guest.py', 'validation/worker/client.py', 'scripts/check-validation-worker')
+    digests = {}
+    for name in paths:
+        with (Path(value['code_dir']) / name).open('rb') as stream:
+            digests[name] = hashlib.file_digest(stream, 'sha256').hexdigest()
+    return hashlib.sha256(json.dumps(digests, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
 def run_vm(value, connection, control='pass', build=None):
     lock = acquire(value)
     state = Path(value['state_dir']); active = state / 'active.json'
@@ -386,15 +403,17 @@ def run_vm(value, connection, control='pass', build=None):
         control = 'build'
         report.update(operation='build', scope='worker-build', control='build',
                       candidate=build['candidate'], tree=build['tree'], payload_sha256=build['sha256'],
-                      coverage=[])
+                      coverage=[], selected_checks=list(BUILD_CHECKS), completed_checks=[])
     try:
         if active.exists():
             raise RuntimeError('Previous worker job requires service cleanup')
         probe = ready(value); report['readiness'] = probe
         if probe['exit_code'] != 0:
             raise RuntimeError('Worker readiness failed')
-        if build is not None and int(resource_state()['memory.max']) < 6 * 1024**3:
-            raise RuntimeError('Server build needs the reviewed 6 GiB service resource update')
+        if build is not None:
+            report['implementation_sha256'] = implementation_identity(value)
+            if int(resource_state()['memory.max']) < 6 * 1024**3:
+                raise RuntimeError('Server build needs the reviewed 6 GiB service resource update')
         required_space = 50 if build is not None else 10
         if shutil.disk_usage(state).free < required_space * 1024**3:
             raise RuntimeError('Worker needs ' + str(required_space) + ' GiB free space')
@@ -436,6 +455,9 @@ def run_vm(value, connection, control='pass', build=None):
             detail = {}
             report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started, detail)
             report['guest'] = detail
+            report['completed_checks'] = detail['completed_checks']
+            if report['implementation_sha256'] != implementation_identity(value):
+                raise RuntimeError('Worker implementation changed during the job')
             if report['exit_code'] == 0:
                 report['coverage'] = ['rust-checks', 'server-build', 'native-utilities']
     except Exception as error:

@@ -21,6 +21,14 @@ ENV = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
        'CCACHE_DISABLE': '1', 'CMAKE_BUILD_PARALLEL_LEVEL': '1'}
 STAGE = 'guest-start'
 DEADLINE = 0
+CHECKS = ()
+COMPLETED = []
+INFRASTRUCTURE = re.compile(
+    r'out of memory|cannot allocate memory|no space left|killed signal|command not found|'
+    r'failed to download|no matching package named|attempting to make an HTTP request|'
+    r'failed to get .+ as a dependency|could not execute process|'
+    r'failed to select a version for the requirement|could not find (?:a |the )?(?:package|configuration file)|'
+    r'could not find a configuration file for package|could NOT find', re.I)
 
 
 class CandidateFailure(RuntimeError):
@@ -38,7 +46,7 @@ def command(name, args, *, cwd=None, candidate=False, seconds=900):
     STAGE = name
     print('EQEMU_STAGE ' + name, flush=True)
     end = min(DEADLINE, time.monotonic() + seconds)
-    tail = bytearray(); total = 0
+    tail = bytearray(); total = 0; infrastructure_failure = False
     process = subprocess.Popen(args, cwd=cwd, env=ENV, stdin=subprocess.DEVNULL,
                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True)
     try:
@@ -57,6 +65,7 @@ def command(name, args, *, cwd=None, candidate=False, seconds=900):
                     if total > 32 * 1024**2:
                         raise RuntimeError(name + ': output limit exceeded')
                     tail.extend(block); del tail[:-8192]
+                    infrastructure_failure |= bool(INFRASTRUCTURE.search(tail.decode(errors='replace')))
                     # Console is the retained diagnostic channel. No artifact/export protocol.
                     offset = 0
                     while offset < len(block):
@@ -64,12 +73,11 @@ def command(name, args, *, cwd=None, candidate=False, seconds=900):
         code = process.wait(timeout=5)
         if code:
             detail = tail.decode(errors='replace')
-            infrastructure = code < 0 or re.search(
-                r'(?i)out of memory|cannot allocate memory|no space left|killed signal|'
-                r'failed to download|no matching package named|attempting to make an HTTP request|'
-                r'failed to get .+ as a dependency|could not execute process', detail)
+            infrastructure = code < 0 or code in (126, 127) or infrastructure_failure
             error = CandidateFailure if candidate and not infrastructure else RuntimeError
             raise error(name + ': exit ' + str(code) + '\n' + detail[-3000:])
+        if name in CHECKS:
+            COMPLETED.append(name)
         return tail.decode(errors='replace')
     finally:
         try:
@@ -184,6 +192,9 @@ def build():
     workspace = source / 'rust/actors'
     cargo = str(prefix / 'bin/cargo')
     command('rust-format', [cargo, 'fmt', '--all', '--check'], cwd=workspace, candidate=True)
+    # Resolve the available offline closure before compiling candidate code. Missing
+    # versions/packages stop as infrastructure rather than consuming candidate repairs.
+    command('rust-dependencies', [cargo, 'metadata', '--format-version=1', '--locked', '--offline'], cwd=workspace)
     for stage, args in (
             ('rust-clippy', ['clippy', '--workspace', '--all-targets', '--locked', '--offline', '--', '-D', 'warnings']),
             ('rust-tests', ['test', '--workspace', '--locked', '--offline', '--lib', '--tests']),
@@ -214,11 +225,14 @@ def build():
 
 
 def main():
-    global DEADLINE
+    global DEADLINE, CHECKS
     if os.geteuid() != 0 or not Path('/opt/eqemu-worker-build-guest').is_file():
         raise RuntimeError('Disposable build guest only')
     nonce = Path('/opt/eqemu-worker-nonce').read_text().strip()
-    result = dict(version=1, scope='worker-build', nonce=nonce, exit_code=2)
+    CHECKS = tuple(json.loads(Path('/opt/eqemu-worker-checks.json').read_text()))
+    COMPLETED.clear()
+    result = dict(version=1, scope='worker-build', nonce=nonce, exit_code=2,
+                  selected_checks=list(CHECKS), completed_checks=COMPLETED)
     DEADLINE = time.monotonic() + 17400
     try:
         WORK.mkdir(); MEDIA.mkdir()

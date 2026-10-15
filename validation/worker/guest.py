@@ -1,6 +1,11 @@
 """Tiny cloud-init workload for worker qualification, not EQEmu acceptance."""
 import json
 
+BUILD_CHECKS = (
+    'rust-format', 'rust-dependencies', 'rust-clippy', 'rust-tests', 'rust-doctests',
+    'native-configure', 'native-build', 'zone-rust-symbol', 'native-utilities',
+)
+
 
 def user_data(nonce, control):
     result = json.dumps({'version': 1, 'nonce': nonce, 'scope': 'worker-smoke',
@@ -29,6 +34,7 @@ def build_user_data(nonce):
             {'path': '/opt/eqemu-worker-build-guest', 'permissions': '0600',
              'content': Path(__file__).with_name('build_guest.py').read_text()},
             {'path': '/opt/eqemu-worker-nonce', 'permissions': '0600', 'content': nonce},
+            {'path': '/opt/eqemu-worker-checks.json', 'permissions': '0600', 'content': json.dumps(BUILD_CHECKS)},
         ],
         'runcmd': [['/bin/sh', '-c',
                     'exec /usr/bin/python3 -u /opt/eqemu-worker-build-guest >/dev/ttyS0 2>&1']],

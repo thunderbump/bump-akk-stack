@@ -1,5 +1,4 @@
 """Package committed source and verified public inputs as data. No candidate execution."""
-import hashlib
 import json
 import re
 from pathlib import Path

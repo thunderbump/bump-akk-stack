@@ -56,7 +56,10 @@ class Transfer(unittest.TestCase):
                 (True, 'exit 1', build_guest.CandidateFailure),
                 (False, 'exit 1', RuntimeError),
                 (True, 'echo "no matching package named dependency"; exit 101', RuntimeError),
-                (True, 'echo "Killed signal terminated program cc1plus"; exit 1', RuntimeError)):
+                (True, 'echo "Killed signal terminated program cc1plus"; exit 1', RuntimeError),
+                (True, 'echo "failed to select a version for the requirement cxx"; exit 101', RuntimeError),
+                (True, 'echo "Could NOT find MissingLibrary"; exit 1', RuntimeError),
+                (True, 'echo "Could not find a package configuration file provided by MissingLibrary"; exit 1', RuntimeError)):
             with self.subTest(script=script, candidate=candidate):
                 with self.assertRaises(error) as caught:
                     build_guest.command('trusted-fixture', ['/bin/sh', '-c', script], candidate=candidate)
@@ -74,7 +77,8 @@ class BuildRuntime(unittest.TestCase):
 
     def test_build_uses_larger_guest_readonly_input_and_same_owned_cleanup(self):
         request = self.build_request(); self.client.sendall(b'ISO')
-        guest = dict(version=1, nonce='n', scope='worker-build', exit_code=1, stage='rust-tests', error='assertion failed')
+        guest = dict(version=1, nonce='n', scope='worker-build', exit_code=1, stage='rust-tests', error='assertion failed',
+                     selected_checks=list(runtime.BUILD_CHECKS), completed_checks=list(runtime.BUILD_CHECKS[:3]))
         def simulate(*args):
             args[-2](12345); args[-1].update(guest); return 1
         with patch.object(runtime, 'resource_state', return_value={'memory.max': str(6*1024**3)}), \
@@ -84,6 +88,8 @@ class BuildRuntime(unittest.TestCase):
         self.assertTrue(result['cleanup_complete'])
         self.assertEqual(result['candidate'], request['candidate'])
         self.assertEqual(result['guest']['stage'], 'rust-tests')
+        self.assertEqual(result['completed_checks'], list(runtime.BUILD_CHECKS[:3]))
+        self.assertRegex(result['implementation_sha256'], '^[a-f0-9]{64}$')
         argv = supervisor.call_args.args[0]
         self.assertEqual(argv[argv.index('-m') + 1], '4096')
         self.assertEqual(argv[argv.index('-nic') + 1], 'none')
@@ -115,7 +121,8 @@ class BuildRuntime(unittest.TestCase):
 
     def test_build_completion_preserves_infrastructure_details(self):
         result = dict(version=1, nonce='a'*32, scope='worker-build', exit_code=2,
-                      stage='offline-package-install', error='Missing offline input')
+                      stage='offline-package-install', error='Missing offline input',
+                      selected_checks=list(runtime.BUILD_CHECKS), completed_checks=[])
         script = self.root / 'emit.py'
         script.write_text('print(' + repr('EQEMU_WORKER_RESULT ' + json.dumps(result)) + ')\n')
         detail = {}
