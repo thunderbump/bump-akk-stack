@@ -159,10 +159,11 @@ def observe(binary_dir, server, control):
         for name, args in (('world', []), ('zone', ['poknowledge', '7000'])):
             path = server / (name + '-console.log'); logs.append(path)
             with path.open('xb') as log:
-                # The startup control uses a deliberately absent config in an owned empty directory.
+                # Native config discovery searches cwd AND its immediate parent.
+                # Keep both empty without moving/removing the positive fixture config.
                 cwd = server
                 if control == 'startup' and name == 'world':
-                    cwd = server / 'missing-config'; cwd.mkdir()
+                    cwd = server / 'missing-config' / 'world'; cwd.mkdir(parents=True)
                 processes.append(subprocess.Popen([str(binary_dir / name), *args], cwd=cwd,
                     stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT))
         while True:

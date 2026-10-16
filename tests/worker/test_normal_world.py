@@ -176,6 +176,62 @@ class Readiness(unittest.TestCase):
             self.assertEqual(len(frames), 1)
             return frames[0]
 
+    def test_startup_fault_defeats_current_and_parent_config_discovery(self):
+        for control in (None, 'startup'):
+            with self.subTest(control=control), tempfile.TemporaryDirectory() as tmp:
+                server = Path(tmp)
+                config = server / 'eqemu_config.json'
+                config.write_text('{"server": {}}')
+                # Reproduce native File::FindEqemuConfigPath's two-directory
+                # search, with the real positive fixture config still present.
+                def find_config(cwd):
+                    return next((p / 'eqemu_config.json' for p in (cwd, cwd.parent)
+                                 if (p / 'eqemu_config.json').is_file()), None)
+                old_cwd = server / 'old-missing-config'; old_cwd.mkdir()
+                self.assertEqual(find_config(old_cwd), config)
+                children = []
+                def launch(args, *, cwd, stdin, stdout, stderr):
+                    found = find_config(cwd)
+                    process = Mock(pid=101 + len(children))
+                    process.poll.return_value = 1 if found is None else None
+                    stdout.write(b'config loaded\n' if found else b'missing configuration\n')
+                    children.append((Path(args[0]).name, cwd, found, process))
+                    return process
+                output = io.StringIO()
+                with patch.object(normal.os, 'geteuid', return_value=65534), \
+                        patch.object(normal.resource, 'setrlimit'), \
+                        patch.object(normal.Path, 'is_file', autospec=True,
+                                     side_effect=lambda p: True if str(p) == '/opt/eqemu-worker-build-guest' else p.exists()), \
+                        patch.object(normal.subprocess, 'Popen', side_effect=launch), \
+                        patch.object(normal, 'world_connected', return_value=True) as connected, \
+                        patch.object(normal, 'probe', return_value=True) as probe, \
+                        patch.object(normal, 'cpu_ticks', side_effect=[0, 0, 1, 4]) as ticks, \
+                        patch.object(normal, 'stop', return_value=True) as stop, \
+                        patch.object(normal.time, 'monotonic', side_effect=itertools.count(0, .1)), \
+                        patch.object(normal.time, 'sleep'), contextlib.redirect_stdout(output):
+                    normal.observe(Path('/never-execute-candidate'), server, control)
+                lines = output.getvalue().splitlines()
+                result = json.loads(next(line.removeprefix('NORMAL_WORLD_RESULT ')
+                                         for line in lines if line.startswith('NORMAL_WORLD_RESULT ')))
+                stop.assert_called_once_with([child[3] for child in children])
+                self.assertTrue(result['cleanup_complete'])
+                self.assertEqual(children[1][1:3], (server, config))  # zone unchanged
+                self.assertEqual(config.read_text(), '{"server": {}}')
+                if control == 'startup':
+                    self.assertIsNone(children[0][2])
+                    self.assertEqual(result['exit_code'], 2)
+                    self.assertEqual(result['error'], 'Normal server exited before assertion completed')
+                    self.assertNotIn('NORMAL_WORLD_READY', lines)
+                    self.assertNotIn('ready_seconds', result)
+                    self.assertNotIn('baseline_seconds', result)
+                    self.assertIn('world-console.log: missing configuration', lines)
+                    connected.assert_not_called(); probe.assert_not_called(); ticks.assert_not_called()
+                else:
+                    self.assertEqual(children[0][1:3], (server, config))
+                    self.assertEqual(result['exit_code'], 0)
+                    self.assertIn('NORMAL_WORLD_READY', lines)
+                    self.assertGreaterEqual(result['baseline_seconds'], normal.BASELINE_SECONDS)
+
     def test_positive_and_assertion_startup_and_interruption_are_nonpass_with_cleanup(self):
         self.assertEqual(self.run_observer()['exit_code'], 0)
         self.assertEqual(self.run_observer('assertion')['exit_code'], 1)

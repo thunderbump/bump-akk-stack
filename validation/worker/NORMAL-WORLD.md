@@ -80,8 +80,14 @@ does not invent a native completion marker or label CPU ticks as gameplay ticks.
 The same command accepts fixed `--world-control startup`, `assertion` or `cancel`
 controls. Each builds the selected candidate and creates a fresh fixture:
 
-* `startup`: world starts in an owned empty directory without configuration;
-  unexpected exit/deadline is infrastructure non-pass 2, with console tails.
+* `startup`: world starts in `server/missing-config/world`, with both its
+  working directory and immediate parent empty. Native config discovery searches
+  both locations; a direct child of `server` would rediscover the positive
+  fixture's config. The positive config and zone working directory stay unchanged.
+  Missing-config startup exit is infrastructure non-pass 2, with console tails,
+  before readiness or baseline measurement. A deadline or the generic
+  control-unexpectedly-completed guard is non-pass, but is not proof that the
+  intended startup fault occurred.
 * `assertion`: after real readiness and baseline measurement, the observer
   deliberately fails its assertion. Complete cleanup yields candidate exit 1.
 * `cancel`: after real readiness, the observer continues bounded responsiveness
@@ -117,7 +123,9 @@ Trusted Python/fake controls in `tests/worker/test_normal_world.py` cover gates,
 zone-row activity configuration/readback refusal before native launch (including
 missing/schema-mismatched rows and failed writes), missing/wrong challenge replies,
 exact-PID connection ownership, positive and
-assertion/startup/interruption paths, descendant cleanup, seed/staging closure
+assertion/startup/interruption paths (including current/parent config discovery
+with a real positive config retained and startup refusal before readiness/baseline),
+descendant cleanup, seed/staging closure
 and old-worker rejection. Socket/process tests cover a split readiness frame,
 foreground interruption upon its receipt, non-pass persistence and owned VM/scratch
 cleanup. Shared installer tests in `tests/validation/test_runtime_packages.py`
