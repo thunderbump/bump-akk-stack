@@ -38,7 +38,7 @@ def build_user_data(nonce):
                 '/usr/bin/python3 -u /opt/eqemu-worker-build-guest\n'
                 'status=$?\n'
                 'if [ "$status" -ne 0 ]; then\n'
-                '    printf ' + shlex.quote('EQEMU_WORKER_RESULT ' + json.dumps(failure) + '\\n') + ' "$status"\n'
+                '    printf ' + shlex.quote('\\nEQEMU_WORKER_RESULT ' + json.dumps(failure) + '\\n') + ' "$status"\n'
                 'fi\n'
                 '/usr/sbin/poweroff\n')
     return '#cloud-config\n' + json.dumps({

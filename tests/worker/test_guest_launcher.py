@@ -14,7 +14,10 @@ import guest
 
 class Launcher(unittest.TestCase):
     def test_abrupt_python_exit_reports_infrastructure_and_requests_poweroff(self):
-        self.run_launcher('import os,signal; os.kill(os.getpid(),signal.SIGKILL)', 2)
+        self.run_launcher('import os,signal; os.write(1,b"partial package output"); os.kill(os.getpid(),signal.SIGKILL)', 2)
+
+    def test_nonzero_exit_after_partial_line_keeps_result_framing(self):
+        self.run_launcher('import sys; sys.stdout.write("partial diagnostic"); raise SystemExit(3)', 2)
 
     def test_existing_results_are_not_duplicated_or_reclassified(self):
         for code in (0, 1, 2):
