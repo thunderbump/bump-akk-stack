@@ -163,7 +163,8 @@ class BuildRuntime(unittest.TestCase):
         qemu.write_text('#!' + sys.executable + '\nimport time\nprint(' + repr(message)
                         + ', flush=True)\ntime.sleep(30)\n')
         self.client.sendall(b'ISO')
-        result = runtime.run_vm(self.value, self.server, build=self.build_request())
+        with patch.object(runtime, 'resource_state', return_value={'memory.max': str(6*1024**3)}):
+            result = runtime.run_vm(self.value, self.server, build=self.build_request())
         self.assertEqual(result['exit_code'], 2)
         self.assertIn('Guest cloud-init command failed', result['error'])
         self.assertTrue(result['vm_started'])
