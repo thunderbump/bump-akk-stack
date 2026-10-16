@@ -19,12 +19,19 @@ def record(path, limit=PAYLOAD_LIMIT):
     return inputs.file_record(Path(path), limit)
 
 
-def prepare(repo, commit, websocketpp, native, rust, output):
+def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world_control=None):
     """Select a complete clean commit, without freezing Cargo manifests or test counts."""
     profile = json.loads((Path(__file__).resolve().parents[1] / 'profile.json').read_text())
     for path, expected in ((native, NATIVE_SHA), (rust, RUST_SHA)):
         if record(path)['sha256'] != expected:
             raise ValueError('Missing or changed offline input: ' + str(path))
+    fixture = json.loads((Path(__file__).resolve().parents[1] / 'runtime-fixture.json').read_text())
+    if runtime is None:
+        raise ValueError('Normal-world validation requires the pinned public runtime ISO')
+    if record(runtime) != {key: fixture['iso'][key] for key in ('bytes', 'sha256')}:
+        raise ValueError('Missing/changed public runtime ISO: ' + str(runtime))
+    if world_control not in (None, 'startup', 'assertion', 'cancel'):
+        raise ValueError('Unknown normal-world control')
     with tempfile.TemporaryDirectory(prefix='eqemu-build-inputs-') as tmp:
         root = Path(tmp)
         scratch = root / 'git'; scratch.mkdir()
@@ -49,9 +56,10 @@ def prepare(repo, commit, websocketpp, native, rust, output):
         dep_archive = root / 'websocketpp.tar'; dependency.archive(wanted['commit'], dep_archive)
         inputs.verify_archive(dep_archive, dep_entries, dep_links)
         files = {'eqemu.tar': archive, 'websocketpp.tar': dep_archive,
-                 'native.iso': Path(native).resolve(), 'rust-inputs.tar': Path(rust).resolve()}
+                 'native.iso': Path(native).resolve(), 'rust-inputs.tar': Path(rust).resolve(),
+                 'runtime.iso': Path(runtime).resolve()}
         identity = {'version': 1, 'candidate': commit, 'tree': tree,
-                    'files': {name: record(path) for name, path in files.items()}}
+                    'files': {name: record(path) for name, path in files.items()}, 'world_control': world_control}
         # Repeat after archiving: dirty index/worktree changes must not silently disappear.
         view.clean(commit, entries, links)
         (root / 'identity.json').write_text(json.dumps(identity))

@@ -8,7 +8,9 @@ import stat
 import tempfile
 
 FILES = ('validation/worker/runtime.py', 'validation/worker/guest.py',
-         'validation/worker/client.py', 'validation/worker/build_guest.py', 'scripts/check-validation-worker')
+         'validation/worker/client.py', 'validation/worker/build_guest.py',
+         'validation/worker/normal_world.py', 'validation/actor.py', 'validation/actor_runtime.py',
+         'validation/debugger.py', 'validation/runtime-fixture.json', 'scripts/check-validation-worker')
 DIRECTORIES = ('', 'validation', 'validation/worker', 'scripts')
 SOURCE = Path(__file__).resolve().parents[2]
 MAX_IMAGE = 2 * 1024**3

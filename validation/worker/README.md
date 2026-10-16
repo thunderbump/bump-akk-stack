@@ -4,6 +4,11 @@ This POC provisions a dedicated worker and qualifies one tiny offline VM.
 It does not change the installed EQEmu validator or AFK configuration. Server
 builds, Rust tests and actor behavior need later qualification.
 
+The ordinary candidate command now includes a fresh normal DB/world/zone slice.
+See [NORMAL-WORLD.md](NORMAL-WORLD.md) for inputs, readiness assertions, fixed
+non-pass controls, cleanup and pending VM qualification. Changed worker assets
+still require separate review/selection; this checkout does not install them.
+
 Inspect and create the account first:
 
 ```sh
@@ -26,7 +31,7 @@ refuse before provisioning.
 ## Stage the runtime and install fixed policy
 
 Use a reviewed checkout and an existing public cloud image with a verified
-SHA256. Full setup copies four finite runtime files into the submitter-owned
+SHA256. Full setup copies the finite reviewed runtime/helper closure into the submitter-owned
 `/srv/eqemu-validator-code` tree and the verified image into root-owned
 `/var/lib/eqemu-validator-inputs/base.qcow2`. It does not download inputs.
 

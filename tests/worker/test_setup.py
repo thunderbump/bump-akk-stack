@@ -87,7 +87,9 @@ class WorkerSetup(unittest.TestCase):
         (code/'validation/worker').mkdir(parents=True)
         (code/'scripts').mkdir()
         for name in ('validation/worker/runtime.py','validation/worker/guest.py',
-                     'validation/worker/client.py','validation/worker/build_guest.py','scripts/check-validation-worker'):
+                     'validation/worker/client.py','validation/worker/build_guest.py',
+                     'validation/worker/normal_world.py','validation/actor.py','validation/actor_runtime.py',
+                     'validation/debugger.py','validation/runtime-fixture.json','scripts/check-validation-worker'):
             (code/name).write_text('"""Synthetic reviewed runtime bytes, not executed."""\n')
         for path in (code,*code.rglob('*')):
             self.host.chown(path,self.host.users['submitter'].pw_uid,4002)

@@ -52,6 +52,14 @@ def exchange_once(path, request, payload=None):
                     or result.get('vm_started') is not True or result.get('candidate') != request['candidate']
                     or result.get('tree') != request['tree'] or result.get('payload_sha256') != request['sha256']):
                 raise RuntimeError('Incomplete or mismatched build result')
+            if request['operation'] == 'build' and result['exit_code'] == 0:
+                from normal_world import validate
+                detail = result.get('guest', {})
+                normal = validate(detail.get('normal_world'))
+                if normal['binaries']['zone'] != detail.get('zone_sha256'):
+                    raise RuntimeError('Normal-world zone differs from built candidate')
+                if 'normal-world' not in result.get('coverage', []):
+                    raise RuntimeError('Installed worker lacks reviewed normal-world coverage')
             if request['operation'] == 'smoke' and (result.get('scope') != 'worker-smoke'
                     or result.get('operation') != 'smoke' or result.get('cleanup_complete') is not True
                     or result.get('vm_started') is not True or result.get('control') != request['control']):

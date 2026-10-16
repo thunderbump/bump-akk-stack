@@ -60,7 +60,7 @@ class Runtime:
             if proc.poll() is not None:
                 raise RuntimeError('Owned runtime service exited unexpectedly')
 
-    def command(self, name, args, timeout=300, cwd=None, stdin=None, actor=False):
+    def command(self, name, args, timeout=300, cwd=None, stdin=None, actor=False, on_line=None):
         """Drain bounded logs and own the process group through every exit."""
         self.guard()
         start = time.monotonic()
@@ -92,6 +92,8 @@ class Runtime:
                         pending += block
                         while b'\n' in pending:
                             line, pending = pending.split(b'\n', 1)
+                            if on_line is not None:
+                                on_line(line)
                             if actor and line.startswith(b'EQEMU_ACTOR_PHASE '):
                                 def unique(pairs):
                                     value = {}

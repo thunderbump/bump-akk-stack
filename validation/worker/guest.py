@@ -4,7 +4,7 @@ import shlex
 
 BUILD_CHECKS = (
     'rust-format', 'rust-dependencies', 'rust-clippy', 'rust-tests', 'rust-doctests',
-    'native-configure', 'native-build', 'zone-rust-symbol', 'native-utilities',
+    'native-configure', 'native-build', 'zone-rust-symbol', 'native-utilities', 'normal-world',
 )
 
 
@@ -44,6 +44,9 @@ def build_user_data(nonce):
                 '    printf ' + shlex.quote('\\nEQEMU_WORKER_RESULT ' + json.dumps(failure) + '\\n') + ' "$status"\n'
                 'fi\n'
                 '/usr/sbin/poweroff\n')
+    helpers = [('normal_world.py', Path(__file__).with_name('normal_world.py')),
+               *[(name, Path(__file__).parents[1] / name) for name in
+                 ('actor.py', 'actor_runtime.py', 'debugger.py', 'runtime-fixture.json')]]
     return '#cloud-config\n' + json.dumps({
         'hostname': 'eqemu-worker-build', 'ssh_pwauth': False, 'disable_root': True,
         'write_files': [
@@ -51,6 +54,7 @@ def build_user_data(nonce):
              'content': Path(__file__).with_name('build_guest.py').read_text()},
             {'path': '/opt/eqemu-worker-nonce', 'permissions': '0600', 'content': nonce},
             {'path': '/opt/eqemu-worker-checks.json', 'permissions': '0600', 'content': json.dumps(BUILD_CHECKS)},
+            *[{'path': '/opt/' + name, 'permissions': '0644', 'content': path.read_text()} for name, path in helpers],
         ],
         'runcmd': [['/bin/sh', '-c', launcher]],
     }) + '\n'

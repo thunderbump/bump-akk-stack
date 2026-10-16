@@ -199,16 +199,18 @@ class Packaging(unittest.TestCase):
             native = root / 'native.iso'; native.write_bytes(b'fixture native')
             rust = root / 'rust.tar'; rust.write_bytes(b'fixture rust')
             profile = {'sources': {'eqemu': {'gitlinks': {}}, 'websocketpp': {'commit': commit, 'tree': tree}}, 'dependency_blobs': {}}
-            with patch.object(prepare.json, 'loads', return_value=profile), \
+            runtime_iso = root / 'runtime.iso'; runtime_iso.write_bytes(b'fixture runtime')
+            fixture = {'iso': prepare.record(runtime_iso)}
+            with patch.object(prepare.json, 'loads', side_effect=lambda raw: fixture if 'manifest_sha256' in raw else profile), \
                     patch.object(prepare, 'NATIVE_SHA', prepare.record(native)['sha256']), \
                     patch.object(prepare, 'RUST_SHA', prepare.record(rust)['sha256']):
                 output = root / 'payload.iso'
-                request = prepare.prepare(repo, 'HEAD', repo, native, rust, output)
+                request = prepare.prepare(repo, 'HEAD', repo, native, rust, output, runtime_iso)
                 self.assertEqual(request['candidate'], commit)
                 self.assertEqual(request['sha256'], prepare.record(output)['sha256'])
                 (repo / 'Cargo.toml').write_text('dirty')
                 with self.assertRaisesRegex(ValueError, 'Dirty source'):
-                    prepare.prepare(repo, 'HEAD', repo, native, rust, root / 'dirty.iso')
+                    prepare.prepare(repo, 'HEAD', repo, native, rust, root / 'dirty.iso', runtime_iso)
 
 
 if __name__ == '__main__':

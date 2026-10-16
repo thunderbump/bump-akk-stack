@@ -9,11 +9,18 @@ import selectors
 import shutil
 import signal
 import subprocess
+import sys
 import tarfile
 import time
 
 WORK = Path('/opt/eqemu-build')
 MEDIA = Path('/opt/build-inputs')
+LOGS = WORK / 'runtime-logs'
+
+
+def emit(value):
+    print('EQEMU_RUNTIME ' + json.dumps(value, separators=(',', ':')), flush=True)
+
 ENV = {'PATH': '/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
        'LANG': 'C.UTF-8', 'HOME': '/root', 'DEBIAN_FRONTEND': 'noninteractive',
        'VCPKG_DISABLE_METRICS': '1', 'VCPKG_MAX_CONCURRENCY': '1',
@@ -226,7 +233,7 @@ def build():
 
 
 def main():
-    global DEADLINE, CHECKS
+    global DEADLINE, CHECKS, STAGE
     if os.geteuid() != 0 or not Path('/opt/eqemu-worker-build-guest').is_file():
         raise RuntimeError('Disposable build guest only')
     nonce = Path('/opt/eqemu-worker-nonce').read_text().strip()
@@ -239,8 +246,15 @@ def main():
         WORK.mkdir(); MEDIA.mkdir()
         Path('/media/eqemu-input').mkdir(parents=True)
         command('mount-job', ['mount', '-o', 'ro,nosuid,nodev', '/dev/sr1', '/media/eqemu-input'])
-        provision()
-        result.update(build(), exit_code=0)
+        identity = provision()
+        result.update(build())
+        STAGE = 'normal-world'
+        print('EQEMU_STAGE normal-world', flush=True)
+        LOGS.mkdir()
+        from normal_world import run
+        result['normal_world'] = run(sys.modules[__name__], identity)
+        COMPLETED.append('normal-world')
+        result['exit_code'] = 0
     except Exception as error:
         result.update(exit_code=1 if isinstance(error, CandidateFailure) else 2, error=str(error)[-3500:])
     result['stage'] = STAGE
