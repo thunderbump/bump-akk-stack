@@ -143,6 +143,34 @@ class BuildRuntime(unittest.TestCase):
         with patch.object(runtime, 'run_vm', side_effect=consume):
             self.assertEqual(runtime.request(self.server, self.value), {'exit_code': 2})
 
+    def test_cloud_init_failure_ends_idle_guest_promptly(self):
+        script = self.root / 'failed-cloud-init.py'
+        # Replay the captured failure split across reads, then keep the fake VM idle.
+        message = b'cloud-init[972]: cc_scripts_user.py[WARNING]: Failed to run module scripts_user'
+        script.write_text('import os,time\n'
+                          'os.write(1,' + repr(message[:50]) + ')\n'
+                          'time.sleep(.05)\n'
+                          'os.write(1,' + repr(message[50:] + b'\nlogin: ') + ')\n'
+                          'time.sleep(30)\n')
+        started = time.monotonic()
+        with self.assertRaisesRegex(RuntimeError, 'Guest cloud-init command failed'):
+            runtime.supervise([sys.executable, str(script)], self.root, self.root / 'console.log',
+                              self.server, started + 2, 'a'*32, build_result={})
+
+    def test_cloud_init_failure_is_infrastructure_with_owned_cleanup(self):
+        message = 'cc_scripts_user.py[WARNING]: Failed to run module scripts_user'
+        qemu = self.tools / 'qemu'
+        qemu.write_text('#!' + sys.executable + '\nimport time\nprint(' + repr(message)
+                        + ', flush=True)\ntime.sleep(30)\n')
+        self.client.sendall(b'ISO')
+        result = runtime.run_vm(self.value, self.server, build=self.build_request())
+        self.assertEqual(result['exit_code'], 2)
+        self.assertIn('Guest cloud-init command failed', result['error'])
+        self.assertTrue(result['vm_started'])
+        self.assertTrue(result['cleanup_complete'])
+        self.assertFalse((self.state / 'active.json').exists())
+        self.assertFalse(any(path.is_dir() for path in self.state.iterdir()))
+
     def test_build_completion_preserves_infrastructure_details(self):
         result = dict(version=1, nonce='a'*32, scope='worker-build', exit_code=2,
                       stage='offline-package-install', error='Missing offline input',

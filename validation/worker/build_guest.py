@@ -245,7 +245,6 @@ def main():
         result.update(exit_code=1 if isinstance(error, CandidateFailure) else 2, error=str(error)[-3500:])
     result['stage'] = STAGE
     print('\nEQEMU_WORKER_RESULT ' + json.dumps(result, separators=(',', ':')), flush=True)
-    subprocess.run(['/usr/sbin/poweroff'], timeout=30)
 
 
 if __name__ == '__main__':
