@@ -10,6 +10,7 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'validation/worker'))
 from client import CONFIG, exchange
 from prepare import prepare
+from identity import identity
 
 
 def main():
@@ -21,8 +22,14 @@ def main():
     parser.add_argument('--rust-input', type=Path, default=Path.home() / '.local/state/eqemu-rust-validator/inputs/bundle-1.99.0-cxx194/rust-inputs.tar')
     parser.add_argument('--config', type=Path, default=CONFIG)
     parser.add_argument('--prepare-only', type=Path, metavar='OUTPUT_ISO')
+    parser.add_argument('--identity', action='store_true', help='Print AFK contract identity without connecting to the worker or running candidate code')
     args = parser.parse_args()
     try:
+        if args.identity:
+            print(json.dumps(identity(Path(__file__).resolve().parents[1], args.config,
+                                     args.input_store / 'build-inputs-20260925-v3/build-inputs.iso',
+                                     args.rust_input), separators=(',', ':')))
+            return 0
         with tempfile.TemporaryDirectory(prefix='eqemu-candidate-') as tmp:
             output = args.prepare_only or Path(tmp) / 'payload.iso'
             if not args.prepare_only:
