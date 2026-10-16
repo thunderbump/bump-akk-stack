@@ -320,6 +320,12 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                     if stream.tell() + len(block) > (64 * LOG_LIMIT if build_result is not None else LOG_LIMIT):
                         raise RuntimeError('Worker serial output limit exceeded')
                     output.extend(block); stream.write(block); stream.flush()
+                    if (build_result is not None
+                            and b'cc_scripts_user.py[WARNING]: Failed to run module scripts_user' in output):
+                        # Cloud-init has returned from our command. An idle login
+                        # prompt cannot complete the job; retain diagnostics and fail now.
+                        raise RuntimeError('Guest cloud-init command failed before shutdown: '
+                                           + output[-900:].decode(errors='replace').strip())
                     # Keep only the diagnostic tail in RAM; complete console output stays bounded on disk.
                     del output[:-16384]
             code = process.wait(timeout=5)

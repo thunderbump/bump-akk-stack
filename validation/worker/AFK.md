@@ -33,3 +33,16 @@ This path uses one disposable VM for Rust checks, native compilation, final zone
 symbol inspection and native utility tests. The worker owns scratch and VM
 cleanup; do not attach the old validator's Docker/lease cleanup adapter. It does
 not run a separate fresh consumer or claim actor gameplay qualification.
+
+
+The cloud-init shell remains the parent of the guest Python command and owns
+poweroff. If Python exits abruptly before normal completion, the shell emits an
+infrastructure result with its exit status and requests shutdown. The host also
+refuses immediately on cloud-init's user-script failure diagnostic, preserving
+the console tail and cleaning its owned VM instead of waiting for the build
+budget to expire. A failure result does not establish completed checks.
+
+The disposable build guest masks/stops `serial-getty@ttyS0.service` before
+opening its validation console. That login service resets/hangs up the same
+terminal and can invalidate existing writers with EIO during boot. Failure to
+stop it refuses guest launch; it changes no host service or root policy.
