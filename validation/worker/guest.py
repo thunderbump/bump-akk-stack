@@ -34,7 +34,10 @@ def build_user_data(nonce):
                    error='Guest command exited with status %s before normal completion')
     # Keep a shell parent alive if Python dies before it can report a result.
     # The shell owns shutdown for both normal completion and abrupt process death.
-    launcher = ('exec >/dev/ttyS0 2>&1\n'
+    # A getty hangup invalidates already-open ttyS0 writers with EIO. Remove
+    # that competing owner before opening the validation console.
+    launcher = ('/usr/bin/systemctl mask --runtime --now serial-getty@ttyS0.service || exit 2\n'
+                'exec >/dev/ttyS0 2>&1\n'
                 '/usr/bin/python3 -u /opt/eqemu-worker-build-guest\n'
                 'status=$?\n'
                 'if [ "$status" -ne 0 ]; then\n'

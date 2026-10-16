@@ -41,3 +41,8 @@ infrastructure result with its exit status and requests shutdown. The host also
 refuses immediately on cloud-init's user-script failure diagnostic, preserving
 the console tail and cleaning its owned VM instead of waiting for the build
 budget to expire. A failure result does not establish completed checks.
+
+The disposable build guest masks/stops `serial-getty@ttyS0.service` before
+opening its validation console. That login service resets/hangs up the same
+terminal and can invalidate existing writers with EIO during boot. Failure to
+stop it refuses guest launch; it changes no host service or root policy.

@@ -26,6 +26,26 @@ class Launcher(unittest.TestCase):
                               stage='rust-tests', selected_checks=list(guest.BUILD_CHECKS), completed_checks=[])
                 self.run_launcher('print(' + repr('EQEMU_WORKER_RESULT '+json.dumps(result)) + ')', code)
 
+    def test_serial_getty_is_stopped_before_python_opens_its_console(self):
+        result = dict(version=1, nonce='a'*32, scope='worker-build', exit_code=0,
+                      selected_checks=list(guest.BUILD_CHECKS), completed_checks=[])
+        fixture = ('from pathlib import Path; '
+                   'assert Path(__file__).with_name("getty-stopped").read_text().strip() '
+                   '== "mask --runtime --now serial-getty@ttyS0.service"; '
+                   'print(' + repr('EQEMU_WORKER_RESULT '+json.dumps(result)) + ')')
+        self.run_launcher(fixture, 0)
+
+    def test_getty_stop_failure_refuses_before_running_python(self):
+        config = json.loads(guest.build_user_data('a'*32).split('\n', 1)[1])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp); marker = root / 'python-ran'
+            script = config['runcmd'][0][2].replace('/usr/bin/systemctl', '/bin/false').replace(
+                '/usr/bin/python3 -u /opt/eqemu-worker-build-guest', '/usr/bin/touch ' + shlex.quote(str(marker))).replace(
+                '/dev/ttyS0', shlex.quote(str(root / 'console'))).replace('/usr/sbin/poweroff', '/bin/true')
+            result = subprocess.run(['/bin/sh', '-c', script], timeout=3, check=False)
+            self.assertEqual(result.returncode, 2)
+            self.assertFalse(marker.exists())
+
     def test_startup_traceback_reports_infrastructure_and_requests_poweroff(self):
         self.run_launcher('raise RuntimeError("trusted startup failure")', 2)
 
@@ -37,10 +57,16 @@ class Launcher(unittest.TestCase):
             console = root / 'console.log'; poweroff = root / 'poweroff'
             poweroff.write_text('#!/bin/sh\ntouch ' + shlex.quote(str(root / 'powered-off')) + '\n')
             poweroff.chmod(0o700)
+            systemctl = root / 'systemctl'
+            systemctl.write_text('#!/bin/sh\nprintf "%s\\n" "$*" > '
+                                 + shlex.quote(str(root / 'getty-stopped')) + '\n')
+            systemctl.chmod(0o700)
             script = config['runcmd'][0][2].replace(
                 '/usr/bin/python3 -u /opt/eqemu-worker-build-guest',
                 shlex.quote(sys.executable) + ' -u ' + shlex.quote(str(python))).replace(
-                '/dev/ttyS0', shlex.quote(str(console))).replace('/usr/sbin/poweroff', shlex.quote(str(poweroff)))
+                '/dev/ttyS0', shlex.quote(str(console))).replace(
+                '/usr/sbin/poweroff', shlex.quote(str(poweroff))).replace(
+                '/usr/bin/systemctl', shlex.quote(str(systemctl)))
             subprocess.run(['/bin/sh', '-c', script], timeout=3, check=False)
             lines = [line for line in console.read_text().splitlines() if line.startswith('EQEMU_WORKER_RESULT ')]
             self.assertEqual(len(lines), 1, console.read_text())
