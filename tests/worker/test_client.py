@@ -1,4 +1,6 @@
 """Socket-level foreground results and failures, without root or a worker service."""
+import contextlib
+import io
 import json
 from pathlib import Path
 import socket
@@ -11,6 +13,7 @@ from unittest.mock import patch
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'validation/worker'))
 import client
+from test_normal_world import baseline
 
 
 class Client(unittest.TestCase):
@@ -76,12 +79,38 @@ class Client(unittest.TestCase):
         request = dict(version=1, operation='build', candidate='a'*40, tree='b'*40, bytes=3, sha256='c'*64)
         report = dict(version=1, scope='worker-build', operation='build', exit_code=0,
                       vm_started=True, cleanup_complete=True, candidate=request['candidate'],
-                      tree=request['tree'], payload_sha256=request['sha256'])
+                      tree=request['tree'], payload_sha256=request['sha256'],
+                      coverage=['normal-world'], guest={'normal_world': baseline(), 'zone_sha256': 'b'*64})
         self.assertEqual(self.exchange((json.dumps(report)+'\n').encode(), request), report)
         for field in ('candidate', 'tree', 'payload_sha256', 'cleanup_complete'):
             changed = dict(report, **{field: False})
             with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'mismatched build'):
                 self.exchange((json.dumps(changed)+'\n').encode(), request)
+
+    def test_old_build_only_worker_cannot_pass_normal_world(self):
+        request = dict(version=1, operation='build', candidate='a'*40, tree='b'*40, sha256='c'*64)
+        report = dict(version=1, operation='build', scope='worker-build', exit_code=0,
+                      vm_started=True, cleanup_complete=True, candidate='a'*40, tree='b'*40, payload_sha256='c'*64)
+        with self.assertRaises(ValueError):
+            self.exchange((json.dumps(report)+'\n').encode(), request)
+
+    def test_progress_can_be_coalesced_with_final_nonpass_report(self):
+        event = dict(version=1, kind='progress', name='normal-world-ready')
+        report = dict(version=1, exit_code=2, error='cancelled')
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            result = self.exchange((json.dumps(event)+'\n'+json.dumps(report)+'\n').encode(),
+                                   dict(version=1, operation='build'))
+        self.assertEqual(result, report)
+        self.assertEqual(output.getvalue(), 'EQEMU_STAGE normal-world-ready\n')
+
+    def test_progress_is_bounded_and_cannot_substitute_for_final_report(self):
+        event = b'{"version":1,"kind":"progress","name":"normal-world-ready"}\n'
+        for data, operation in ((event, 'check'), (event+event, 'build'), (event, 'build'),
+                                (event.replace(b'normal-world-ready', b'arbitrary'), 'build')):
+            with self.subTest(data=data, operation=operation), contextlib.redirect_stderr(io.StringIO()), \
+                    self.assertRaises(RuntimeError):
+                self.exchange(data, dict(version=1, operation=operation))
 
     def test_last_result_observation_preserves_nested_smoke_failure(self):
         report=dict(version=1,scope='worker-observation',operation='last-result',exit_code=0,

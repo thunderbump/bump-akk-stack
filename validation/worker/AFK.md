@@ -18,10 +18,11 @@ return infrastructure exit 2 without a usable identity. Normal validation keeps
 its existing JSON report and exit 0/pass, 1/candidate failure, 2/infrastructure.
 AFK retains stdout/stderr and publishes its normal checks and feedback.
 
-The frontend needs these six files in their original relative locations:
+The frontend needs these eight files in their original relative locations:
 `scripts/validate-worker-candidate`, `validation/worker/identity.py`,
 `validation/worker/prepare.py`, `validation/worker/client.py`,
-`validation/inputs.py` and `validation/profile.json`. Copy them to a fresh,
+`validation/inputs.py`, `validation/profile.json`, `validation/runtime-fixture.json`
+and `validation/worker/normal_world.py`. Copy them to a fresh,
 commit-named directory owned by the submitter; keep that directory fixed while
 any AFK job is running. Source/client changes require a fresh copy and an AFK
 configuration update while jobs are quiescent. Root account/service/policy/base
@@ -30,7 +31,9 @@ selection needs no sudo. Identity probes before/after execution detect observed
 changes; they do not replace keeping trusted implementation fixed during a run.
 
 This path uses one disposable VM for Rust checks, native compilation, final zone
-symbol inspection and native utility tests. The worker owns scratch and VM
+symbol inspection, native utility tests and the
+[normal disposable DB/world/zone baseline](NORMAL-WORLD.md). The pinned public
+runtime ISO is now required by ordinary validation and identity probes. The worker owns scratch and VM
 cleanup; do not attach the old validator's Docker/lease cleanup adapter. It does
 not run a separate fresh consumer or claim actor gameplay qualification.
 

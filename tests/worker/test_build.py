@@ -143,6 +143,56 @@ class BuildRuntime(unittest.TestCase):
         with patch.object(runtime, 'run_vm', side_effect=consume):
             self.assertEqual(runtime.request(self.server, self.value), {'exit_code': 2})
 
+    def test_foreground_cancellation_after_streamed_readiness_cleans_owned_vm(self):
+        import client
+        qemu = self.tools/'qemu'
+        marker = b'EQEMU_RUNTIME {"kind":"stage","name":"normal-world-ready","state":"started"}\n'
+        # Exercise split serial reads and do not exit until the worker cancels us.
+        qemu.write_text('#!' + sys.executable + '\nimport os,time\n'
+                        'os.write(1,' + repr(marker[:35]) + ')\ntime.sleep(.05)\n'
+                        'os.write(1,' + repr(marker[35:]) + ')\ntime.sleep(30)\n')
+        payload = self.root/'payload'; payload.write_bytes(b'ISO')
+        path = self.root/'progress.sock'
+        reports = []; errors = []
+        with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as listener:
+            listener.bind(str(path)); listener.listen(1); listener.settimeout(3)
+            def serve():
+                try:
+                    connection, _ = listener.accept()
+                    with connection:
+                        raw = bytearray()
+                        while not raw.endswith(b'\n'):
+                            raw.extend(connection.recv(1))
+                        reports.append(runtime.run_vm(self.value, connection, build=json.loads(raw)))
+                except BaseException as error:
+                    errors.append(error)
+            def interrupt(message, **kwargs):
+                self.assertEqual(message, 'EQEMU_STAGE normal-world-ready')
+                self.assertIs(kwargs['file'], sys.stderr)
+                self.assertTrue(kwargs['flush'])
+                raise KeyboardInterrupt
+            with patch.object(runtime, 'resource_state', return_value={'memory.max': str(6*1024**3)}), \
+                    patch.object(runtime, 'BUILD_SECONDS', 3), \
+                    patch('builtins.print', side_effect=interrupt):
+                thread = threading.Thread(target=serve); thread.start()
+                try:
+                    with self.assertRaises(KeyboardInterrupt):
+                        client.exchange(path, self.build_request(), payload)
+                finally:
+                    thread.join(5)
+            self.assertFalse(thread.is_alive())
+        self.assertFalse(errors, errors)
+        self.assertEqual(len(reports), 1)
+        result = reports[0]
+        self.assertEqual(result['exit_code'], 2)
+        self.assertIn('disconnected', result['error'])
+        self.assertTrue(result['vm_started'])
+        self.assertTrue(result['cleanup_complete'])
+        self.assertFalse((self.state/'active.json').exists())
+        self.assertFalse(any(p.is_dir() for p in self.state.iterdir()))
+        with self.assertRaises(ProcessLookupError):
+            os.kill(result['qemu_pid'], 0)
+
     def test_cloud_init_failure_ends_idle_guest_promptly(self):
         script = self.root / 'failed-cloud-init.py'
         # Replay the captured failure split across reads, then keep the fake VM idle.
@@ -199,16 +249,18 @@ class Packaging(unittest.TestCase):
             native = root / 'native.iso'; native.write_bytes(b'fixture native')
             rust = root / 'rust.tar'; rust.write_bytes(b'fixture rust')
             profile = {'sources': {'eqemu': {'gitlinks': {}}, 'websocketpp': {'commit': commit, 'tree': tree}}, 'dependency_blobs': {}}
-            with patch.object(prepare.json, 'loads', return_value=profile), \
+            runtime_iso = root / 'runtime.iso'; runtime_iso.write_bytes(b'fixture runtime')
+            fixture = {'iso': prepare.record(runtime_iso)}
+            with patch.object(prepare.json, 'loads', side_effect=lambda raw: fixture if 'manifest_sha256' in raw else profile), \
                     patch.object(prepare, 'NATIVE_SHA', prepare.record(native)['sha256']), \
                     patch.object(prepare, 'RUST_SHA', prepare.record(rust)['sha256']):
                 output = root / 'payload.iso'
-                request = prepare.prepare(repo, 'HEAD', repo, native, rust, output)
+                request = prepare.prepare(repo, 'HEAD', repo, native, rust, output, runtime_iso)
                 self.assertEqual(request['candidate'], commit)
                 self.assertEqual(request['sha256'], prepare.record(output)['sha256'])
                 (repo / 'Cargo.toml').write_text('dirty')
                 with self.assertRaisesRegex(ValueError, 'Dirty source'):
-                    prepare.prepare(repo, 'HEAD', repo, native, rust, root / 'dirty.iso')
+                    prepare.prepare(repo, 'HEAD', repo, native, rust, root / 'dirty.iso', runtime_iso)
 
 
 if __name__ == '__main__':

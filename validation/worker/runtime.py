@@ -298,6 +298,9 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                                cwd=scratch, start_new_session=True, close_fds=True,
                                env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': str(scratch)})
     output = bytearray()
+    pending = bytearray()
+    discarding = False
+    notified = False
     try:
         if on_started is not None:
             if process.poll() is not None:
@@ -320,6 +323,26 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                     if stream.tell() + len(block) > (64 * LOG_LIMIT if build_result is not None else LOG_LIMIT):
                         raise RuntimeError('Worker serial output limit exceeded')
                     output.extend(block); stream.write(block); stream.flush()
+                    if build_result is not None:
+                        pending.extend(block)
+                        while b'\n' in pending:
+                            line, _, rest = pending.partition(b'\n')
+                            pending = bytearray(rest)
+                            if (not discarding and not notified and line.rstrip(b'\r') ==
+                                    b'EQEMU_RUNTIME {"kind":"stage","name":"normal-world-ready","state":"started"}'):
+                                notified = True
+                                # Advisory only, never completion evidence. Bound socket backpressure.
+                                connection.settimeout(1)
+                                try:
+                                    connection.sendall(b'{"version":1,"kind":"progress","name":"normal-world-ready"}\n')
+                                finally:
+                                    connection.settimeout(None)
+                            discarding = False
+                        # Ignore oversized serial lines; never forward guest text.
+                        if len(pending) > 65536:
+                            pending.clear()
+                            discarding = True
+
                     if (build_result is not None
                             and b'cc_scripts_user.py[WARNING]: Failed to run module scripts_user' in output):
                         # Cloud-init has returned from our command. An idle login
@@ -346,7 +369,7 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
         raise RuntimeError('Missing or duplicate guest completion')
     result = results[0]
     if (not isinstance(result, dict) or (set(result) != {'version', 'nonce', 'scope', 'exit_code'} if build_result is None
-                                                else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities', 'selected_checks', 'completed_checks'})
+                                                else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities', 'normal_world', 'selected_checks', 'completed_checks'})
             or type(result.get('version')) is not int or result['version'] != 1 or result.get('nonce') != nonce or result.get('scope') != ('worker-smoke' if build_result is None else 'worker-build')
             or type(result.get('exit_code')) is not int or result['exit_code'] not in ((0, 1) if build_result is None else (0, 1, 2))):
         raise RuntimeError('Malformed guest completion')
@@ -364,6 +387,11 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
         if result['exit_code'] == 0 and (not isinstance(result.get('zone_sha256'), str)
                 or not re.fullmatch('[a-f0-9]{64}', result['zone_sha256']) or not isinstance(result.get('utilities'), dict)):
             raise RuntimeError('Build completion missing zone or utility evidence')
+        if result['exit_code'] == 0:
+            from normal_world import validate
+            normal = validate(result.get('normal_world'))
+            if normal['binaries']['zone'] != result['zone_sha256']:
+                raise RuntimeError('Normal-world zone differs from built candidate')
         build_result.update(result)
     return result['exit_code']
 
@@ -390,7 +418,8 @@ def receive_payload(connection, target, expected, deadline):
 def implementation_identity(value):
     """Digest the finite reviewed worker implementation, independent of candidate inputs."""
     paths = ('validation/worker/runtime.py', 'validation/worker/guest.py',
-             'validation/worker/build_guest.py', 'validation/worker/client.py', 'scripts/check-validation-worker')
+             'validation/worker/build_guest.py', 'validation/worker/normal_world.py', 'validation/actor.py', 'validation/actor_runtime.py',
+              'validation/debugger.py', 'validation/runtime-fixture.json', 'validation/worker/client.py', 'scripts/check-validation-worker')
     digests = {}
     for name in paths:
         with (Path(value['code_dir']) / name).open('rb') as stream:
@@ -465,7 +494,7 @@ def run_vm(value, connection, control='pass', build=None):
             if report['implementation_sha256'] != implementation_identity(value):
                 raise RuntimeError('Worker implementation changed during the job')
             if report['exit_code'] == 0:
-                report['coverage'] = ['rust-checks', 'server-build', 'native-utilities']
+                report['coverage'] = ['rust-checks', 'server-build', 'native-utilities', 'normal-world']
     except Exception as error:
         report['error'] = str(error)[:1000]
         report['exit_code'] = 2
