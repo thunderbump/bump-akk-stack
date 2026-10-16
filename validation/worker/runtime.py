@@ -298,6 +298,9 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                                cwd=scratch, start_new_session=True, close_fds=True,
                                env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': str(scratch)})
     output = bytearray()
+    pending = bytearray()
+    discarding = False
+    notified = False
     try:
         if on_started is not None:
             if process.poll() is not None:
@@ -320,6 +323,26 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                     if stream.tell() + len(block) > (64 * LOG_LIMIT if build_result is not None else LOG_LIMIT):
                         raise RuntimeError('Worker serial output limit exceeded')
                     output.extend(block); stream.write(block); stream.flush()
+                    if build_result is not None:
+                        pending.extend(block)
+                        while b'\n' in pending:
+                            line, _, rest = pending.partition(b'\n')
+                            pending = bytearray(rest)
+                            if (not discarding and not notified and line.rstrip(b'\r') ==
+                                    b'EQEMU_RUNTIME {"kind":"stage","name":"normal-world-ready","state":"started"}'):
+                                notified = True
+                                # Advisory only, never completion evidence. Bound socket backpressure.
+                                connection.settimeout(1)
+                                try:
+                                    connection.sendall(b'{"version":1,"kind":"progress","name":"normal-world-ready"}\n')
+                                finally:
+                                    connection.settimeout(None)
+                            discarding = False
+                        # Ignore oversized serial lines; never forward guest text.
+                        if len(pending) > 65536:
+                            pending.clear()
+                            discarding = True
+
                     if (build_result is not None
                             and b'cc_scripts_user.py[WARNING]: Failed to run module scripts_user' in output):
                         # Cloud-init has returned from our command. An idle login

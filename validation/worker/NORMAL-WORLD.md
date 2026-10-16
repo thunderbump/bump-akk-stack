@@ -21,7 +21,10 @@ media, fixture declaration and complete installed guest-helper closure.
 
 The runtime manifest identifies the five PEQ SQL members/import order, quests,
 maps, opcodes, offline package proof and public provenance. The helper checks the
-actual package solver plan against the pinned closure, installs with
+actual package solver plan against the pinned closure minus identical installed
+packages. It uses isolated APT state with the verified runtime metadata and live
+guest dpkg status, not the native bundle's indices or a retained simulation status.
+Version changes to existing pins, removals and unpinned additions refuse. It installs with
 `--no-download --no-remove`, audits installed versions and probes Perl/debugger
 tools in this current guest. It does not assume a previous guest's installed
 packages still exist. Missing media, unavailable versions, solver changes,
@@ -77,7 +80,10 @@ controls. Each builds the selected candidate and creates a fresh fixture:
   deliberately fails its assertion. Complete cleanup yields candidate exit 1.
 * `cancel`: after real readiness, the observer continues bounded responsiveness
   checks instead of passing. Wait for the `normal-world-ready` stage in the
-  ordinary output, then interrupt/disconnect the foreground client. The existing
+  ordinary stderr (`EQEMU_STAGE normal-world-ready`), then interrupt/disconnect
+  the foreground client. The worker sends at most one fixed, bounded progress
+  frame; it never forwards raw guest output. This is an advisory synchronization
+  notification, not a pass: the final identity/assertion/cleanup gates still apply. The existing
   worker cancellation path destroys its exact VM/scratch and returns non-pass.
   An un-interrupted cancel control also reaches a non-pass deadline, never pass.
 
@@ -104,7 +110,11 @@ for controller death. No unrelated VM, PID, socket or filesystem tree is pruned.
 Trusted Python/fake controls in `tests/worker/test_normal_world.py` cover gates,
 missing/wrong challenge replies, exact-PID connection ownership, positive and
 assertion/startup/interruption paths, descendant cleanup, seed/staging closure
-and old-worker rejection. They do not establish a real native startup, package
+and old-worker rejection. Socket/process tests cover a split readiness frame,
+foreground interruption upon its receipt, non-pass persistence and owned VM/scratch
+cleanup. Shared installer tests in `tests/validation/test_runtime_packages.py`
+cover runtime metadata selection, live installed pins, plan refusal and failure
+restoration without executing apt. They do not establish a real native startup, package
 compatibility, gameplay ticks or GitHub delivery. Actual positive, startup,
 assertion and foreground-cancellation evidence must be collected separately in
 the current worker after reviewed asset activation. No such acceptance run was

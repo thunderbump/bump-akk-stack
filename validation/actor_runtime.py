@@ -164,9 +164,43 @@ class Runtime:
                 raise RuntimeError('Missing/changed runtime fixture: '+item['path'])
 
     def install_packages(self):
+        # Do not inherit the producer/native solver's indices or cached plan.
+        # Callers have verified MEDIA against the sealed runtime manifest.
+        apt = self.build.WORK/'runtime-apt'
+        for directory in ('lists/partial', 'archives/partial', 'parts', 'sources', 'log'):
+            (apt/directory).mkdir(parents=True)
+        for path in (MEDIA/'apt-lists').iterdir():
+            shutil.copyfile(path, apt/'lists'/path.name)
+        (apt/'empty.conf').touch()
+        (apt/'sources.list').write_text(''.join(
+            f'deb [arch=amd64 signed-by={MEDIA}/ubuntu-archive-keyring.gpg] https://archive.ubuntu.com/ubuntu {suite} main universe\n'
+            for suite in ('noble', 'noble-updates', 'noble-security')))
+        config = apt/'apt.conf'
+        config.write_text(f'''Dir::Etc "{apt}";
+Dir::Etc::main "{apt}/empty.conf";
+Dir::Etc::parts "{apt}/parts";
+Dir::Etc::sourcelist "{apt}/sources.list";
+Dir::Etc::sourceparts "{apt}/sources";
+Dir::State "{apt}";
+Dir::State::lists "{apt}/lists";
+Dir::State::status "/var/lib/dpkg/status";
+Dir::Cache "{apt}";
+Dir::Cache::archives "{apt}/archives";
+Dir::Cache::pkgcache "";
+Dir::Cache::srcpkgcache "";
+Dir::Log "{apt}/log";
+APT::Install-Recommends "false";
+''')
+        previous = self.build.ENV
+        self.build.ENV = dict(previous, APT_CONFIG=str(config))
+        try:
+            return self._install_packages(apt/'archives')
+        finally:
+            self.build.ENV = previous
+
+    def _install_packages(self, cache):
         proof = json.loads((MEDIA/'provenance/runtime-package-proof.json').read_text())
         allowed = {(p['Package'], p['Version']) for p in proof['packages']}
-        cache = self.build.WORK/'apt/archives'
         for package in proof['packages']:
             self.guard()
             source = MEDIA/'debs'/Path(package['Filename']).name
@@ -180,6 +214,15 @@ class Runtime:
                 raise RuntimeError('Runtime package copy changed')
         args = ['apt-get', '--no-download', '--no-remove', '-y', '-o', 'Dpkg::Options::=--force-confdef',
                 '-o', 'Dpkg::Options::=--force-confold', 'install', *(p+'='+v for p, v in sorted(allowed))]
+        identities = self.command('actor-package-current', ['dpkg-query', '-W',
+                                  '-f=${Package}\t${Version}\t${db:Status-Status}\n'])
+        installed = set()
+        for line in identities.splitlines():
+            name, version, status = line.split('\t')
+            if status == 'installed':
+                installed.add((name, version))
+        if any(name == p and version != v for name, version in installed for p, v in allowed):
+            raise RuntimeError('Runtime pinned package would change installed version')
         plan = self.command('actor-package-plan', ['apt-get', '-s', *args[1:]])
         selected = set()
         for line in plan.splitlines():
@@ -188,7 +231,7 @@ class Runtime:
                 match = re.fullmatch(r'Inst (\S+) \((\S+) .*\)', line)
                 if match is None: raise RuntimeError('Runtime solver upgrade or invalid line')
                 selected.add((match[1].split(':')[0], match[2]))
-        if selected != allowed:
+        if selected != allowed - installed:
             raise RuntimeError('Runtime solver differs from pinned closure')
         policy = Path('/usr/sbin/policy-rc.d')
         if policy.exists(): raise RuntimeError('Unexpected guest service policy')

@@ -33,16 +33,29 @@ def exchange_once(path, request, payload=None):
                 while block := stream.read(1024**2):
                     connection.sendall(block)
         data = bytearray()
-        while b'\n' not in data:
-            block = connection.recv(min(4096, REPORT_LIMIT + 1 - len(data)))
-            if not block:
-                raise RuntimeError('Worker closed without a final report')
-            data.extend(block)
-            if len(data) > REPORT_LIMIT:
-                raise RuntimeError('Worker report size limit exceeded')
-        if not data.endswith(b'\n') or data.count(b'\n') != 1:
-            raise RuntimeError('Expected one final worker report')
-        result = json.loads(data)
+        notified = False
+        while True:
+            while b'\n' not in data:
+                block = connection.recv(min(4096, REPORT_LIMIT + 1 - len(data)))
+                if not block:
+                    raise RuntimeError('Worker closed without a final report')
+                data.extend(block)
+                if len(data) > REPORT_LIMIT:
+                    raise RuntimeError('Worker report size limit exceeded')
+            line, _, rest = data.partition(b'\n')
+            result = json.loads(line)
+            if isinstance(result, dict) and result.get('kind') == 'progress':
+                if (request['operation'] != 'build' or notified or result !=
+                        {'version': 1, 'kind': 'progress', 'name': 'normal-world-ready'}
+                        or type(result['version']) is not int):
+                    raise RuntimeError('Unexpected worker progress notification')
+                notified = True
+                print('EQEMU_STAGE normal-world-ready', file=sys.stderr, flush=True)
+                data = bytearray(rest)
+                continue
+            if rest:
+                raise RuntimeError('Expected one final worker report')
+            break
         if (not isinstance(result, dict) or type(result.get('version')) is not int or result['version'] != 1
                 or type(result.get('exit_code')) is not int or result['exit_code'] not in (0, 1, 2)):
             raise RuntimeError('Malformed worker report')

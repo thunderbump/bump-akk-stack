@@ -1,4 +1,6 @@
 """Socket-level foreground results and failures, without root or a worker service."""
+import contextlib
+import io
 import json
 from pathlib import Path
 import socket
@@ -91,6 +93,24 @@ class Client(unittest.TestCase):
                       vm_started=True, cleanup_complete=True, candidate='a'*40, tree='b'*40, payload_sha256='c'*64)
         with self.assertRaises(ValueError):
             self.exchange((json.dumps(report)+'\n').encode(), request)
+
+    def test_progress_can_be_coalesced_with_final_nonpass_report(self):
+        event = dict(version=1, kind='progress', name='normal-world-ready')
+        report = dict(version=1, exit_code=2, error='cancelled')
+        output = io.StringIO()
+        with contextlib.redirect_stderr(output):
+            result = self.exchange((json.dumps(event)+'\n'+json.dumps(report)+'\n').encode(),
+                                   dict(version=1, operation='build'))
+        self.assertEqual(result, report)
+        self.assertEqual(output.getvalue(), 'EQEMU_STAGE normal-world-ready\n')
+
+    def test_progress_is_bounded_and_cannot_substitute_for_final_report(self):
+        event = b'{"version":1,"kind":"progress","name":"normal-world-ready"}\n'
+        for data, operation in ((event, 'check'), (event+event, 'build'), (event, 'build'),
+                                (event.replace(b'normal-world-ready', b'arbitrary'), 'build')):
+            with self.subTest(data=data, operation=operation), contextlib.redirect_stderr(io.StringIO()), \
+                    self.assertRaises(RuntimeError):
+                self.exchange(data, dict(version=1, operation=operation))
 
     def test_last_result_observation_preserves_nested_smoke_failure(self):
         report=dict(version=1,scope='worker-observation',operation='last-result',exit_code=0,
