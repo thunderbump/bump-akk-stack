@@ -235,10 +235,11 @@ def run(build, identity):
         runtime.verify_inputs()
         runtime.install_packages()
         runtime.initialize_database(); runtime.import_database()
-        # Deliberately keep an empty zone active: no NPC spawns, no zone controller,
-        # no clients, state saving, idle sleep, shutdown-on-empty, login or external sinks.
-        runtime.query('normal-activity', "REPLACE INTO rule_values (ruleset_id,rule_name,rule_value,notes) VALUES (1,'Zone:IdleWhenEmpty','false','Disposable normal-world baseline');")
-        if runtime.query('normal-activity-check', "SELECT rule_value FROM rule_values WHERE ruleset_id=1 AND rule_name='Zone:IdleWhenEmpty';").strip() != 'false':
+        # Native Zone construction reads the selected zone row, not a rule_values
+        # entry. Disable idle processing before boot; seconds_before_idle is then
+        # irrelevant. Match the exact default PoK row verified by import_database.
+        runtime.query('normal-activity', "UPDATE zone SET idle_when_empty=0 WHERE zoneidnumber=202 AND version=0 AND short_name='poknowledge';")
+        if runtime.query('normal-activity-check', "SELECT zoneidnumber,version,short_name,idle_when_empty FROM zone WHERE zoneidnumber=202 AND version=0 AND short_name='poknowledge';").strip() != '202\t0\tpoknowledge\t0':
             raise RuntimeError('Empty-zone activity configuration missing')
         server = runtime.configure()
         config_path = server / 'eqemu_config.json'

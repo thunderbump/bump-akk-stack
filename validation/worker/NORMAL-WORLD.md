@@ -46,8 +46,14 @@ combined payload refuses rather than expanding host policy automatically.
 Root performs only guest-local preparation: pinned package installation, a fresh
 owned MariaDB datadir/database, verified public imports and derived fixture
 configuration. It removes ambient PoK spawn2 entries, disables zone controller,
-bots, state saving and external logging sinks, and explicitly sets and reads
-back `Zone:IdleWhenEmpty=false`. No player/login records are added. Normal native
+bots, state saving and external logging sinks. Before native boot it sets
+`zone.idle_when_empty=0` on the exact default PoK row (`zoneidnumber=202`,
+`version=0`, `short_name='poknowledge'`) and reads back that row's identity and
+value, refusing missing, duplicate or mismatched results. Native zone construction
+loads `idle_when_empty` and `seconds_before_idle` from the zone table; with idling
+disabled, the idle delay is irrelevant and is left unchanged. An arbitrary
+`Zone:IdleWhenEmpty` rule row is not a native activity control or proof.
+No player/login records are added. Normal native
 executables and the source-owned observer run as `nobody`, with empty supplementary
 groups, no-new-privileges, no cores and bounded output files. Login attempts are
 restricted to loopback; the VM still has no network interface.
@@ -108,7 +114,9 @@ for controller death. No unrelated VM, PID, socket or filesystem tree is pruned.
 ## Qualification limits
 
 Trusted Python/fake controls in `tests/worker/test_normal_world.py` cover gates,
-missing/wrong challenge replies, exact-PID connection ownership, positive and
+zone-row activity configuration/readback refusal before native launch (including
+missing/schema-mismatched rows and failed writes), missing/wrong challenge replies,
+exact-PID connection ownership, positive and
 assertion/startup/interruption paths, descendant cleanup, seed/staging closure
 and old-worker rejection. Socket/process tests cover a split readiness frame,
 foreground interruption upon its receipt, non-pass persistence and owned VM/scratch

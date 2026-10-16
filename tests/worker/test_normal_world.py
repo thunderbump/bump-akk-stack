@@ -3,6 +3,8 @@ import contextlib
 import io
 import itertools
 import json
+import sqlite3
+import types
 from pathlib import Path
 import sys
 import tempfile
@@ -46,6 +48,66 @@ class Completion(unittest.TestCase):
         self.assertIn('normal-world', guest.BUILD_CHECKS)
         for name in ('validation/worker/normal_world.py', 'validation/actor_runtime.py', 'validation/runtime-fixture.json'):
             self.assertIn(name, staging.FILES)
+
+
+class ActivityConfiguration(unittest.TestCase):
+    def test_run_configures_native_zone_row_before_boot_and_refuses_bad_state(self):
+        # Execute the production SQL against a small relational fixture, not a
+        # mock returning the exact string the implementation wants to see.
+        cases = ('valid', 'missing', 'wrong-id', 'wrong-version', 'wrong-name', 'duplicate',
+                 'null-readback', 'ignored-write', 'write-error', 'missing-column')
+        for case in cases:
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as tmp, sqlite3.connect(':memory:') as db:
+                columns = 'zoneidnumber INTEGER, version INTEGER, short_name TEXT'
+                if case != 'missing-column':
+                    columns += ', idle_when_empty INTEGER, seconds_before_idle INTEGER'
+                db.execute('CREATE TABLE zone (' + columns + ')')
+                row = (203 if case == 'wrong-id' else 202, 1 if case == 'wrong-version' else 0,
+                       'other' if case == 'wrong-name' else 'poknowledge', 1, 60)
+                if case == 'missing-column':
+                    row = row[:3]
+                if case != 'missing':
+                    db.execute('INSERT INTO zone VALUES (' + ','.join('?' for _ in row) + ')', row)
+                if case == 'duplicate':
+                    db.execute("INSERT INTO zone VALUES (202,0,'poknowledge',1,60)")
+                # An unrelated version must never be modified.
+                if case != 'missing-column':
+                    db.execute("INSERT INTO zone VALUES (202,2,'poknowledge',1,90)")
+                runtime = Mock()
+                def query(label, sql):
+                    if label == 'normal-activity':
+                        if case == 'write-error':
+                            raise RuntimeError('write refused')
+                        if case in ('ignored-write', 'null-readback'):
+                            if case == 'null-readback':
+                                db.execute('UPDATE zone SET idle_when_empty=NULL')
+                            return ''
+                    cursor = db.execute(sql)
+                    return '\n'.join('\t'.join('NULL' if v is None else str(v) for v in r) for r in cursor.fetchall())
+                runtime.query.side_effect = query
+                runtime.configure.side_effect = RuntimeError('configuration reached after readback')
+                runtime.cleanup.return_value = True
+                runtime.scrub.side_effect = str
+                fake = types.SimpleNamespace(Runtime=Mock(return_value=runtime),
+                    ROOT=Path(tmp)/'runtime', MEDIA=Path(tmp)/'media')
+                build = Mock(DEADLINE=normal.time.monotonic()+10000, WORK=Path(tmp)/'build')
+                with patch.dict(sys.modules, actor_runtime=fake), \
+                        patch.object(normal.os, 'geteuid', return_value=0), \
+                        patch.object(normal.Path, 'is_file', return_value=True), \
+                        patch.object(normal.Path, 'read_text', return_value='{}'):
+                    with self.assertRaises(RuntimeError):
+                        normal.run(build, {})
+                runtime.initialize_database.assert_called_once()
+                runtime.import_database.assert_called_once()
+                runtime.cleanup.assert_called_once()
+                self.assertEqual(runtime.configure.call_count, int(case == 'valid'))
+                # Neither shared_memory nor the observer/native children can run
+                # after a refused write/readback. Mounting is the sole command.
+                self.assertEqual([c.args[0] for c in runtime.command.call_args_list], ['normal-mount-runtime'])
+                build.emit.assert_not_called()
+                if case == 'valid':
+                    self.assertEqual(db.execute('SELECT idle_when_empty,seconds_before_idle FROM zone ORDER BY version').fetchall(),
+                                     [(0, 60), (1, 90)])
 
 
 class Readiness(unittest.TestCase):
