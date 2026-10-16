@@ -1,4 +1,4 @@
-# Disposable normal world/zone slice (not yet VM-qualified)
+# Disposable normal world/zone slice
 
 The ordinary `scripts/validate-worker-candidate` command now selects a clean
 committed candidate, performs the existing Rust/native build, bridge-symbol and
@@ -130,8 +130,11 @@ and old-worker rejection. Socket/process tests cover a split readiness frame,
 foreground interruption upon its receipt, non-pass persistence and owned VM/scratch
 cleanup. Shared installer tests in `tests/validation/test_runtime_packages.py`
 cover runtime metadata selection, live installed pins, plan refusal and failure
-restoration without executing apt. They do not establish a real native startup, package
-compatibility, gameplay ticks or GitHub delivery. Actual positive, startup,
-assertion and foreground-cancellation evidence must be collected separately in
-the current worker after reviewed asset activation. No such acceptance run was
-performed as part of this source implementation.
+restoration without executing apt. These source tests establish helper behavior,
+not real native startup, package compatibility, gameplay ticks or GitHub delivery.
+Actual installed/runtime acceptance is tracked separately in the authoritative
+[Operations qualification worklog](http://localhost:8081/projects/bump-akk-stack/worklog/2026-10-16-normal-world-qualification.html).
+Before acceptance, a deployment must collect current positive, intended
+startup-failure, assertion-failure and readiness-cancellation evidence on the
+current worker after reviewed asset activation. Operational run identities and
+results belong in that worklog, not in this source document.
