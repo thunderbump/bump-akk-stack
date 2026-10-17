@@ -269,7 +269,7 @@ def observe(binary_dir, server, control):
         while time.monotonic() - baseline < BASELINE_SECONDS or control == 'cancel':
             guard()
             if not world_connected(processes[0].pid, processes[1].pid) or not probe():
-                raise RuntimeError('Normal zone lost world connection or application responsiveness')
+                raise InserverFailure('Normal zone lost world connection or application responsiveness')
             samples += 1
             time.sleep(.1)
         delta = [cpu_ticks(p.pid) - tick for p, tick in zip(processes, before)]

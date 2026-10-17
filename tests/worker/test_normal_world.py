@@ -167,6 +167,9 @@ class Readiness(unittest.TestCase):
                 zone.poll.side_effect = itertools.chain([None]*10, itertools.repeat(1))
             output = io.StringIO()
             probes = [True, RuntimeError('cancelled')] if interrupt else None
+            if mode == 'baseline-response-loss':
+                probes = [True, False]
+            connections = [True, False] if mode == 'baseline-world-loss' else None
             children = []
             reports = []
             def launch(args, **kwargs):
@@ -199,7 +202,7 @@ class Readiness(unittest.TestCase):
             with patch.object(normal.os, 'geteuid', return_value=65534), \
                     patch.object(normal.resource, 'setrlimit'), patch.object(normal.Path, 'is_file', return_value=True), \
                     patch.object(normal.subprocess, 'Popen', side_effect=launch) as popen, \
-                    patch.object(normal, 'world_connected', return_value=True), \
+                    patch.object(normal, 'world_connected', side_effect=connections, return_value=True), \
                     patch.object(normal, 'probe', side_effect=probes, return_value=True), \
                     patch.object(normal, 'cpu_ticks', side_effect=[0, 0, 1, 4]), \
                     patch.object(normal, 'stop', side_effect=cleanup) as stop, \
@@ -294,6 +297,16 @@ class Readiness(unittest.TestCase):
         result = self.run_observer(clean=False)
         self.assertEqual(result['exit_code'], 2)
         self.assertFalse(result['cleanup_complete'])
+
+    def test_baseline_world_or_response_loss_after_readiness_is_candidate_failure(self):
+        for mode in ('baseline-world-loss', 'baseline-response-loss'):
+            with self.subTest(mode=mode):
+                result = self.run_observer(mode=mode)
+                self.assertEqual(result['exit_code'], 1, result)
+                self.assertTrue(result['cleanup_complete'])
+                self.assertIn('ready_seconds', result)
+                self.assertNotIn('baseline_seconds', result)
+                self.assertIn('lost world connection or application responsiveness', result['error'])
 
     def test_assertion_control_requires_source_suite_failure_not_wrapper_failure(self):
         failed = self.run_observer('assertion')
