@@ -10,6 +10,8 @@ from pathlib import Path
 import pwd
 import math
 import resource
+import re
+import stat
 import signal
 import socket
 import struct
@@ -20,6 +22,76 @@ import time
 SECONDS = 1800
 OBSERVE_SECONDS = 120
 BASELINE_SECONDS = 5
+INSERVER_LIMIT = 4096
+
+
+class InserverFailure(Exception):
+    """Candidate suite did not produce complete, consistent native test evidence."""
+
+
+def unique_object(pairs):
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate in-server result key")
+        result[key] = value
+    return result
+
+
+def validate_inserver(value, run_id=None):
+    """The fixture knows the report protocol, never scenario names or assertions."""
+    fields = {"version", "run_id", "suite", "selected", "started", "completed",
+              "failed", "finalized", "passed", "tests"}
+    if not isinstance(value, dict) or set(value) != fields:
+        raise ValueError("Missing or malformed in-server completion")
+    if (type(value["version"]) is not int or value["version"] != 1
+            or not isinstance(value["run_id"], str) or not re.fullmatch("[a-f0-9]{32}", value["run_id"])
+            or (run_id is not None and value["run_id"] != run_id)
+            or value["suite"] != "zone" or value["finalized"] is not True
+            or type(value["passed"]) is not bool):
+        raise ValueError("Invalid in-server identity or completion")
+    tests = value["tests"]
+    if (not isinstance(tests, list) or not 1 <= len(tests) <= 32
+            or any(type(value[name]) is not int for name in ("selected", "started", "completed", "failed"))
+            or not value["selected"] == value["started"] == value["completed"] == len(tests)):
+        raise ValueError("Incomplete in-server tests")
+    names = set()
+    for test in tests:
+        if (not isinstance(test, dict) or set(test) != {"name", "passed", "diagnostic"}
+                or not isinstance(test["name"], str) or not 1 <= len(test["name"]) <= 64
+                or test["name"] in names or type(test["passed"]) is not bool
+                or not isinstance(test["diagnostic"], str) or len(test["diagnostic"]) > 256):
+            raise ValueError("Invalid or duplicate in-server test")
+        names.add(test["name"])
+    failed = sum(not test["passed"] for test in tests)
+    if (value["failed"] != failed or value["passed"] != (failed == 0)
+            or len(json.dumps(value, separators=(",", ":")).encode()) > INSERVER_LIMIT):
+        raise ValueError("Inconsistent or oversized in-server completion")
+    return value
+
+
+def read_inserver(path, run_id):
+    """Read bounded regular bytes without following candidate-created links or pipes."""
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    except FileNotFoundError:
+        return None
+    except OSError as error:
+        raise InserverFailure(str(error)) from error
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or not 0 < info.st_size <= INSERVER_LIMIT:
+            raise ValueError("In-server result must be a bounded regular file")
+        with os.fdopen(fd, "rb", closefd=False) as stream:
+            data = stream.read(INSERVER_LIMIT + 1)
+        if len(data) != info.st_size:
+            raise ValueError("In-server result changed while reading")
+        value = validate_inserver(json.loads(data, object_pairs_hook=unique_object), run_id)
+        return value, (info.st_dev, info.st_ino, info.st_mtime_ns, data)
+    except (ValueError, OSError) as error:
+        raise InserverFailure(str(error)) from error
+    finally:
+        os.close(fd)
 
 
 def cpu_ticks(pid):
@@ -108,7 +180,7 @@ def validate(value):
     """Host-safe success gate; CPU scheduler ticks are not gameplay tick counts."""
     required = {'exit_code', 'cleanup_complete', 'control', 'ready_seconds', 'baseline_seconds',
                 'responsive_samples', 'cpu_ticks', 'clock_ticks_per_second',
-                'fixture_manifest_sha256', 'binaries', 'database_cleanup'}
+                'fixture_manifest_sha256', 'binaries', 'database_cleanup', 'inserver_tests'}
     if not isinstance(value, dict) or set(value) != required:
         raise ValueError('Missing normal-world baseline')
     if (type(value['exit_code']) is not int or value['exit_code'] != 0 or value['control'] is not None
@@ -124,12 +196,14 @@ def validate(value):
             or any(type(t) is not int or not 0 <= t <= 10000000 for t in value['cpu_ticks'])
             or value['cpu_ticks'][1] <= 0):
         raise ValueError('Invalid normal-world activity')
-    import re
     if (not isinstance(value['fixture_manifest_sha256'], str)
             or not re.fullmatch('[a-f0-9]{64}', value['fixture_manifest_sha256'])
             or not isinstance(value['binaries'], dict) or set(value['binaries']) != {'world', 'zone', 'shared_memory'}
             or any(not isinstance(d, str) or not re.fullmatch('[a-f0-9]{64}', d) for d in value['binaries'].values())):
         raise ValueError('Normal-world input/output identity')
+    suite = validate_inserver(value['inserver_tests'])
+    if suite['passed'] is not True:
+        raise ValueError('In-server suite failed')
     return value
 
 
@@ -142,6 +216,10 @@ def observe(binary_dir, server, control):
     processes = []
     logs = []
     cancelled = False
+    ready = False
+    run_id = os.urandom(16).hex()
+    result_path = server / ('inserver-' + run_id + '.json')
+    suite_snapshot = None
     def cancel(*_):
         nonlocal cancelled
         cancelled = True
@@ -150,12 +228,18 @@ def observe(binary_dir, server, control):
     start = time.monotonic()
     try:
         def guard():
-            if cancelled or time.monotonic() - start >= OBSERVE_SECONDS:
-                raise RuntimeError('Normal-world cancellation or readiness deadline')
+            if cancelled:
+                raise RuntimeError('Normal-world cancellation')
+            if time.monotonic() - start >= OBSERVE_SECONDS:
+                error = InserverFailure if ready and control != 'cancel' else RuntimeError
+                raise error('Normal-world deadline or missing in-server completion')
             if any(p.poll() is not None for p in processes):
-                raise RuntimeError('Normal server exited before assertion completed')
+                error = InserverFailure if ready else RuntimeError
+                raise error('Normal server exited before assertion completed')
             if any(path.stat().st_size > 1024**2 for path in logs):
                 raise RuntimeError('Normal server console budget')
+        if result_path.exists() or result_path.is_symlink():
+            raise RuntimeError('In-server result path is not fresh')
         for name, args in (('world', []), ('zone', ['poknowledge', '7000'])):
             path = server / (name + '-console.log'); logs.append(path)
             with path.open('xb') as log:
@@ -164,13 +248,20 @@ def observe(binary_dir, server, control):
                 cwd = server
                 if control == 'startup' and name == 'world':
                     cwd = server / 'missing-config' / 'world'; cwd.mkdir(parents=True)
-                processes.append(subprocess.Popen([str(binary_dir / name), *args], cwd=cwd,
+                env = {key: value for key, value in os.environ.items()
+                       if not key.startswith('EQEMU_INSERVER_TEST_')}
+                if name == 'zone':
+                    env.update(EQEMU_INSERVER_TEST_RUN=run_id, EQEMU_INSERVER_TEST_RESULT=str(result_path))
+                    if control == 'assertion':
+                        env['EQEMU_INSERVER_TEST_CONTROL'] = 'assertion'
+                processes.append(subprocess.Popen([str(binary_dir / name), *args], cwd=cwd, env=env,
                     stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT))
         while True:
             guard()
             if world_connected(processes[0].pid, processes[1].pid) and probe():
                 break
             time.sleep(.1)
+        ready = True
         result['ready_seconds'] = round(time.monotonic() - start, 3)
         print('NORMAL_WORLD_READY', flush=True)
         before = [cpu_ticks(p.pid) for p in processes]
@@ -184,18 +275,35 @@ def observe(binary_dir, server, control):
         delta = [cpu_ticks(p.pid) - tick for p, tick in zip(processes, before)]
         result.update(baseline_seconds=round(time.monotonic() - baseline, 3),
                       responsive_samples=samples, cpu_ticks=delta, clock_ticks_per_second=os.sysconf('SC_CLK_TCK'))
-        # No native lifecycle test CLI or candidate-authored completion marker is used.
-        if samples < 2 or delta[1] <= 0 or control == 'assertion':
+        while suite_snapshot is None:
+            guard()
+            suite_snapshot = read_inserver(result_path, run_id)
+            if suite_snapshot is None:
+                if not world_connected(processes[0].pid, processes[1].pid) or not probe():
+                    raise InserverFailure('Normal zone lost responsiveness before suite completion')
+                time.sleep(.1)
+        suite = suite_snapshot[0]
+        result['inserver_tests'] = suite
+        if samples < 2 or delta[1] <= 0:
             result.update(exit_code=1, error='Normal-world readiness/activity assertion failed')
+        elif not suite['passed']:
+            result.update(exit_code=1, error='In-server test assertions failed')
         elif control is not None:
-            raise RuntimeError('Qualification control unexpectedly completed')
+            raise InserverFailure('Qualification control unexpectedly completed')
         else:
             result['exit_code'] = 0
     except Exception as error:
-        result.update(exit_code=2, error=str(error)[-500:])
+        result.update(exit_code=1 if isinstance(error, InserverFailure) else 2, error=str(error)[-500:])
     finally:
         try:
             result['cleanup_complete'] = stop(processes)
+            if suite_snapshot is not None:
+                try:
+                    final = read_inserver(result_path, run_id)
+                    if final is None or final != suite_snapshot:
+                        raise InserverFailure('In-server result changed or disappeared after completion')
+                except Exception as error:
+                    result.update(exit_code=1, error=str(error)[-500:])
         finally:
             for sig, handler in prior.items():
                 signal.signal(sig, handler)

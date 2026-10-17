@@ -3,6 +3,7 @@ import contextlib
 import io
 import itertools
 import json
+import os
 import sqlite3
 import types
 from pathlib import Path
@@ -18,11 +19,18 @@ import guest
 import staging
 
 
+def suite(run_id='a'*32, failed=False):
+    return dict(version=1, run_id=run_id, suite='zone', selected=1, started=1, completed=1,
+                failed=int(failed), finalized=True, passed=not failed,
+                tests=[dict(name='native.case', passed=not failed,
+                            diagnostic='deliberate assertion' if failed else '')])
+
+
 def baseline():
     return dict(exit_code=0, cleanup_complete=True, control=None, ready_seconds=1.0,
                 baseline_seconds=5.1, responsive_samples=40, cpu_ticks=[1, 4], clock_ticks_per_second=100,
                 fixture_manifest_sha256='a'*64, binaries={n: 'b'*64 for n in ('world', 'zone', 'shared_memory')},
-                database_cleanup=True)
+                database_cleanup=True, inserver_tests=suite())
 
 
 class Completion(unittest.TestCase):
@@ -149,26 +157,57 @@ class Readiness(unittest.TestCase):
             self.assertTrue(any(call.args[0] == 102 for call in kill.call_args_list))
             self.assertTrue(any(call.args[1] == normal.signal.SIGKILL for call in kill.call_args_list))
 
-    def run_observer(self, control=None, died=False, interrupt=False):
+    def run_observer(self, control=None, died=False, interrupt=False, mode="valid", clean=True):
         with tempfile.TemporaryDirectory() as tmp:
             server = Path(tmp)
             world, zone = Mock(pid=101), Mock(pid=102)
             world.poll.return_value = 1 if died else None
             zone.poll.return_value = None
+            if mode == 'crash':
+                zone.poll.side_effect = itertools.chain([None]*10, itertools.repeat(1))
             output = io.StringIO()
             probes = [True, RuntimeError('cancelled')] if interrupt else None
+            children = []
+            reports = []
+            def launch(args, **kwargs):
+                env = kwargs['env']
+                if Path(args[0]).name == 'world':
+                    self.assertFalse(any(key.startswith('EQEMU_INSERVER_TEST_') for key in env))
+                    process = world
+                else:
+                    self.assertEqual(env.get('EQEMU_INSERVER_TEST_CONTROL'),
+                                     'assertion' if control == 'assertion' else None)
+                    path = Path(env['EQEMU_INSERVER_TEST_RESULT'])
+                    self.assertFalse(path.exists())
+                    value = suite(env['EQEMU_INSERVER_TEST_RUN'], control == 'assertion' and mode != 'unexpected-pass')
+                    if mode != 'missing':
+                        path.write_text('{bad' if mode == 'malformed' else json.dumps(value))
+                    reports.append(path)
+                    process = zone
+                children.append(process)
+                return process
+            def cleanup(processes):
+                if mode == 'changed':
+                    reports[0].write_text('{}')
+                if mode == 'disappeared':
+                    reports[0].unlink()
+                if mode == 'replaced':
+                    replacement = reports[0].with_suffix('.new')
+                    replacement.write_bytes(reports[0].read_bytes())
+                    replacement.replace(reports[0])
+                return clean
             with patch.object(normal.os, 'geteuid', return_value=65534), \
                     patch.object(normal.resource, 'setrlimit'), patch.object(normal.Path, 'is_file', return_value=True), \
-                    patch.object(normal.subprocess, 'Popen', side_effect=[world, zone]) as launch, \
+                    patch.object(normal.subprocess, 'Popen', side_effect=launch) as popen, \
                     patch.object(normal, 'world_connected', return_value=True), \
                     patch.object(normal, 'probe', side_effect=probes, return_value=True), \
                     patch.object(normal, 'cpu_ticks', side_effect=[0, 0, 1, 4]), \
-                    patch.object(normal, 'stop', return_value=True) as stop, \
+                    patch.object(normal, 'stop', side_effect=cleanup) as stop, \
                     patch.object(normal.time, 'monotonic', side_effect=itertools.count(0, .1)), \
                     patch.object(normal.time, 'sleep'), contextlib.redirect_stdout(output):
                 normal.observe(Path('/never-execute-candidate'), server, control)
                 stop.assert_called_once_with([world, zone])
-                for call in launch.call_args_list:
+                for call in popen.call_args_list:
                     self.assertNotIn('start_new_session', call.kwargs)
             lines = output.getvalue().splitlines()
             frames = [json.loads(line.removeprefix('NORMAL_WORLD_RESULT ')) for line in lines
@@ -190,11 +229,13 @@ class Readiness(unittest.TestCase):
                 old_cwd = server / 'old-missing-config'; old_cwd.mkdir()
                 self.assertEqual(find_config(old_cwd), config)
                 children = []
-                def launch(args, *, cwd, stdin, stdout, stderr):
+                def launch(args, *, cwd, stdin, stdout, stderr, env):
                     found = find_config(cwd)
                     process = Mock(pid=101 + len(children))
                     process.poll.return_value = 1 if found is None else None
                     stdout.write(b'config loaded\n' if found else b'missing configuration\n')
+                    if Path(args[0]).name == 'zone':
+                        Path(env['EQEMU_INSERVER_TEST_RESULT']).write_text(json.dumps(suite(env['EQEMU_INSERVER_TEST_RUN'])))
                     children.append((Path(args[0]).name, cwd, found, process))
                     return process
                 output = io.StringIO()
@@ -238,6 +279,91 @@ class Readiness(unittest.TestCase):
         for value in (self.run_observer('startup', died=True), self.run_observer('cancel', interrupt=True)):
             self.assertEqual(value['exit_code'], 2)
             self.assertTrue(value['cleanup_complete'])
+
+
+    def test_suite_noncompletion_malformed_changed_and_failed_cleanup_cannot_pass(self):
+        for mode in ('missing', 'malformed', 'changed', 'disappeared', 'replaced'):
+            with self.subTest(mode=mode):
+                result = self.run_observer(mode=mode)
+                self.assertEqual(result['exit_code'], 1, result)
+                self.assertTrue(result['cleanup_complete'])
+                self.assertGreaterEqual(result['baseline_seconds'], normal.BASELINE_SECONDS)
+        result = self.run_observer(mode='crash')
+        self.assertEqual(result['exit_code'], 1)
+        self.assertTrue(result['cleanup_complete'])
+        result = self.run_observer(clean=False)
+        self.assertEqual(result['exit_code'], 2)
+        self.assertFalse(result['cleanup_complete'])
+
+    def test_assertion_control_requires_source_suite_failure_not_wrapper_failure(self):
+        failed = self.run_observer('assertion')
+        self.assertEqual(failed['exit_code'], 1)
+        self.assertFalse(failed['inserver_tests']['passed'])
+        self.assertEqual(failed['inserver_tests']['tests'][0]['diagnostic'], 'deliberate assertion')
+        unexpected = self.run_observer('assertion', mode='unexpected-pass')
+        self.assertEqual(unexpected['exit_code'], 1)
+        self.assertIn('unexpectedly completed', unexpected['error'])
+        self.assertTrue(unexpected['inserver_tests']['passed'])
+
+
+class InserverProtocol(unittest.TestCase):
+    def test_valid_success_and_honest_failure(self):
+        for failed in (False, True):
+            value = suite(failed=failed)
+            self.assertEqual(normal.validate_inserver(value, 'a'*32), value)
+        failed = dict(baseline(), inserver_tests=suite(failed=True))
+        with self.assertRaises(ValueError):
+            normal.validate(failed)
+
+    def test_identity_counts_completeness_duplicates_and_diagnostics(self):
+        cases = [('version', True), ('run_id', 'b'*32), ('suite', 'other'), ('selected', 0),
+                 ('selected', True), ('started', 0), ('completed', 0), ('failed', True),
+                 ('failed', 1), ('finalized', False), ('passed', False), ('tests', []),
+                 ('tests', [dict(name='duplicate', passed=True, diagnostic='')]*2),
+                 ('tests', [dict(name='', passed=True, diagnostic='')]),
+                 ('tests', [dict(name='x'*65, passed=True, diagnostic='')]),
+                 ('tests', [dict(name='x', passed=1, diagnostic='')]),
+                 ('tests', [dict(name='x', passed=True, diagnostic='x'*257)])]
+        for name, value in cases:
+            with self.subTest(name=name, value=value), self.assertRaises(ValueError):
+                normal.validate_inserver(dict(suite(), **{name: value}), 'a'*32)
+        for name in suite():
+            value = suite(); del value[name]
+            with self.subTest(missing=name), self.assertRaises(ValueError):
+                normal.validate_inserver(value)
+        for size in (0, 33):
+            value = suite(); value.update(selected=size, started=size, completed=size,
+                tests=[dict(name=str(n), passed=True, diagnostic='') for n in range(size)])
+            with self.assertRaises(ValueError):
+                normal.validate_inserver(value)
+        value = suite(); value.update(selected=32, started=32, completed=32,
+            tests=[dict(name=str(n), passed=True, diagnostic='x'*256) for n in range(32)])
+        with self.assertRaises(ValueError):
+            normal.validate_inserver(value)
+        value = suite(); value.update(selected=2, started=2, completed=2, tests=value['tests']*2)
+        with self.assertRaises(ValueError):
+            normal.validate_inserver(value)
+
+    def test_bounded_fresh_regular_result_file_and_duplicate_json_keys(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'result.json'
+            self.assertIsNone(normal.read_inserver(path, 'a'*32))
+            path.write_text(json.dumps(suite()))
+            self.assertEqual(normal.read_inserver(path, 'a'*32)[0], suite())
+            for data in ('{bad', '{}', 'x'*4097, json.dumps(suite()).replace('"version": 1', '"version": 1,"version": 1')):
+                path.write_text(data)
+                with self.subTest(data=data[:50]), self.assertRaises(normal.InserverFailure):
+                    normal.read_inserver(path, 'a'*32)
+            path.unlink(); target = Path(tmp) / 'target'; target.write_text(json.dumps(suite()))
+            path.symlink_to(target)
+            with self.assertRaises(normal.InserverFailure):
+                normal.read_inserver(path, 'a'*32)
+            path.unlink(); os.mkfifo(path)
+            with self.assertRaises(normal.InserverFailure):
+                normal.read_inserver(path, 'a'*32)
+            path.unlink(); path.mkdir()
+            with self.assertRaises(normal.InserverFailure):
+                normal.read_inserver(path, 'a'*32)
 
 
 if __name__ == '__main__':
