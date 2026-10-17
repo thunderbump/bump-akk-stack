@@ -157,7 +157,13 @@ config, quest state or credentials are exported.
 The unprivileged observer and native children share one exact owned session, so
 the root adapter also kills their group if the observer dies or is interrupted.
 Orderly teardown observes descendant absence, including after leader exit;
-forced rescue cannot establish success. The database has its own owned group
+forced rescue cannot establish success. On incomplete native cleanup, the observer
+retains whether forced rescue was needed, up to eight surviving PID/name/state/
+wait-channel observations before and after rescue, and bounded direct-child exit
+codes. The root adapter preserves a scrubbed compact observer record, including
+suite failure details, in the infrastructure diagnostic. Host VM cleanup is a
+separate layer and cannot turn incomplete native cleanup into a candidate pass or
+a candidate assertion failure. The existing ten-second TERM grace is unchanged. The database has its own owned group
 and is stopped on every adapter exit. The worker then terminates its owned VM
 and removes the disposable overlay/input/seed scratch on success, failure and
 client death. Whole-VM destruction also removes guest database and runtime state

@@ -153,7 +153,7 @@ def owned_members():
     return result
 
 
-def stop(processes):
+def stop(processes, *, diagnostics=None):
     """Clean the exact owned session even when a native leader exited first."""
     def send(sig):
         for pid in owned_members():
@@ -161,19 +161,40 @@ def stop(processes):
                 os.kill(pid, sig)
             except ProcessLookupError:
                 pass
+    def snapshot(members):
+        values = []
+        for pid in members[:8]:
+            item = dict(pid=pid)
+            try:
+                text = Path('/proc', str(pid), 'stat').read_text()
+                item.update(name=text.split('(', 1)[1].rsplit(')', 1)[0][:32],
+                            state=text.rsplit(')', 1)[1].split()[0],
+                            wait=Path('/proc', str(pid), 'wchan').read_text().strip()[:48])
+            except (OSError, ValueError):
+                item['state'] = 'unavailable'
+            values.append(item)
+        return values
     send(signal.SIGTERM)
     end = time.monotonic() + 10
     while owned_members() and time.monotonic() < end:
         time.sleep(.05)
-    clean = not owned_members()
+    survivors = owned_members()
+    clean = not survivors
     if not clean:
+        if diagnostics is not None:
+            diagnostics.update(grace_seconds=10, forced_kill=True,
+                               survivors_before_kill=snapshot(survivors))
         send(signal.SIGKILL)
     for process in processes:
         process.wait(timeout=5)
     end = time.monotonic() + 2
     while owned_members() and time.monotonic() < end:
         time.sleep(.05)
-    return clean and not owned_members()
+    remaining = owned_members()
+    if diagnostics is not None and (not clean or remaining):
+        diagnostics.update(forced_kill=not clean, survivors_after_kill=snapshot(remaining),
+                           child_exits=[dict(pid=p.pid, returncode=p.poll()) for p in processes[:8]])
+    return clean and not remaining
 
 
 def validate(value):
@@ -296,7 +317,10 @@ def observe(binary_dir, server, control):
         result.update(exit_code=1 if isinstance(error, InserverFailure) else 2, error=str(error)[-500:])
     finally:
         try:
-            result['cleanup_complete'] = stop(processes)
+            cleanup = {}
+            result['cleanup_complete'] = stop(processes, diagnostics=cleanup)
+            if result['cleanup_complete'] is not True:
+                result['cleanup_diagnostics'] = cleanup
             if suite_snapshot is not None:
                 try:
                     final = read_inserver(result_path, run_id)
@@ -383,8 +407,26 @@ def run(build, identity):
         if len(frames) != 1:
             raise RuntimeError('Missing/duplicate normal-world assertion completion')
         result = frames[0]
-        if result.get('exit_code') not in (0, 1, 2) or result.get('cleanup_complete') is not True:
-            raise RuntimeError('Incomplete normal-world cleanup/result')
+        if (not isinstance(result, dict) or type(result.get('exit_code')) is not int
+                or result['exit_code'] not in (0, 1, 2) or result.get('cleanup_complete') is not True):
+            # Keep the observer's own cleanup evidence. Host VM destruction is a
+            # separate cleanup layer and cannot make this native result clean.
+            if isinstance(result, dict):
+                observed = {key: result.get(key) for key in
+                            ('exit_code', 'cleanup_complete', 'cleanup_diagnostics', 'control', 'error')}
+                suite = result.get('inserver_tests')
+                if isinstance(suite, dict):
+                    observed['inserver_tests'] = {key: suite.get(key) for key in
+                        ('selected', 'started', 'completed', 'failed', 'finalized', 'passed')}
+                    tests = suite.get('tests')
+                    if isinstance(tests, list):
+                        observed['inserver_tests']['tests'] = [
+                            {key: test.get(key) for key in ('name', 'passed', 'diagnostic')}
+                            for test in tests[:3] if isinstance(test, dict)]
+            else:
+                observed = result
+            detail = runtime.scrub(json.dumps(observed, separators=(',', ':')))[:2400]
+            raise RuntimeError('Incomplete normal-world cleanup/result; observer=' + detail)
         if control is not None and result['exit_code'] == 0:
             raise RuntimeError('Qualification control cannot pass')
         runtime.verify_inputs()

@@ -189,7 +189,7 @@ class Readiness(unittest.TestCase):
                     process = zone
                 children.append(process)
                 return process
-            def cleanup(processes):
+            def cleanup(processes, *, diagnostics):
                 if mode == 'changed':
                     reports[0].write_text('{}')
                 if mode == 'disappeared':
@@ -209,7 +209,7 @@ class Readiness(unittest.TestCase):
                     patch.object(normal.time, 'monotonic', side_effect=itertools.count(0, .1)), \
                     patch.object(normal.time, 'sleep'), contextlib.redirect_stdout(output):
                 normal.observe(Path('/never-execute-candidate'), server, control)
-                stop.assert_called_once_with([world, zone])
+                stop.assert_called_once_with([world, zone], diagnostics={})
                 for call in popen.call_args_list:
                     self.assertNotIn('start_new_session', call.kwargs)
             lines = output.getvalue().splitlines()
@@ -257,7 +257,7 @@ class Readiness(unittest.TestCase):
                 lines = output.getvalue().splitlines()
                 result = json.loads(next(line.removeprefix('NORMAL_WORLD_RESULT ')
                                          for line in lines if line.startswith('NORMAL_WORLD_RESULT ')))
-                stop.assert_called_once_with([child[3] for child in children])
+                stop.assert_called_once_with([child[3] for child in children], diagnostics={})
                 self.assertTrue(result['cleanup_complete'])
                 self.assertEqual(children[1][1:3], (server, config))  # zone unchanged
                 self.assertEqual(config.read_text(), '{"server": {}}')
