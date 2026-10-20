@@ -269,6 +269,19 @@ class QuickRuntime(unittest.TestCase):
             with self.assertRaises(ConnectionResetError):client.exchange('/unused',request)
             once.assert_called_once()
 
+    def test_quick_protocol_accepts_valid_pax_boundary_and_rejects_derived_cap_excess(self):
+        request=self.request_data();request['files']['eqemu.tar']['bytes']=286699520
+        request['bytes']=sum(entry['bytes'] for entry in request['files'].values())+1024**2
+        self.client.sendall(snapshot.canonical(request)+b'\n')
+        with patch.object(runtime,'run_vm',return_value={'exit_code':2}) as run:
+            self.assertEqual(runtime.request(self.server,self.value),{'exit_code':2})
+            self.assertEqual(run.call_args.kwargs['quick'],request)
+        request['files']['eqemu.tar']['bytes']=snapshot.ARCHIVE_LIMIT+1
+        self.client.sendall(snapshot.canonical(request)+b'\n')
+        with patch.object(runtime,'run_vm') as run,self.assertRaisesRegex(ValueError,'Malformed quick request'):
+            runtime.request(self.server,self.value)
+        run.assert_not_called()
+
     def test_quick_vm_uses_build_resources_and_owned_cleanup(self):
         request=self.request_data();self.client.sendall(b'ISO')
         detail=quick_guest.unavailable('private source diagnostic')
