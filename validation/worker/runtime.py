@@ -174,6 +174,14 @@ def persisted_report(report):
     if report.get('scope') != 'working-snapshot-format':
         return report
     value = dict(report)
+    # Rustfmt diagnostics can contain private source lines and diffs. Retain them
+    # only in the explicit private invocation artifact and owned serial log.
+    value.pop('error', None)
+    value.pop('cleanup_error', None)
+    if report.get('exit_code') != 0:
+        value['failure_class'] = ('formatter-candidate-failure' if report.get('exit_code') == 1 else
+                                  'formatter-infrastructure-failure' if report.get('cleanup_complete') is True else
+                                  'formatter-cleanup-unconfirmed')
     value['changed_files'] = [{key: item[key] for key in ('path', 'before_sha256', 'after_sha256')}
                               for item in report.get('changed_files', [])]
     # Keep the established read-only last-result protocol below 16 KiB too.

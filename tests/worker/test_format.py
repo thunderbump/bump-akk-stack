@@ -291,12 +291,24 @@ class FormatRuntime(unittest.TestCase):
 
     def test_formatter_persistence_omits_bytes_and_check_never_retries(self):
         report=dict(scope='working-snapshot-format', changed_files=[dict(path='rust/actors/a.rs',
-             before_sha256='a'*64, after_sha256='b'*64,content_base64='SOURCE')])
+             before_sha256='a'*64, after_sha256='b'*64,content_base64='SOURCE')],
+             exit_code=1, error='Diff: PRIVATE_RUST_SOURCE', cleanup_error='PRIVATE_CLEANUP_SOURCE')
         self.assertNotIn('SOURCE',json.dumps(runtime.persisted_report(report)))
+        self.assertEqual(runtime.persisted_report(report)['failure_class'],'formatter-candidate-failure')
         self.assertIn('SOURCE',json.dumps(report))
         with patch.object(client,'exchange_once',side_effect=ConnectionResetError) as once:
             with self.assertRaises(ConnectionResetError): client.exchange('/unused',dict(self.request_data(),operation='check'))
             once.assert_called_once()
+
+    def test_legacy_last_result_stdout_has_only_formatter_failure_metadata(self):
+        raw=dict(scope='working-snapshot-format',exit_code=1,error='Diff: PRIVATE_SOURCE_MARKER',changed_files=[])
+        observation=dict(version=1,scope='worker-observation',operation='last-result',exit_code=0,
+                         result=runtime.persisted_report(raw))
+        config=self.root/'client.json';config.write_text(json.dumps({'socket':'/unused'}))
+        with patch.object(client,'exchange',return_value=observation),contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(client.main(['--last-result','--config',str(config)]),0)
+        self.assertNotIn('PRIVATE_SOURCE_MARKER',output.getvalue())
+        self.assertEqual(json.loads(output.getvalue())['result']['failure_class'],'formatter-candidate-failure')
 
     def test_format_launcher_has_no_native_build_or_server_execution(self):
         data=json.loads(guest.format_user_data('a'*32,self.request_data()).split('\n',1)[1])
