@@ -35,6 +35,7 @@ def prepare(repo,value,websocketpp,native,rust,output):
         if record(path)['sha256']!=wanted:raise ValueError('Missing/changed pinned quick input: '+str(path))
     with tempfile.TemporaryDirectory(prefix='eqemu-quick-payload-') as tmp:
         root=Path(tmp);archive=root/'eqemu.tar';snapshot.archive(repo,value,archive)
+        if archive.stat().st_size>snapshot.ARCHIVE_LIMIT:raise ValueError('Quick source archive exceeds derived bound')
         scratch=root/'git';scratch.mkdir();dependency=GitTree(websocketpp,scratch)
         wanted=profile['sources']['websocketpp']
         entries,links=dependency.inventory(wanted['commit'],wanted['tree'])

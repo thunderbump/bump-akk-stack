@@ -68,6 +68,31 @@ class QuickSnapshots(unittest.TestCase):
         (self.repo/'rust/actors/old.rs').write_text('newer edit')
         with self.assertRaisesRegex(ValueError,'Source changed'):snapshot.archive(self.repo,value,self.root/'stale.tar')
 
+    def test_archive_limit_covers_valid_maximum_count_long_pax_paths_without_large_files(self):
+        # Reproduce the review counterexample using metadata only, not a 287 MB archive.
+        value=dict(version=1,scope='working-snapshot-quick-input',base='a'*40,head='b'*40,recipe_sha256='d'*64,
+                   files=[dict(path=str(index).zfill(4)+'a'*231+'.cpp',mode='100644',bytes=26843,sha256='e'*64)
+                          for index in range(9999)],changed=[],deleted=[],gitlinks={})
+        value['files'].append(dict(path='rust/actors/Cargo.toml',mode='100644',bytes=23,sha256='f'*64))
+        snapshot.validate_snapshot(value)
+        self.assertEqual(sum(entry['bytes'] for entry in value['files']),268403180)
+        size=0
+        for entry in value['files']:
+            info=tarfile.TarInfo(entry['path']);info.size=entry['bytes'];info.mode=0o644
+            size+=len(info.tobuf(format=tarfile.PAX_FORMAT,encoding='utf-8'))
+            size+=(entry['bytes']+tarfile.BLOCKSIZE-1)//tarfile.BLOCKSIZE*tarfile.BLOCKSIZE
+        size+=2*tarfile.BLOCKSIZE
+        size=(size+tarfile.RECORDSIZE-1)//tarfile.RECORDSIZE*tarfile.RECORDSIZE
+        self.assertEqual(size,286699520)
+        self.assertGreater(size,272*1024**2)
+        self.assertLessEqual(size,snapshot.ARCHIVE_LIMIT)
+        # A longest valid four-byte Unicode path also fits the per-member proof.
+        path='𐀀'*snapshot.PATH_CHARACTERS
+        self.assertTrue(snapshot.safe_path(path))
+        info=tarfile.TarInfo(path);info.size=1
+        actual_overhead=len(info.tobuf(format=tarfile.PAX_FORMAT,encoding='utf-8'))+tarfile.BLOCKSIZE-1
+        self.assertLessEqual(actual_overhead,snapshot.ARCHIVE_MEMBER_OVERHEAD)
+
     def test_bridge_changes_deleted_translation_unit_and_many_objects_unavailable(self):
         value=self.capture()
         for name in ('rust/actors/bridge/src/lib.rs','rust/actors/bridge/build.rs','rust/actors/Cargo.toml','zone/deleted.cpp','common/header.hpp'):

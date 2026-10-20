@@ -668,6 +668,7 @@ def request(connection, value):
         return run_vm(value, connection, build=data)
     if data.get('operation')=='quick':
         from snapshot import RUST_INPUT_SHA256
+        from quick_snapshot import ARCHIVE_LIMIT, MANIFEST_LIMIT
         if (set(data)!={'version','operation','base','head','input_snapshot_sha256','recipe_sha256','files','bytes','sha256'}
                 or any(not isinstance(data.get(key),str) or not re.fullmatch('[a-f0-9]{40}',data[key]) for key in ('base','head'))
                 or any(not isinstance(data.get(key),str) or not re.fullmatch('[a-f0-9]{64}',data[key]) for key in ('input_snapshot_sha256','recipe_sha256','sha256'))
@@ -678,7 +679,7 @@ def request(connection, value):
                        or not re.fullmatch('[a-f0-9]{64}',entry['sha256']) for entry in data['files'].values())
                 or data['files']['rust-inputs.tar']['sha256']!=RUST_INPUT_SHA256
                 or data['files']['native.iso']['sha256']!='02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4'
-                or data['files']['snapshot.json']['bytes']>4*1024**2 or data['files']['eqemu.tar']['bytes']>272*1024**2):
+                or data['files']['snapshot.json']['bytes']>MANIFEST_LIMIT or data['files']['eqemu.tar']['bytes']>ARCHIVE_LIMIT):
             raise ValueError('Malformed quick request')
         connection.settimeout(None)
         return run_vm(value,connection,quick=data)

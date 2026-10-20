@@ -192,7 +192,7 @@ bridge/build inputs report native coverage unavailable. A cold build has no
 trustworthy header dependency database. Rust core internals alone do not select
 native objects; that omission is explicit in the stage results.
 Unknown inputs default to native coverage unavailable, including `.hh`, `.ipp`,
-`.tpp` and extensionless included files. The only unrelated-file exclusions are
+`.tpp` and extensionless included files. Outside bridge/build paths, unrelated-file exclusions are
 Markdown/reStructuredText, root LICENSE/COPYING/NOTICE, known ancestor rustfmt
 configuration and Rust actor core `.rs` internals other than `build.rs`.
 
@@ -214,3 +214,6 @@ Native path/reason details have explicit encoded-byte caps and omitted counts.
 Omitted translation units force unavailable coverage. Diagnostics use a 3000-byte
 JSON budget per stage, including Unicode escaping. Last-result native scope is
 counts only, preserving its existing 16 KiB protocol.
+The internal source-archive bound adds the maximum PAX header, UTF-8 path and
+padding overhead to the existing source/file limits. It does not narrow those
+caller-facing limits.

@@ -13,6 +13,12 @@ from snapshot import canonical, sha, read_file
 SOURCE_LIMIT = 256 * 1024**2
 FILE_LIMIT = 16 * 1024**2
 FILE_COUNT = 10000
+PATH_CHARACTERS = 240
+# A regular PAX member has its file header, optional PAX header/path payload,
+# and at most one block of content padding. Other TarInfo fields remain zero.
+PAX_PATH_BLOCKS = (PATH_CHARACTERS * 4 + 32 + tarfile.BLOCKSIZE - 1) // tarfile.BLOCKSIZE
+ARCHIVE_MEMBER_OVERHEAD = (2 + PAX_PATH_BLOCKS) * tarfile.BLOCKSIZE + tarfile.BLOCKSIZE - 1
+ARCHIVE_LIMIT = SOURCE_LIMIT + FILE_COUNT * ARCHIVE_MEMBER_OVERHEAD + 2 * tarfile.BLOCKSIZE + tarfile.RECORDSIZE - 1
 MANIFEST_LIMIT = 4 * 1024**2
 RESULT_LIMIT = 65536
 CHECKS = ('rust-format', 'rust-dependencies', 'rust-clippy', 'rust-tests', 'native-configure', 'native-objects')
@@ -20,8 +26,10 @@ UNTRACKED_EXCLUDED = {'target','vendor','generated','CMakeFiles','__pycache__','
 
 
 def safe_path(name):
-    if not isinstance(name, str) or not name or len(name) > 240:
+    if not isinstance(name, str) or not name or len(name) > PATH_CHARACTERS:
         return False
+    try:name.encode('utf-8')
+    except UnicodeEncodeError:return False
     path = PurePosixPath(name)
     return (not path.is_absolute() and str(path) == name and
             not any(part in ('.', '..', '.git') for part in path.parts) and
@@ -133,13 +141,15 @@ def identity(value):
 
 def archive(repo, value, output):
     """Write raw regular source bytes, never Git filters or checkout commands."""
-    with tarfile.open(output,'x') as stream:
+    with tarfile.open(output,'x',format=tarfile.PAX_FORMAT) as stream:
         for entry in value['files']:
             data,mode=read_file(repo,entry['path'],FILE_LIMIT)
             if len(data)!=entry['bytes'] or sha(data)!=entry['sha256'] or mode!=entry['mode']:
                 raise ValueError('Source changed while packaging quick snapshot')
             info=tarfile.TarInfo(entry['path']);info.size=len(data);info.mode=0o755 if mode=='100755' else 0o644
             stream.addfile(info,io.BytesIO(data))
+    if Path(output).stat().st_size>ARCHIVE_LIMIT:
+        raise ValueError('Quick source archive exceeds its derived overhead bound')
 
 
 def native_scope(value):
