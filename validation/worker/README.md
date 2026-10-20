@@ -91,3 +91,61 @@ Run source regressions without sudo:
 ```sh
 python3 -B -m unittest discover -s tests/worker -v
 ```
+
+## Working-copy Rust formatting
+
+`scripts/format-worker-snapshot` submits an uncommitted `rust/actors` snapshot to
+one disposable offline VM. It uses the same pinned Rust bundle and
+`cargo fmt --all` workspace as the final validator. `--check` adds `--check` to
+that formatter invocation. It does not build the server, run Rust build scripts,
+or certify a Git commit. Neither operation changes the caller's checkout.
+
+```sh
+scripts/format-worker-snapshot --identity
+scripts/format-worker-snapshot --repo /absolute/eqemu --base FULL_BASE_SHA --snapshot-identity
+scripts/format-worker-snapshot --repo /absolute/eqemu --base FULL_BASE_SHA --check --output /private/fresh-check.json
+scripts/format-worker-snapshot --repo /absolute/eqemu --base FULL_BASE_SHA --output /private/fresh-format.json
+```
+
+The identity and snapshot queries run no Cargo commands and boot no VM. Results
+bind the base, HEAD, complete Rust/config snapshot, trusted recipe, pinned Rust
+bundle and worker implementation. The ordinary validator's format gate remains
+check-only. Format success is only formatter success.
+
+Snapshots contain tracked and new nonignored `.rs`, Cargo manifests/lockfiles,
+and applicable Cargo/rustfmt configuration. Deletions are explicit. Target,
+vendor, generated and submodule directories are outside this scope. Limits are
+4 MiB and 512 source files, 512 KiB per file, and 1 MiB/128 returned file changes.
+Changes can replace only captured regular `.rs` files. Private output artifacts
+are fresh files with mode 0600; stdout carries a summary without source bytes.
+Last-result observations retain metadata only, not returned file contents.
+
+Applying changes is a separate, explicit caller-side operation. AFK and developer
+tools use this shared helper rather than implementing their own file writer.
+It boots no VM, runs no Cargo command and leaves the Git index alone. Supply the
+identities captured before the formatter ran:
+
+```sh
+scripts/format-worker-snapshot --repo /absolute/eqemu --base FULL_BASE_SHA \
+  --apply-result /private/fresh-format.json \
+  --expected-input INPUT_SNAPSHOT_SHA256 --expected-recipe RECIPE_SHA256 \
+  --expected-implementation WORKER_IMPLEMENTATION_SHA256 \
+  --output /private/fresh-apply.json
+```
+
+The helper validates the entire result and current snapshot before staging any
+writes. It preserves permissions, configuration and deletions. It stages all
+replacement bytes first and rolls back its own writes on replacement or receipt
+publication failure. If another writer changes a file during recovery, the helper
+preserves that newer edit and reports failure. Work on the same checkout must
+still be serialized by the caller. No multi-file filesystem operation can make
+concurrent writers safe without that ownership rule.
+SIGTERM and SIGINT enter the same rollback path. Replacement and ownership
+bookkeeping defer those signals together; recovery ignores repeated cancellation.
+A hard kill cannot run recovery and must be treated as an unconfirmed failure.
+
+Exit 0 means the selected operation completed, 1 means a formatter/check
+candidate failure, and 2 means unavailable infrastructure, invalid/stale data,
+interruption or unconfirmed cleanup. Error and check results never return edits.
+Artifacts must be outside the checkout. The operator must activate the reviewed
+worker implementation separately; an older worker rejects the new operations.

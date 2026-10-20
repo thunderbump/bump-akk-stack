@@ -1,6 +1,7 @@
 #!/usr/bin/python3 -I
 """One offline VM under a dedicated worker. Candidate code runs only in the guest."""
 import argparse
+import base64
 import fcntl
 import hashlib
 import json
@@ -21,7 +22,7 @@ import uuid
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from guest import user_data, build_user_data, BUILD_CHECKS
+from guest import user_data, build_user_data, format_user_data, BUILD_CHECKS
 
 CONFIG = Path('/etc/eqemu-validator/config.json')
 QEMU = '/usr/bin/qemu-system-x86_64'
@@ -33,7 +34,13 @@ BUILD_SECONDS = 18000
 PAYLOAD_LIMIT = 1024**3
 BASE_LIMIT = 2 * 1024**3
 CONTROLS = ('pass', 'assertion', 'missing-result', 'deadline', 'controller-death')
-OWNED_CONTROLS = (*CONTROLS, 'build')
+OWNED_CONTROLS = (*CONTROLS, 'build', 'format', 'check-format')
+FORMAT_SECONDS = 900
+IMPLEMENTATION_FILES = ('validation/worker/runtime.py', 'validation/worker/guest.py',
+    'validation/worker/build_guest.py', 'validation/worker/normal_world.py', 'validation/actor.py',
+    'validation/actor_runtime.py', 'validation/debugger.py', 'validation/runtime-fixture.json',
+    'validation/worker/client.py', 'scripts/check-validation-worker',
+    'validation/worker/format_guest.py', 'validation/worker/snapshot.py')
 
 
 class CleanupError(RuntimeError):
@@ -162,6 +169,28 @@ def atomic_json(path, value):
     os.replace(temporary, path)
 
 
+def persisted_report(report):
+    """Last-result is an observation, never a second export of source bytes."""
+    if report.get('scope') != 'working-snapshot-format':
+        return report
+    value = dict(report)
+    # Rustfmt diagnostics can contain private source lines and diffs. Retain them
+    # only in the explicit private invocation artifact and owned serial log.
+    value.pop('error', None)
+    value.pop('cleanup_error', None)
+    if report.get('exit_code') != 0:
+        value['failure_class'] = ('formatter-candidate-failure' if report.get('exit_code') == 1 else
+                                  'formatter-infrastructure-failure' if report.get('cleanup_complete') is True else
+                                  'formatter-cleanup-unconfirmed')
+    value['changed_files'] = [{key: item[key] for key in ('path', 'before_sha256', 'after_sha256')}
+                              for item in report.get('changed_files', [])]
+    # Keep the established read-only last-result protocol below 16 KiB too.
+    if len(json.dumps(value).encode()) > 15000:
+        value['changed_files'] = []
+        value['changed_file_count'] = len(report.get('changed_files', []))
+    return value
+
+
 def acquire(value):
     fd = os.open(Path(value['state_dir']) / 'worker.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
     try:
@@ -215,8 +244,10 @@ def cleanup(value):
                     or not re.fullmatch('[a-f0-9]{32}', record['run_id'])):
                 raise ValueError('Unexpected active job record')
             job = Path(value['state_dir']) / record['run_id']
-            report = {'version': 1, 'operation': 'build' if record['control'] == 'build' else 'smoke',
-                      'scope': 'worker-build' if record['control'] == 'build' else 'worker-smoke', 'run_id': record['run_id'],
+            operation = {'build': 'build', 'format': 'format', 'check-format': 'check'}.get(record['control'], 'smoke')
+            report = {'version': 1, 'operation': operation,
+                      'scope': 'working-snapshot-format' if record['control'] in ('format', 'check-format') else
+                               'worker-build' if record['control'] == 'build' else 'worker-smoke', 'run_id': record['run_id'],
                       'control': record['control'], 'qemu_pid': record['qemu_pid'],
                       'vm_started': record['qemu_pid'] is not None, 'exit_code': 2,
                       'error': 'Controller stopped before final completion',
@@ -293,7 +324,7 @@ def stop_process(process):
         raise CleanupError('Owned process cleanup could not be confirmed') from error
 
 
-def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None):
+def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None, format_result=None):
     process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                cwd=scratch, start_new_session=True, close_fds=True,
                                env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': str(scratch)})
@@ -301,6 +332,7 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
     pending = bytearray()
     discarding = False
     notified = False
+    started_at = time.monotonic()
     try:
         if on_started is not None:
             if process.poll() is not None:
@@ -320,9 +352,12 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                     if not block:
                         eof = True; selector.unregister(key.fileobj)
                         continue
-                    if stream.tell() + len(block) > (64 * LOG_LIMIT if build_result is not None else LOG_LIMIT):
+                    if stream.tell() + len(block) > (64 * LOG_LIMIT if build_result is not None or format_result is not None else LOG_LIMIT):
                         raise RuntimeError('Worker serial output limit exceeded')
                     output.extend(block); stream.write(block); stream.flush()
+                    if (format_result is not None and 'boot_seconds' not in format_result
+                            and b'EQEMU_STAGE mount-job' in output):
+                        format_result['boot_seconds'] = round(time.monotonic() - started_at, 3)
                     if build_result is not None:
                         pending.extend(block)
                         while b'\n' in pending:
@@ -343,7 +378,7 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                             pending.clear()
                             discarding = True
 
-                    if (build_result is not None
+                    if ((build_result is not None or format_result is not None)
                             and b'cc_scripts_user.py[WARNING]: Failed to run module scripts_user' in output):
                         # Cloud-init has returned from our command. An idle login
                         # prompt cannot complete the job; retain diagnostics and fail now.
@@ -361,6 +396,11 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
     results = []
     with log.open('rb') as stream:
         for line in stream:
+            if format_result is not None and line.startswith(b'EQEMU_FORMAT_RESULT '):
+                from snapshot import RESULT_LIMIT
+                if len(line) > RESULT_LIMIT * 2:
+                    raise RuntimeError('Oversized formatter completion')
+                results.append(json.loads(base64.b64decode(line.removeprefix(b'EQEMU_FORMAT_RESULT ').strip(), validate=True)))
             if line.startswith(b'EQEMU_WORKER_RESULT '):
                 if len(line) > 8192:
                     raise RuntimeError('Oversized guest completion')
@@ -368,6 +408,18 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
     if len(results) != 1:
         raise RuntimeError('Missing or duplicate guest completion')
     result = results[0]
+    if format_result is not None:
+        from snapshot import RESULT_LIMIT, canonical
+        if (not isinstance(result, dict) or len(canonical(result)) > RESULT_LIMIT
+                or result.get('nonce') != nonce or result.get('scope') != 'working-snapshot-format'
+                or type(result.get('version')) is not int or result['version'] != 1
+                or type(result.get('exit_code')) is not int or result['exit_code'] not in (0, 1, 2)
+                or not isinstance(result.get('changed_files'), list)
+                or not isinstance(result.get('output_snapshot_sha256'), str)
+                or not re.fullmatch('[a-f0-9]{64}', result['output_snapshot_sha256'])):
+            raise RuntimeError('Malformed formatter completion')
+        format_result.update(result)
+        return result['exit_code']
     if (not isinstance(result, dict) or (set(result) != {'version', 'nonce', 'scope', 'exit_code'} if build_result is None
                                                 else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities', 'normal_world', 'selected_checks', 'completed_checks'})
             or type(result.get('version')) is not int or result['version'] != 1 or result.get('nonce') != nonce or result.get('scope') != ('worker-smoke' if build_result is None else 'worker-build')
@@ -417,17 +469,15 @@ def receive_payload(connection, target, expected, deadline):
 
 def implementation_identity(value):
     """Digest the finite reviewed worker implementation, independent of candidate inputs."""
-    paths = ('validation/worker/runtime.py', 'validation/worker/guest.py',
-             'validation/worker/build_guest.py', 'validation/worker/normal_world.py', 'validation/actor.py', 'validation/actor_runtime.py',
-              'validation/debugger.py', 'validation/runtime-fixture.json', 'validation/worker/client.py', 'scripts/check-validation-worker')
     digests = {}
-    for name in paths:
+    for name in IMPLEMENTATION_FILES:
         with (Path(value['code_dir']) / name).open('rb') as stream:
             digests[name] = hashlib.file_digest(stream, 'sha256').hexdigest()
     return hashlib.sha256(json.dumps(digests, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def run_vm(value, connection, control='pass', build=None):
+def run_vm(value, connection, control='pass', build=None, formatting=None):
+    started_at = time.monotonic()
     lock = acquire(value)
     state = Path(value['state_dir']); active = state / 'active.json'
     run_id = uuid.uuid4().hex; job = state / run_id
@@ -439,14 +489,22 @@ def run_vm(value, connection, control='pass', build=None):
         report.update(operation='build', scope='worker-build', control='build',
                       candidate=build['candidate'], tree=build['tree'], payload_sha256=build['sha256'],
                       coverage=[], selected_checks=list(BUILD_CHECKS), completed_checks=[])
+    if formatting is not None:
+        control = 'format' if formatting['operation'] == 'format' else 'check-format'
+        report.update(operation=formatting['operation'], scope='working-snapshot-format', control=control,
+                      coverage=[], candidate=None, changed_files=[],
+                      **{key: formatting[key] for key in ('base', 'head', 'input_snapshot_sha256', 'recipe_sha256')},
+                      output_snapshot_sha256=formatting['input_snapshot_sha256'],
+                      rust_input_sha256=formatting['files']['rust-inputs.tar']['sha256'])
     try:
         if active.exists():
             raise RuntimeError('Previous worker job requires service cleanup')
         probe = ready(value); report['readiness'] = probe
         if probe['exit_code'] != 0:
             raise RuntimeError('Worker readiness failed')
-        if build is not None:
+        if build is not None or formatting is not None:
             report['implementation_sha256'] = implementation_identity(value)
+        if build is not None:
             if int(resource_state()['memory.max']) < 6 * 1024**3:
                 raise RuntimeError('Server build needs the reviewed 6 GiB service resource update')
         required_space = 50 if build is not None else 10
@@ -455,13 +513,15 @@ def run_vm(value, connection, control='pass', build=None):
         active_record = {'run_id': run_id, 'invocation_id': invocation(), 'control': control, 'qemu_pid': None}
         atomic_json(active, active_record)
         job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
-        deadline = time.monotonic() + (BUILD_SECONDS if build is not None else SECONDS)
+        deadline = time.monotonic() + (BUILD_SECONDS if build is not None else FORMAT_SECONDS if formatting is not None else SECONDS)
         base = root_file(value['base_image'])
         with base.open('rb') as stream:
             report['base_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
-        if build is not None:
-            receive_payload(connection, scratch / 'payload.iso', build, time.monotonic() + 120)
-        (scratch / 'user-data').write_text(build_user_data(run_id) if build is not None else user_data(run_id, control))
+        payload = build if build is not None else formatting
+        if payload is not None:
+            receive_payload(connection, scratch / 'payload.iso', payload, time.monotonic() + 120)
+        (scratch / 'user-data').write_text(build_user_data(run_id) if build is not None else
+                                         format_user_data(run_id, formatting) if formatting is not None else user_data(run_id, control))
         (scratch / 'meta-data').write_text('instance-id: eqemu-smoke-' + run_id + '\n')
         tool([QEMU_IMG, 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', str(base), str(scratch / 'disk.qcow2'), '48G' if build is not None else '8G'], deadline)
         tool([GENISOIMAGE, '-output', str(scratch / 'seed.iso'), '-volid', 'cidata', '-joliet', '-rock',
@@ -473,7 +533,7 @@ def run_vm(value, connection, control='pass', build=None):
                 '-sandbox', 'on,obsolete=deny,elevateprivileges=deny,spawn=deny,resourcecontrol=deny',
                 '-drive', 'file=' + str(scratch / 'disk.qcow2') + ',if=virtio,format=qcow2,cache=none',
                 '-drive', 'file=' + str(scratch / 'seed.iso') + ',media=cdrom,readonly=on,format=raw']
-        if build is not None:
+        if payload is not None:
             args += ['-drive', 'file=' + str(scratch / 'payload.iso') + ',media=cdrom,readonly=on,format=raw']
         def started(pid):
             report['vm_started'] = True
@@ -484,7 +544,18 @@ def run_vm(value, connection, control='pass', build=None):
                 # Explicit qualification control: bypass Python finally, exercising systemd's
                 # cgroup kill and ExecStopPost rather than the controller's normal cleanup.
                 os.kill(os.getpid(), signal.SIGKILL)
-        if build is None:
+        if formatting is not None:
+            detail = {}
+            report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started,
+                                            format_result=detail)
+            report.update(changed_files=detail['changed_files'], output_snapshot_sha256=detail['output_snapshot_sha256'])
+            if 'error' in detail:
+                report['error'] = detail['error']
+            report['timings'] = dict(boot_seconds=detail.get('boot_seconds', 0),
+                preparation_seconds=detail.get('preparation_seconds', 0), format_seconds=detail.get('format_seconds', 0))
+            if report['implementation_sha256'] != implementation_identity(value):
+                raise RuntimeError('Worker implementation changed during formatting')
+        elif build is None:
             report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started)
         else:
             detail = {}
@@ -500,6 +571,8 @@ def run_vm(value, connection, control='pass', build=None):
         report['exit_code'] = 2
         if isinstance(error, CleanupError):
             report['cleanup_error'] = str(error)[:1000]
+        if formatting is not None:
+            report.update(changed_files=[], output_snapshot_sha256=formatting['input_snapshot_sha256'])
     finally:
         try:
             if 'cleanup_error' not in report:
@@ -508,8 +581,12 @@ def run_vm(value, connection, control='pass', build=None):
                 report['cleanup_complete'] = True
         except Exception as error:
             report['cleanup_error'] = str(error)[:1000]; report['exit_code'] = 2
+        if formatting is not None:
+            report.setdefault('timings', {})['total_seconds'] = round(time.monotonic() - started_at, 3)
+            if report['exit_code'] != 0:
+                report.update(changed_files=[], output_snapshot_sha256=formatting['input_snapshot_sha256'])
         if job.exists():
-            atomic_json(state / 'last-result.json', report)
+            atomic_json(state / 'last-result.json', persisted_report(report))
             if (job / 'serial.log').exists():
                 os.replace(job / 'serial.log', state / 'last-serial.log')
             if report['cleanup_complete']:
@@ -552,6 +629,23 @@ def request(connection, value):
             raise ValueError('Malformed build request')
         connection.settimeout(None)
         return run_vm(value, connection, build=data)
+    if data.get('operation') in ('format', 'check'):
+        from snapshot import RUST_INPUT_SHA256 as RUST_SHA
+        if (set(data) != {'version', 'operation', 'base', 'head', 'input_snapshot_sha256', 'recipe_sha256', 'files', 'bytes', 'sha256'}
+                or any(not isinstance(data.get(k), str) or not re.fullmatch('[a-f0-9]{40}', data[k]) for k in ('base', 'head'))
+                or any(not isinstance(data.get(k), str) or not re.fullmatch('[a-f0-9]{64}', data[k])
+                       for k in ('input_snapshot_sha256', 'recipe_sha256', 'sha256'))
+                or type(data['bytes']) is not int or not 0 < data['bytes'] <= PAYLOAD_LIMIT
+                or not isinstance(data['files'], dict) or set(data['files']) != {'snapshot.json', 'rust-inputs.tar'}
+                or any(not isinstance(entry, dict) or set(entry) != {'bytes', 'sha256'}
+                       or type(entry['bytes']) is not int or not 0 < entry['bytes'] <= PAYLOAD_LIMIT
+                       or not isinstance(entry['sha256'], str) or not re.fullmatch('[a-f0-9]{64}', entry['sha256'])
+                       for entry in data['files'].values())
+                or data['files']['rust-inputs.tar']['sha256'] != RUST_SHA
+                or data['files']['snapshot.json']['bytes'] > 8 * 1024**2):
+            raise ValueError('Malformed formatter request')
+        connection.settimeout(None)
+        return run_vm(value, connection, formatting=data)
     if set(data) != {'version', 'operation', 'control'} or data['operation'] != 'smoke' or data['control'] not in CONTROLS:
         raise ValueError('Unsupported worker operation')
     connection.settimeout(None)  # MSG_DONTWAIT EOF probes must not inherit the request-read timeout.
