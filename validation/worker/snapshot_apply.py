@@ -1,12 +1,50 @@
 """Explicit caller-side application of a verified formatter artifact. No VM or tools."""
 import base64
+import contextlib
 import json
 import os
 from pathlib import Path, PurePosixPath
 import stat
+import signal
 import uuid
 
 from snapshot import capture, canonical, sha, read_file, validate_result, RESULT_LIMIT
+
+CANCEL_SIGNALS = {signal.SIGTERM, signal.SIGINT}
+
+
+class ApplyCancelled(RuntimeError):
+    pass
+
+
+@contextlib.contextmanager
+def defer_cancellation():
+    """A pending signal is delivered after replacement and ownership agree."""
+    previous = signal.pthread_sigmask(signal.SIG_BLOCK, CANCEL_SIGNALS)
+    try:
+        yield
+    finally:
+        signal.pthread_sigmask(signal.SIG_SETMASK, previous)
+
+
+@contextlib.contextmanager
+def cancellation_handler():
+    """The first cancellation enters rollback; further signals cannot interrupt it."""
+    state = dict(recovering=False, cancelled=False)
+    previous = {number: signal.getsignal(number) for number in CANCEL_SIGNALS}
+    def cancel(number, _frame):
+        already_cancelled = state['cancelled']
+        state['cancelled'] = True
+        if not state['recovering'] and not already_cancelled:
+            raise ApplyCancelled('Formatter apply cancelled by signal ' + str(number))
+    try:
+        for number in CANCEL_SIGNALS:
+            signal.signal(number, cancel)
+        yield state
+    finally:
+        state['recovering'] = True
+        for number, handler in previous.items():
+            signal.signal(number, handler)
 
 
 def parent_fd(root, name):
@@ -46,6 +84,12 @@ def current_bytes(fd, name):
 
 
 def apply_result(repo, base, artifact, identity, expected_input, publish_receipt=None):
+    """CLI/main-thread entry point with cooperative SIGTERM/SIGINT recovery."""
+    with cancellation_handler() as cancellation:
+        return _apply_result(repo, base, artifact, identity, expected_input, publish_receipt, cancellation)
+
+
+def _apply_result(repo, base, artifact, identity, expected_input, publish_receipt, cancellation):
     """Stage all bytes first. Roll back only writes still owned by this invocation."""
     from snapshot import FILE_LIMIT
     descriptor = os.open(artifact, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
@@ -75,15 +119,17 @@ def apply_result(repo, base, artifact, identity, expected_input, publish_receipt
                 raise ValueError('Apply target changed; no changes applied')
             data = base64.b64decode(change['content_base64'], validate=True)
             item.update(original=original, formatted=data, mode=mode)
-            item['backup'] = prepare_file(fd, original, mode)
-            item['replacement'] = prepare_file(fd, data, mode)
+            with defer_cancellation():
+                item['backup'] = prepare_file(fd, original, mode)
+                item['replacement'] = prepare_file(fd, data, mode)
         if capture(repo, base, identity['recipe_sha256']) != snapshot:
             raise ValueError('Source changed while staging formatter output')
         for item in pending:
             if current_bytes(item['fd'], item['name']) != (item['original'], item['mode']):
                 raise ValueError('Apply target changed before replacement')
-            os.replace(item['replacement'], item['name'], src_dir_fd=item['fd'], dst_dir_fd=item['fd'])
-            item['installed'] = True
+            with defer_cancellation():
+                os.replace(item['replacement'], item['name'], src_dir_fd=item['fd'], dst_dir_fd=item['fd'])
+                item['installed'] = True
             os.fsync(item['fd'])
         actual = capture(repo, base, identity['recipe_sha256'])
         if sha(canonical(actual)) != result['output_snapshot_sha256']:
@@ -92,10 +138,15 @@ def apply_result(repo, base, artifact, identity, expected_input, publish_receipt
                     input_snapshot_sha256=expected_input, output_snapshot_sha256=result['output_snapshot_sha256'],
                     recipe_sha256=identity['recipe_sha256'], implementation_sha256=identity['implementation_sha256'],
                     applied_paths=[item['path'] for item in pending], vm_started=False)
-        if publish_receipt is not None:
-            publish_receipt(receipt)
+        # Publication is the completion boundary. Do not roll back after a
+        # successful receipt has claimed these exact source bytes.
+        with defer_cancellation():
+            if publish_receipt is not None:
+                publish_receipt(receipt)
+            cancellation['recovering'] = True
         return receipt
     except BaseException as original_error:
+        cancellation['recovering'] = True
         uncertain = []
         for item in reversed(pending):
             if not item['installed']:
@@ -112,6 +163,7 @@ def apply_result(repo, base, artifact, identity, expected_input, publish_receipt
             raise RuntimeError('Apply failed; newer or uncertain files preserved: ' + ', '.join(uncertain)) from original_error
         raise
     finally:
+        cancellation['recovering'] = True
         for item in pending:
             for kind in ('backup', 'replacement'):
                 if kind in item:

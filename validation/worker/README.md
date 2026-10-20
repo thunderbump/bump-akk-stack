@@ -140,6 +140,9 @@ publication failure. If another writer changes a file during recovery, the helpe
 preserves that newer edit and reports failure. Work on the same checkout must
 still be serialized by the caller. No multi-file filesystem operation can make
 concurrent writers safe without that ownership rule.
+SIGTERM and SIGINT enter the same rollback path. Replacement and ownership
+bookkeeping defer those signals together; recovery ignores repeated cancellation.
+A hard kill cannot run recovery and must be treated as an unconfirmed failure.
 
 Exit 0 means the selected operation completed, 1 means a formatter/check
 candidate failure, and 2 means unavailable infrastructure, invalid/stale data,

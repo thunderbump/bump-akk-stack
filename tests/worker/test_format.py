@@ -9,6 +9,8 @@ import json
 import os
 from pathlib import Path
 import socket
+import signal
+import selectors
 import subprocess
 import sys
 import tempfile
@@ -233,6 +235,53 @@ class ApplyResult(unittest.TestCase):
         fresh=snapshot.sha(snapshot.canonical(self.capture()))
         with self.assertRaises(ValueError):snapshot_apply.apply_result(self.repo,self.base,path,identity,fresh)
         self.assertFalse(list(self.repo.rglob('.eqemu-format-*')))
+
+    def test_real_sigterm_and_sigint_between_replace_and_bookkeeping_roll_back(self):
+        for number in (signal.SIGTERM,signal.SIGINT):
+            with self.subTest(signal=number):
+                value,path,identity,digest=self.fixture_result()
+                original={e['path']:base64.b64decode(e['content_base64']) for e in value['files']}
+                index=(self.repo/'.git/index').read_bytes()
+                child=self.root/'trusted-apply-child.py'
+                child.write_text('''import json,os,signal,sys
+sys.path.insert(0,sys.argv[1])
+import snapshot_apply
+replace=os.replace
+count=0
+def barrier(*args,**kwargs):
+    global count
+    replace(*args,**kwargs)
+    count+=1
+    if count==1:
+        print('FIRST_REPLACED',flush=True)
+        sys.stdin.readline()
+    else:
+        # Repeated cancellation must not interrupt the active rollback.
+        os.kill(os.getpid(),signal.SIGTERM)
+os.replace=barrier
+try:
+    snapshot_apply.apply_result(sys.argv[2],sys.argv[3],sys.argv[4],dict(recipe_sha256='d'*64,implementation_sha256='e'*64),sys.argv[5])
+except snapshot_apply.ApplyCancelled:
+    raise SystemExit(2)
+raise SystemExit(0)
+''')
+                process=subprocess.Popen([sys.executable,'-B',str(child),str(ROOT/'validation/worker'),str(self.repo),
+                                          self.base,str(path),digest],stdin=subprocess.PIPE,stdout=subprocess.PIPE,
+                                         stderr=subprocess.PIPE,text=True)
+                try:
+                    with selectors.DefaultSelector() as ready:
+                        ready.register(process.stdout,selectors.EVENT_READ)
+                        self.assertTrue(ready.select(3),'child did not reach the replacement barrier')
+                    self.assertEqual(process.stdout.readline().strip(),'FIRST_REPLACED')
+                    process.send_signal(number)
+                    process.stdin.write('\n');process.stdin.flush()
+                    stdout,stderr=process.communicate(timeout=5)
+                    self.assertEqual(process.returncode,2,(stdout,stderr))
+                finally:
+                    if process.poll() is None:process.kill();process.wait(timeout=3)
+                self.assertEqual(original,{name:(self.repo/name).read_bytes() for name in original})
+                self.assertEqual((self.repo/'.git/index').read_bytes(),index)
+                self.assertFalse(list(self.repo.rglob('.eqemu-format-*')))
 
 
 class FormatRuntime(unittest.TestCase):
