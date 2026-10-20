@@ -116,6 +116,36 @@ class QuickSnapshots(unittest.TestCase):
         self.assertEqual(calls,['rust-format','rust-dependencies','rust-clippy','rust-tests'])
         snapshot.validate_detail(result)
 
+    def test_added_and_edited_unknown_native_headers_never_become_not_applicable(self):
+        for index,suffix in enumerate(('.hh','.ipp','.tpp','','.unknown')):
+            for mode in ('added','edited'):
+                with self.subTest(suffix=suffix,mode=mode):
+                    name=f'zone/input-{index}-{mode}{suffix}';path=self.repo/name;path.parent.mkdir(exist_ok=True)
+                    if mode=='edited':
+                        path.write_text('opaque original include')
+                        git(self.repo,'add',name);git(self.repo,'commit','-qm','trusted header fixture')
+                        self.base=git(self.repo,'rev-parse','HEAD')
+                    path.write_text('opaque invalid include')
+                    value=self.capture();source=self.root/f'extracted-{index}-{mode}';source.mkdir()
+                    archive=self.root/f'archive-{index}-{mode}.tar';snapshot.archive(self.repo,value,archive)
+                    with tarfile.open(archive) as stream:stream.extractall(source,filter='data')
+                    calls=[]
+                    result=quick_guest.run_checks(source,source/'submodules/vcpkg','/trusted/cargo',value,
+                                                  lambda check,*args,**kwargs:calls.append(check))
+                    self.assertEqual(result['exit_code'],2)
+                    self.assertIn('native-objects',result['unavailable_checks'])
+                    self.assertIn('rust-tests',result['completed_checks'])
+                    self.assertFalse({'native-configure','native-objects'}&set(calls))
+                    git(self.repo,'add',name);git(self.repo,'commit','-qm','trusted complete fixture')
+                    self.base=git(self.repo,'rev-parse','HEAD')
+
+    def test_native_not_applicable_exclusions_are_narrow_and_documented(self):
+        value=self.capture()
+        for name in ('README.md','documentation/module.rst','LICENSE','rustfmt.toml','rust/actors/.rustfmt.toml','rust/actors/core/src/lib.rs'):
+            with self.subTest(name=name):self.assertEqual(snapshot.native_scope(dict(value,changed=[name]))['limitations'],[])
+        for name in ('rust/actors/core/build.rs','rust/unknown.hh','rust/actors/core/Cargo.toml','zone/README.txt','zone/LICENSE'):
+            with self.subTest(name=name):self.assertTrue(snapshot.native_scope(dict(value,changed=[name]))['limitations'])
+
     def test_generated_object_target_preserves_real_ninja_prerequisite_execution(self):
         (self.repo/'zone').mkdir();(self.repo/'zone/movement.cpp').write_text('opaque compile input')
         value=self.capture();source=self.extracted(value);build=self.root/'build';build.mkdir()

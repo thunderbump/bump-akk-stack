@@ -146,16 +146,20 @@ def native_scope(value):
     """Cold builds have no reliable header dependency map. State that limit."""
     translation=[];limitations=[]
     for name in value['changed']:
-        suffix=PurePosixPath(name).suffix.lower()
+        path=PurePosixPath(name);suffix=path.suffix.lower()
         if name.startswith('rust/actors/bridge/') or name in ('rust/actors/Cargo.toml','rust/actors/Cargo.lock') or '/.cargo/' in '/'+name:
             limitations.append('Rust bridge/build input changed: '+name)
-        elif name.startswith('rust/'):
+        elif name.startswith('rust/actors/core/') and suffix=='.rs' and path.name!='build.rs':
+            continue
+        elif suffix in ('.md','.rst') or name in ('LICENSE','COPYING','NOTICE'):
+            continue
+        elif name in [prefix+leaf for prefix in ('','rust/','rust/actors/') for leaf in ('rustfmt.toml','.rustfmt.toml')]:
             continue
         elif suffix in ('.cpp','.cc','.cxx'):
             if name in value['deleted']:limitations.append('Deleted/renamed translation unit: '+name)
             else:translation.append(name)
-        elif suffix in ('.h','.hpp','.hxx','.inl','.inc','.c','.s','.cmake') or PurePosixPath(name).name in ('CMakeLists.txt','vcpkg.json','vcpkg-configuration.json','.gitmodules'):
-            limitations.append('Native header/build scope requires full validation: '+name)
+        else:
+            limitations.append('Unknown native input/header/build scope requires full validation: '+name)
     if len(translation)>8:limitations.append('More than eight changed translation units require full validation')
     def bounded(items):
         kept=[]

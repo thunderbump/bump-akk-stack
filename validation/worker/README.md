@@ -191,6 +191,10 @@ changed headers/build inputs, deleted or renamed translation units, and Rust
 bridge/build inputs report native coverage unavailable. A cold build has no
 trustworthy header dependency database. Rust core internals alone do not select
 native objects; that omission is explicit in the stage results.
+Unknown inputs default to native coverage unavailable, including `.hh`, `.ipp`,
+`.tpp` and extensionless included files. The only unrelated-file exclusions are
+Markdown/reStructuredText, root LICENSE/COPYING/NOTICE, known ancestor rustfmt
+configuration and Rust actor core `.rs` internals other than `build.rs`.
 
 The result is advisory, with one status and timing per selected check, explicit
 completed/failed/unavailable/skipped lists, actual selected object paths and
