@@ -31,6 +31,23 @@ def publish(path, result):
         raise
 
 
+def failure_report(operation, error, snapshot=None, identity=None, verified=None, submitted=False):
+    """Only local input facts and a fully verified worker result may bind a failure."""
+    result = dict(version=1, scope='working-snapshot-format', operation=operation, exit_code=2,
+                  changed_files=[], vm_started=None if submitted else False, cleanup_complete=False,
+                  error=str(error)[-2000:])
+    if snapshot is not None:
+        known = snapshot_identity(snapshot)
+        result.update({key: known[key] for key in ('base', 'head', 'input_snapshot_sha256', 'recipe_sha256')})
+        result['output_snapshot_sha256'] = known['input_snapshot_sha256']
+        result.update(implementation_sha256=identity['implementation_sha256'],
+                      rust_input_sha256=identity['rust_input_sha256'])
+    if verified is not None:
+        result.update(vm_started=verified['vm_started'], cleanup_complete=verified['cleanup_complete'],
+                      timings=dict(verified['timings']))
+    return result
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--repo', type=Path, default=Path.cwd())
@@ -54,6 +71,9 @@ def main(argv=None):
     if args.apply_result and not all((args.expected_input, args.expected_recipe, args.expected_implementation)):
         parser.error('--apply-result requires --expected-input, --expected-recipe, --expected-implementation')
     started = time.monotonic()
+    operation = 'check' if args.check else 'format'
+    snapshot = identity = verified = None
+    submitted = False
     report = dict(version=1, scope='working-snapshot-format', exit_code=2, changed_files=[],
                   vm_started=False, cleanup_complete=False)
     try:
@@ -78,7 +98,6 @@ def main(argv=None):
             detail = snapshot_identity(snapshot)
             detail['indexed_paths'] = indexed_paths(args.repo)
             print(json.dumps(detail, separators=(',', ':'))); return 0
-        operation = 'check' if args.check else 'format'
         config = json.loads(args.config.read_text())
         readiness = exchange(config['socket'], dict(version=1, operation='check'))
         if readiness['exit_code'] != 0:
@@ -87,16 +106,24 @@ def main(argv=None):
             output = Path(tmp) / 'payload.iso'
             request = prepare(snapshot, operation, args.rust_input, output)
             preparation_seconds = time.monotonic() - started
-            report = exchange(config['socket'], request, output)
-        validate_result(report, snapshot, operation, identity['implementation_sha256'])
+            submitted = True
+            response = exchange(config['socket'], request, output)
+        validate_result(response, snapshot, operation, identity['implementation_sha256'])
+        verified = response
+        report = response
         if capture(args.repo, args.base, identity['recipe_sha256']) != snapshot:
             raise ValueError('Source snapshot changed during formatting; discard returned changes')
         report['timings']['client_preparation_seconds'] = round(preparation_seconds, 3)
         report['timings']['client_total_seconds'] = round(time.monotonic() - started, 3)
     except KeyboardInterrupt:
-        report.update(exit_code=2, changed_files=[], error='Client interrupted; socket closed for owned worker cancellation')
+        error = 'Client interrupted; socket closed for owned worker cancellation'
+        report = failure_report(operation, error, snapshot, identity, verified, submitted)
     except Exception as error:
-        report.update(exit_code=2, changed_files=[], error=str(error)[-2000:])
+        if args.apply_result:
+            report = dict(version=1, scope='working-snapshot-apply', exit_code=2, vm_started=False,
+                          applied_paths=[], error=str(error)[-2000:])
+        else:
+            report = failure_report(operation, error, snapshot, identity, verified, submitted)
     if args.output:
         try:
             publish(args.output, report)

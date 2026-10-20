@@ -334,6 +334,53 @@ class FormatCLI(unittest.TestCase):
         self.assertEqual(expected['rust_input_sha256'],snapshot.RUST_INPUT_SHA256)
         self.assertEqual(expected['implementation_sha256'],runtime.implementation_identity({'code_dir':str(ROOT)}))
 
+    def test_stale_cli_result_has_input_identity_and_private_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);repo,base=source_fixture(root)
+            identity=format_prepare.tool_identity(ROOT)
+            before=snapshot.capture(repo,base,identity['recipe_sha256'])
+            entry=next(e for e in before['files'] if e['path'].endswith('old.rs'))
+            data=b'fn formatted() {}\n'
+            change=dict(path=entry['path'],before_sha256=entry['sha256'],after_sha256=snapshot.sha(data),
+                        content_base64=base64.b64encode(data).decode())
+            response=complete(before,changes=[change]);response['implementation_sha256']=identity['implementation_sha256']
+            config=root/'config.json';config.write_text(json.dumps({'socket':'/unused'}))
+            output=root/'result.json'
+            def exchange(*args):
+                if args[1]==dict(version=1,operation='check'):return {'exit_code':0}
+                (repo/'rust/actors/old.rs').write_text('newer caller edit')
+                return response
+            with patch.object(self.cli,'exchange',side_effect=exchange),patch.object(self.cli,'prepare',return_value={'operation':'format'}), \
+                    contextlib.redirect_stdout(io.StringIO()) as public:
+                self.assertEqual(self.cli.main(['--repo',str(repo),'--base',base,'--config',str(config),'--output',str(output)]),2)
+            result=json.loads(output.read_text())
+            self.assertEqual(result['changed_files'],[])
+            self.assertEqual(result['output_snapshot_sha256'],result['input_snapshot_sha256'])
+            self.assertNotEqual(result['output_snapshot_sha256'],response['output_snapshot_sha256'])
+            self.assertTrue(result['vm_started']);self.assertTrue(result['cleanup_complete'])
+            self.assertNotIn('newer caller edit',public.getvalue())
+            snapshot.validate_result(result,before,'format',identity['implementation_sha256'])
+
+    def test_malformed_worker_cannot_supply_public_bindings_or_diagnostics(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);repo,base=source_fixture(root)
+            identity=format_prepare.tool_identity(ROOT)
+            before=snapshot.capture(repo,base,identity['recipe_sha256'])
+            forged=dict(version=1,scope='working-snapshot-format',exit_code=0,changed_files=[],
+                        input_snapshot_sha256='FORGED_PRIVATE_SOURCE',output_snapshot_sha256='FORGED_OUTPUT',
+                        implementation_sha256='FORGED_TOOL',timings={'secret':'FORGED_PRIVATE_SOURCE'})
+            config=root/'config.json';config.write_text(json.dumps({'socket':'/unused'}))
+            output=root/'result.json'
+            with patch.object(self.cli,'exchange',side_effect=[{'exit_code':0},forged]), \
+                    patch.object(self.cli,'prepare',return_value={'operation':'format'}),contextlib.redirect_stdout(io.StringIO()) as public:
+                self.assertEqual(self.cli.main(['--repo',str(repo),'--base',base,'--config',str(config),'--output',str(output)]),2)
+            result=json.loads(output.read_text())
+            self.assertEqual(result['input_snapshot_sha256'],snapshot.sha(snapshot.canonical(before)))
+            self.assertEqual(result['output_snapshot_sha256'],result['input_snapshot_sha256'])
+            self.assertEqual(result['implementation_sha256'],identity['implementation_sha256'])
+            self.assertIsNone(result['vm_started']);self.assertFalse(result['cleanup_complete'])
+            self.assertNotIn('FORGED',public.getvalue());self.assertNotIn('timings',result)
+
     def test_fresh_artifact_no_overwrite_and_private_mode(self):
         with tempfile.TemporaryDirectory() as tmp:
             path=Path(tmp)/'result.json'
