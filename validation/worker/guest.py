@@ -78,3 +78,17 @@ def format_user_data(nonce, request):
              {'path': '/opt/eqemu-format-request.json', 'permissions': '0600', 'content': json.dumps(request)}],
         'runcmd': [['/bin/sh', '-c', launcher]],
     }) + '\n'
+
+
+def quick_user_data(nonce,request):
+    """Fixed quick checks reuse the reviewed full-build provisioning helpers."""
+    from pathlib import Path
+    launcher=('/usr/bin/systemctl mask --runtime --now serial-getty@ttyS0.service || exit 2\n'
+              'exec >/dev/ttyS0 2>&1\n/usr/bin/python3 -u /opt/eqemu-worker-quick-guest\n/usr/sbin/poweroff\n')
+    files=[('quick_guest.py','/opt/eqemu-worker-quick-guest'),('quick_snapshot.py','/opt/quick_snapshot.py'),
+           ('snapshot.py','/opt/snapshot.py'),('build_guest.py','/opt/build_guest.py')]
+    return '#cloud-config\n'+json.dumps(dict(hostname='eqemu-worker-quick',ssh_pwauth=False,disable_root=True,
+        write_files=[dict(path=target,permissions='0600',content=Path(__file__).with_name(name).read_text()) for name,target in files]+
+            [dict(path='/opt/eqemu-worker-nonce',permissions='0600',content=nonce),
+             dict(path='/opt/eqemu-quick-request.json',permissions='0600',content=json.dumps(request))],
+        runcmd=[['/bin/sh','-c',launcher]]))+'\n'

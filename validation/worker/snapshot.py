@@ -45,7 +45,7 @@ def selected(name):
         path.suffix == '.rs' or path.name in ('Cargo.toml', 'Cargo.lock', *CONFIG_NAMES))
 
 
-def read_file(root, name):
+def read_file(root, name, limit=FILE_LIMIT):
     """Traverse with directory descriptors so links cannot escape the checkout."""
     fd = os.open(root, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
     try:
@@ -56,10 +56,10 @@ def read_file(root, name):
         file_fd = os.open(parts[-1], os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW, dir_fd=fd)
         with os.fdopen(file_fd, 'rb') as stream:
             info = os.fstat(stream.fileno())
-            if not stat.S_ISREG(info.st_mode) or info.st_size > FILE_LIMIT:
+            if not stat.S_ISREG(info.st_mode) or info.st_size > limit:
                 raise ValueError('Snapshot file type/size refused: ' + name)
-            data = stream.read(FILE_LIMIT + 1)
-            if len(data) != info.st_size or len(data) > FILE_LIMIT:
+            data = stream.read(limit + 1)
+            if len(data) != info.st_size or len(data) > limit:
                 raise ValueError('Snapshot file changed during read: ' + name)
         return data, '100755' if info.st_mode & 0o111 else '100644'
     finally:

@@ -168,7 +168,7 @@ APT::Install-Recommends "false";
     return identity
 
 
-def build():
+def prepare_source():
     source = WORK / 'source'
     extract('/media/eqemu-input/eqemu.tar', source)
     websocket = source / 'submodules/websocketpp'
@@ -181,6 +181,10 @@ def build():
     shutil.copyfile(MEDIA / 'tools/vcpkg', registry / 'vcpkg'); (registry / 'vcpkg').chmod(0o755)
     downloads = WORK / 'downloads'; shutil.copytree(MEDIA / 'downloads', downloads)
     ENV.update(VCPKG_ROOT=str(registry), VCPKG_DOWNLOADS=str(downloads))
+    return source, registry
+
+
+def prepare_rust():
     rust = WORK / 'rust'; extract('/media/eqemu-input/rust-inputs.tar', rust / 'inputs')
     prefix = rust / 'toolchain'
     for component in ('rustc', 'cargo', 'rust-std', 'rustfmt-preview', 'clippy-preview'):
@@ -197,8 +201,25 @@ def build():
                RUSTC_WRAPPER='', RUSTC_WORKSPACE_WRAPPER='', CARGO_HOME=str(home),
                CARGO_TARGET_DIR=str(rust / 'target'), CARGO_NET_OFFLINE='true',
                CARGO_BUILD_JOBS='1', CARGO_INCREMENTAL='0', RUSTUP_AUTO_INSTALL='0')
+    return str(prefix / 'bin/cargo')
+
+
+def configure_native(source, registry, seconds=14400):
+    output = WORK / 'build'
+    command('native-configure', ['cmake', '-S', str(source), '-B', str(output), '-G', 'Ninja',
+            '-DCMAKE_BUILD_TYPE=RelWithDebInfo', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
+            '-DCMAKE_TOOLCHAIN_FILE=' + str(registry / 'scripts/buildsystems/vcpkg.cmake'),
+            '-DVCPKG_TARGET_TRIPLET=x64-linux', '-DVCPKG_HOST_TRIPLET=x64-linux',
+            '-DVCPKG_INSTALL_OPTIONS=--no-downloads;--binarysource=clear',
+            *['-DEQEMU_BUILD_' + name + '=ON' for name in ('SERVER', 'TESTS', 'LOGIN', 'LUA', 'PERL', 'CLIENT_FILES')]],
+            candidate=True, seconds=seconds)
+    return output
+
+
+def build():
+    source, registry = prepare_source()
+    cargo = prepare_rust()
     workspace = source / 'rust/actors'
-    cargo = str(prefix / 'bin/cargo')
     command('rust-format', [cargo, 'fmt', '--all', '--check'], cwd=workspace, candidate=True)
     # Resolve the available offline closure before compiling candidate code. Missing
     # versions/packages stop as infrastructure rather than consuming candidate repairs.
@@ -208,14 +229,7 @@ def build():
             ('rust-tests', ['test', '--workspace', '--locked', '--offline', '--lib', '--tests']),
             ('rust-doctests', ['test', '--workspace', '--locked', '--offline', '--doc'])):
         command(stage, [cargo, *args], cwd=workspace, candidate=True)
-    output = WORK / 'build'
-    command('native-configure', ['cmake', '-S', str(source), '-B', str(output), '-G', 'Ninja',
-            '-DCMAKE_BUILD_TYPE=RelWithDebInfo', '-DCMAKE_EXPORT_COMPILE_COMMANDS=ON',
-            '-DCMAKE_TOOLCHAIN_FILE=' + str(registry / 'scripts/buildsystems/vcpkg.cmake'),
-            '-DVCPKG_TARGET_TRIPLET=x64-linux', '-DVCPKG_HOST_TRIPLET=x64-linux',
-            '-DVCPKG_INSTALL_OPTIONS=--no-downloads;--binarysource=clear',
-            *['-DEQEMU_BUILD_' + name + '=ON' for name in ('SERVER', 'TESTS', 'LOGIN', 'LUA', 'PERL', 'CLIENT_FILES')]],
-            candidate=True, seconds=14400)
+    output = configure_native(source, registry)
     command('native-build', ['cmake', '--build', str(output), '--parallel', '1'], candidate=True, seconds=14400)
     # Filter while draining the complete symbol stream; never retain the full nm table.
     command('zone-rust-symbol', ['/bin/bash', '-o', 'pipefail', '-c',
