@@ -1,0 +1,116 @@
+#!/usr/bin/python3 -I
+"""Format/check an uncommitted Rust snapshot in the fixed offline worker VM."""
+import argparse
+import json
+import os
+from pathlib import Path
+import sys
+import tempfile
+import time
+
+sys.dont_write_bytecode = True
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / 'validation/worker'))
+from client import CONFIG, exchange
+from format_prepare import prepare, tool_identity
+from snapshot import capture, snapshot_identity, indexed_paths, canonical, validate_result, RESULT_LIMIT
+from snapshot_apply import apply_result
+
+
+def publish(path, result):
+    """A private fresh artifact; never replace an existing receipt or follow its link."""
+    encoded = canonical(result) + b'\n'
+    if len(encoded) > RESULT_LIMIT:
+        raise ValueError('Formatter result size limit exceeded')
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    try:
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(encoded); stream.flush(); os.fsync(stream.fileno())
+    except BaseException:
+        path.unlink(missing_ok=True)
+        raise
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--repo', type=Path, default=Path.cwd())
+    parser.add_argument('--base')
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--identity', action='store_true')
+    mode.add_argument('--snapshot-identity', action='store_true')
+    mode.add_argument('--check', action='store_true')
+    mode.add_argument('--apply-result', type=Path)
+    parser.add_argument('--expected-input')
+    parser.add_argument('--expected-recipe')
+    parser.add_argument('--expected-implementation')
+    parser.add_argument('--output', type=Path)
+    parser.add_argument('--config', type=Path, default=CONFIG)
+    parser.add_argument('--rust-input', type=Path, default=Path.home() / '.local/state/eqemu-rust-validator/inputs/bundle-1.99.0-cxx194/rust-inputs.tar')
+    args = parser.parse_args(argv)
+    if not args.identity and not args.base:
+        parser.error('--base requires a full commit SHA')
+    if not args.identity and not args.snapshot_identity and (not args.output or not args.output.is_absolute()):
+        parser.error('Execution requires --output with a fresh absolute result path')
+    if args.apply_result and not all((args.expected_input, args.expected_recipe, args.expected_implementation)):
+        parser.error('--apply-result requires --expected-input, --expected-recipe, --expected-implementation')
+    started = time.monotonic()
+    report = dict(version=1, scope='working-snapshot-format', exit_code=2, changed_files=[],
+                  vm_started=False, cleanup_complete=False)
+    try:
+        identity = tool_identity(ROOT)
+        if args.identity:
+            print(json.dumps(identity, separators=(',', ':'))); return 0
+        if args.output and (args.output.parent.resolve() != args.output.parent.absolute()
+                            or args.output.resolve().is_relative_to(args.repo.resolve())):
+            raise ValueError('Result must be outside the checkout and not traverse symlinks')
+        if args.output and (args.output.exists() or args.output.is_symlink()):
+            raise ValueError('Output artifact already exists')
+        if args.apply_result:
+            report = dict(version=1, scope='working-snapshot-apply', exit_code=2, vm_started=False, applied_paths=[])
+            if (args.expected_recipe != identity['recipe_sha256']
+                    or args.expected_implementation != identity['implementation_sha256']):
+                raise ValueError('Trusted formatter identity changed; no changes applied')
+            report = apply_result(args.repo, args.base, args.apply_result, identity, args.expected_input,
+                                  publish_receipt=lambda receipt: publish(args.output, receipt))
+            print(json.dumps(report, separators=(',', ':'))); return 0
+        snapshot = capture(args.repo, args.base, identity['recipe_sha256'])
+        if args.snapshot_identity:
+            detail = snapshot_identity(snapshot)
+            detail['indexed_paths'] = indexed_paths(args.repo)
+            print(json.dumps(detail, separators=(',', ':'))); return 0
+        operation = 'check' if args.check else 'format'
+        config = json.loads(args.config.read_text())
+        readiness = exchange(config['socket'], dict(version=1, operation='check'))
+        if readiness['exit_code'] != 0:
+            raise RuntimeError('Worker readiness failed')
+        with tempfile.TemporaryDirectory(prefix='eqemu-format-client-') as tmp:
+            output = Path(tmp) / 'payload.iso'
+            request = prepare(snapshot, operation, args.rust_input, output)
+            preparation_seconds = time.monotonic() - started
+            report = exchange(config['socket'], request, output)
+        validate_result(report, snapshot, operation, identity['implementation_sha256'])
+        if capture(args.repo, args.base, identity['recipe_sha256']) != snapshot:
+            raise ValueError('Source snapshot changed during formatting; discard returned changes')
+        report['timings']['client_preparation_seconds'] = round(preparation_seconds, 3)
+        report['timings']['client_total_seconds'] = round(time.monotonic() - started, 3)
+    except KeyboardInterrupt:
+        report.update(exit_code=2, changed_files=[], error='Client interrupted; socket closed for owned worker cancellation')
+    except Exception as error:
+        report.update(exit_code=2, changed_files=[], error=str(error)[-2000:])
+    if args.output:
+        try:
+            publish(args.output, report)
+        except Exception as error:
+            print(json.dumps(dict(version=1, scope='working-snapshot-format', exit_code=2,
+                                  error='Result publication failed', error_type=type(error).__name__)))
+            return 2
+    summary = {k: v for k, v in report.items() if k in ('version', 'scope', 'operation', 'exit_code',
+               'base', 'head', 'input_snapshot_sha256', 'output_snapshot_sha256', 'recipe_sha256',
+               'implementation_sha256', 'vm_started', 'cleanup_complete', 'timings')}
+    summary.update(output=str(args.output) if args.output else None, changed_files=len(report.get('changed_files', [])))
+    print(json.dumps(summary, separators=(',', ':')))
+    return report['exit_code']
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

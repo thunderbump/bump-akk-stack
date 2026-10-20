@@ -18,14 +18,18 @@ def exchange(path, request, payload=None):
             return exchange_once(path, request, payload)
         except (ConnectionResetError, BrokenPipeError):
             # Never retry a build/smoke request: it may already have started a VM.
-            if request['operation'] not in ('check', 'last-result') or time.monotonic() >= deadline:
+            if (request not in ({'version': 1, 'operation': 'check'}, {'version': 1, 'operation': 'last-result'})
+                    or time.monotonic() >= deadline):
                 raise
             time.sleep(.1)
 
 
 def exchange_once(path, request, payload=None):
+    from snapshot import RESULT_LIMIT
+    report_limit = RESULT_LIMIT if 'input_snapshot_sha256' in request else REPORT_LIMIT
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
-        connection.settimeout(18330 if request['operation'] == 'build' else 330 if request['operation'] == 'smoke' else 15)
+        formatting = 'input_snapshot_sha256' in request
+        connection.settimeout(18330 if request['operation'] == 'build' else 930 if formatting else 330 if request['operation'] == 'smoke' else 15)
         connection.connect(str(path))
         connection.sendall((json.dumps(request, separators=(',', ':')) + '\n').encode())
         if payload is not None:
@@ -36,11 +40,11 @@ def exchange_once(path, request, payload=None):
         notified = False
         while True:
             while b'\n' not in data:
-                block = connection.recv(min(4096, REPORT_LIMIT + 1 - len(data)))
+                block = connection.recv(min(4096, report_limit + 1 - len(data)))
                 if not block:
                     raise RuntimeError('Worker closed without a final report')
                 data.extend(block)
-                if len(data) > REPORT_LIMIT:
+                if len(data) > report_limit:
                     raise RuntimeError('Worker report size limit exceeded')
             line, _, rest = data.partition(b'\n')
             result = json.loads(line)
@@ -80,7 +84,7 @@ def exchange_once(path, request, payload=None):
             if request['operation'] == 'last-result' and (result.get('operation') != 'last-result'
                     or result.get('scope') != 'worker-observation' or not isinstance(result.get('result'), dict)):
                 raise RuntimeError('Incomplete last-result observation')
-            if request['operation'] == 'check' and (result.get('scope') != 'worker-readiness'
+            if request['operation'] == 'check' and not formatting and (result.get('scope') != 'worker-readiness'
                     or result.get('operation') != 'check' or result.get('vm_started') is not False
                     or not isinstance(result.get('checks'), dict) or not result['checks']
                     or any(value is not True for value in result['checks'].values())):

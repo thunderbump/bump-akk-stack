@@ -58,3 +58,23 @@ def build_user_data(nonce):
         ],
         'runcmd': [['/bin/sh', '-c', launcher]],
     }) + '\n'
+
+
+def format_user_data(nonce, request):
+    """Only the reviewed formatter workload is copied into this disposable guest."""
+    from pathlib import Path
+    launcher = ('/usr/bin/systemctl mask --runtime --now serial-getty@ttyS0.service || exit 2\n'
+                'exec >/dev/ttyS0 2>&1\n'
+                '/usr/bin/python3 -u /opt/eqemu-worker-format-guest\n'
+                '/usr/sbin/poweroff\n')
+    files = [('format_guest.py', '/opt/eqemu-worker-format-guest'),
+             ('build_guest.py', '/opt/build_guest.py'), ('snapshot.py', '/opt/snapshot.py')]
+    return '#cloud-config\n' + json.dumps({
+        'hostname': 'eqemu-worker-format', 'ssh_pwauth': False, 'disable_root': True,
+        'write_files': [
+            {'path': target, 'permissions': '0600', 'content': Path(__file__).with_name(name).read_text()}
+            for name, target in files
+        ] + [{'path': '/opt/eqemu-worker-nonce', 'permissions': '0600', 'content': nonce},
+             {'path': '/opt/eqemu-format-request.json', 'permissions': '0600', 'content': json.dumps(request)}],
+        'runcmd': [['/bin/sh', '-c', launcher]],
+    }) + '\n'

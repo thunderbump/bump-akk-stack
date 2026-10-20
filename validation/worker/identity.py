@@ -13,10 +13,8 @@ def identity(root, config_path, native, rust, runtime=None):
                 'validation/worker/prepare.py', 'validation/worker/client.py',
                 'validation/inputs.py', 'validation/profile.json', 'validation/runtime-fixture.json',
                 'validation/worker/normal_world.py')
-    worker = ('validation/worker/runtime.py', 'validation/worker/guest.py',
-              'validation/worker/build_guest.py', 'validation/worker/normal_world.py', 'validation/actor.py', 'validation/actor_runtime.py',
-              'validation/debugger.py', 'validation/runtime-fixture.json', 'validation/worker/client.py',
-              'scripts/check-validation-worker')
+    from runtime import IMPLEMENTATION_FILES
+    worker = IMPLEMENTATION_FILES
     files = [*(root / name for name in frontend),
              *(Path(config['code_dir']) / name for name in worker), config_path,
              Path('/etc/systemd/system/eqemu-validator@.service'),
