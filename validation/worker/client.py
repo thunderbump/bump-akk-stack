@@ -26,10 +26,10 @@ def exchange(path, request, payload=None):
 
 def exchange_once(path, request, payload=None):
     from snapshot import RESULT_LIMIT
-    report_limit = RESULT_LIMIT if 'input_snapshot_sha256' in request else REPORT_LIMIT
+    report_limit = 65536 if request['operation']=='quick' else RESULT_LIMIT if 'input_snapshot_sha256' in request else REPORT_LIMIT
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
         formatting = 'input_snapshot_sha256' in request
-        connection.settimeout(18330 if request['operation'] == 'build' else 930 if formatting else 330 if request['operation'] == 'smoke' else 15)
+        connection.settimeout(18330 if request['operation'] == 'build' else 3630 if request['operation']=='quick' else 930 if formatting else 330 if request['operation'] == 'smoke' else 15)
         connection.connect(str(path))
         connection.sendall((json.dumps(request, separators=(',', ':')) + '\n').encode())
         if payload is not None:

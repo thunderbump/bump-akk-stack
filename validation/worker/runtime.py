@@ -22,7 +22,7 @@ import uuid
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from guest import user_data, build_user_data, format_user_data, BUILD_CHECKS
+from guest import user_data, build_user_data, format_user_data, quick_user_data, BUILD_CHECKS
 
 CONFIG = Path('/etc/eqemu-validator/config.json')
 QEMU = '/usr/bin/qemu-system-x86_64'
@@ -34,13 +34,14 @@ BUILD_SECONDS = 18000
 PAYLOAD_LIMIT = 1024**3
 BASE_LIMIT = 2 * 1024**3
 CONTROLS = ('pass', 'assertion', 'missing-result', 'deadline', 'controller-death')
-OWNED_CONTROLS = (*CONTROLS, 'build', 'format', 'check-format')
+OWNED_CONTROLS = (*CONTROLS, 'build', 'format', 'check-format', 'quick')
 FORMAT_SECONDS = 900
 IMPLEMENTATION_FILES = ('validation/worker/runtime.py', 'validation/worker/guest.py',
     'validation/worker/build_guest.py', 'validation/worker/normal_world.py', 'validation/actor.py',
     'validation/actor_runtime.py', 'validation/debugger.py', 'validation/runtime-fixture.json',
     'validation/worker/client.py', 'scripts/check-validation-worker',
-    'validation/worker/format_guest.py', 'validation/worker/snapshot.py')
+    'validation/worker/format_guest.py', 'validation/worker/snapshot.py',
+    'validation/worker/quick_guest.py', 'validation/worker/quick_snapshot.py')
 
 
 class CleanupError(RuntimeError):
@@ -171,17 +172,22 @@ def atomic_json(path, value):
 
 def persisted_report(report):
     """Last-result is an observation, never a second export of source bytes."""
-    if report.get('scope') != 'working-snapshot-format':
+    if report.get('scope') not in ('working-snapshot-format','working-snapshot-quickcheck'):
         return report
     value = dict(report)
     # Rustfmt diagnostics can contain private source lines and diffs. Retain them
     # only in the explicit private invocation artifact and owned serial log.
     value.pop('error', None)
     value.pop('cleanup_error', None)
+    if report.get('scope')=='working-snapshot-quickcheck':
+        value['checks']=[{key:item[key] for key in ('name','status','reason','seconds')} for item in report.get('checks',[])]
+        native=report.get('native_scope',{})
+        value['native_scope']=dict(changed_translation_unit_count=len(native.get('changed_translation_units',[]))+native.get('omitted_translation_units',0),
+            selected_object_count=len(native.get('selected_objects',[])),limitation_count=len(native.get('limitations',[]))+native.get('omitted_limitations',0))
     if report.get('exit_code') != 0:
-        value['failure_class'] = ('formatter-candidate-failure' if report.get('exit_code') == 1 else
-                                  'formatter-infrastructure-failure' if report.get('cleanup_complete') is True else
-                                  'formatter-cleanup-unconfirmed')
+        prefix='quick' if report.get('scope')=='working-snapshot-quickcheck' else 'formatter'
+        value['failure_class'] = prefix+('-candidate-failure' if report.get('exit_code') == 1 else
+                                       '-infrastructure-failure' if report.get('cleanup_complete') is True else '-cleanup-unconfirmed')
     value['changed_files'] = [{key: item[key] for key in ('path', 'before_sha256', 'after_sha256')}
                               for item in report.get('changed_files', [])]
     # Keep the established read-only last-result protocol below 16 KiB too.
@@ -244,9 +250,10 @@ def cleanup(value):
                     or not re.fullmatch('[a-f0-9]{32}', record['run_id'])):
                 raise ValueError('Unexpected active job record')
             job = Path(value['state_dir']) / record['run_id']
-            operation = {'build': 'build', 'format': 'format', 'check-format': 'check'}.get(record['control'], 'smoke')
+            operation = {'build': 'build', 'format': 'format', 'check-format': 'check','quick':'quick'}.get(record['control'], 'smoke')
             report = {'version': 1, 'operation': operation,
-                      'scope': 'working-snapshot-format' if record['control'] in ('format', 'check-format') else
+                      'scope': 'working-snapshot-quickcheck' if record['control']=='quick' else
+                               'working-snapshot-format' if record['control'] in ('format', 'check-format') else
                                'worker-build' if record['control'] == 'build' else 'worker-smoke', 'run_id': record['run_id'],
                       'control': record['control'], 'qemu_pid': record['qemu_pid'],
                       'vm_started': record['qemu_pid'] is not None, 'exit_code': 2,
@@ -324,7 +331,7 @@ def stop_process(process):
         raise CleanupError('Owned process cleanup could not be confirmed') from error
 
 
-def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None, format_result=None):
+def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None, format_result=None, quick_result=None):
     process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                cwd=scratch, start_new_session=True, close_fds=True,
                                env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': str(scratch)})
@@ -352,12 +359,14 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                     if not block:
                         eof = True; selector.unregister(key.fileobj)
                         continue
-                    if stream.tell() + len(block) > (64 * LOG_LIMIT if build_result is not None or format_result is not None else LOG_LIMIT):
+                    if stream.tell() + len(block) > (64 * LOG_LIMIT if build_result is not None or format_result is not None or quick_result is not None else LOG_LIMIT):
                         raise RuntimeError('Worker serial output limit exceeded')
                     output.extend(block); stream.write(block); stream.flush()
                     if (format_result is not None and 'boot_seconds' not in format_result
                             and b'EQEMU_STAGE mount-job' in output):
                         format_result['boot_seconds'] = round(time.monotonic() - started_at, 3)
+                    if quick_result is not None and 'boot_seconds' not in quick_result and b'EQEMU_STAGE mount-job' in output:
+                        quick_result['boot_seconds']=round(time.monotonic()-started_at,3)
                     if build_result is not None:
                         pending.extend(block)
                         while b'\n' in pending:
@@ -378,7 +387,7 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                             pending.clear()
                             discarding = True
 
-                    if ((build_result is not None or format_result is not None)
+                    if ((build_result is not None or format_result is not None or quick_result is not None)
                             and b'cc_scripts_user.py[WARNING]: Failed to run module scripts_user' in output):
                         # Cloud-init has returned from our command. An idle login
                         # prompt cannot complete the job; retain diagnostics and fail now.
@@ -396,6 +405,10 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
     results = []
     with log.open('rb') as stream:
         for line in stream:
+            if quick_result is not None and line.startswith(b'EQEMU_QUICK_RESULT '):
+                from quick_snapshot import RESULT_LIMIT
+                if len(line)>RESULT_LIMIT*2:raise RuntimeError('Oversized quick completion')
+                results.append(json.loads(base64.b64decode(line.removeprefix(b'EQEMU_QUICK_RESULT ').strip(),validate=True)))
             if format_result is not None and line.startswith(b'EQEMU_FORMAT_RESULT '):
                 from snapshot import RESULT_LIMIT
                 if len(line) > RESULT_LIMIT * 2:
@@ -408,6 +421,14 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
     if len(results) != 1:
         raise RuntimeError('Missing or duplicate guest completion')
     result = results[0]
+    if quick_result is not None:
+        from quick_snapshot import validate_detail
+        validate_detail(result)
+        if (type(result.get('version')) is not int or result['version']!=1 or result.get('nonce')!=nonce
+                or result.get('scope')!='working-snapshot-quickcheck'):
+            raise RuntimeError('Malformed quick completion')
+        quick_result.update(result)
+        return result['exit_code']
     if format_result is not None:
         from snapshot import RESULT_LIMIT, canonical
         if (not isinstance(result, dict) or len(canonical(result)) > RESULT_LIMIT
@@ -476,7 +497,7 @@ def implementation_identity(value):
     return hashlib.sha256(json.dumps(digests, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
 
 
-def run_vm(value, connection, control='pass', build=None, formatting=None):
+def run_vm(value, connection, control='pass', build=None, formatting=None, quick=None):
     started_at = time.monotonic()
     lock = acquire(value)
     state = Path(value['state_dir']); active = state / 'active.json'
@@ -496,37 +517,44 @@ def run_vm(value, connection, control='pass', build=None, formatting=None):
                       **{key: formatting[key] for key in ('base', 'head', 'input_snapshot_sha256', 'recipe_sha256')},
                       output_snapshot_sha256=formatting['input_snapshot_sha256'],
                       rust_input_sha256=formatting['files']['rust-inputs.tar']['sha256'])
+    if quick is not None:
+        control='quick'
+        report.update(operation='quick',scope='working-snapshot-quickcheck',control=control,coverage=[],advisory=True,
+            **{key:quick[key] for key in ('base','head','input_snapshot_sha256','recipe_sha256')},
+            output_snapshot_sha256=quick['input_snapshot_sha256'],rust_input_sha256=quick['files']['rust-inputs.tar']['sha256'],
+            native_input_sha256=quick['files']['native.iso']['sha256'])
     try:
         if active.exists():
             raise RuntimeError('Previous worker job requires service cleanup')
         probe = ready(value); report['readiness'] = probe
         if probe['exit_code'] != 0:
             raise RuntimeError('Worker readiness failed')
-        if build is not None or formatting is not None:
+        if build is not None or formatting is not None or quick is not None:
             report['implementation_sha256'] = implementation_identity(value)
-        if build is not None:
+        if build is not None or quick is not None:
             if int(resource_state()['memory.max']) < 6 * 1024**3:
                 raise RuntimeError('Server build needs the reviewed 6 GiB service resource update')
-        required_space = 50 if build is not None else 10
+        required_space = 50 if build is not None or quick is not None else 10
         if shutil.disk_usage(state).free < required_space * 1024**3:
             raise RuntimeError('Worker needs ' + str(required_space) + ' GiB free space')
         active_record = {'run_id': run_id, 'invocation_id': invocation(), 'control': control, 'qemu_pid': None}
         atomic_json(active, active_record)
         job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
-        deadline = time.monotonic() + (BUILD_SECONDS if build is not None else FORMAT_SECONDS if formatting is not None else SECONDS)
+        deadline = time.monotonic() + (BUILD_SECONDS if build is not None else 3600 if quick is not None else FORMAT_SECONDS if formatting is not None else SECONDS)
         base = root_file(value['base_image'])
         with base.open('rb') as stream:
             report['base_sha256'] = hashlib.file_digest(stream, 'sha256').hexdigest()
-        payload = build if build is not None else formatting
+        payload = build if build is not None else quick if quick is not None else formatting
         if payload is not None:
             receive_payload(connection, scratch / 'payload.iso', payload, time.monotonic() + 120)
         (scratch / 'user-data').write_text(build_user_data(run_id) if build is not None else
+                                         quick_user_data(run_id,quick) if quick is not None else
                                          format_user_data(run_id, formatting) if formatting is not None else user_data(run_id, control))
         (scratch / 'meta-data').write_text('instance-id: eqemu-smoke-' + run_id + '\n')
-        tool([QEMU_IMG, 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', str(base), str(scratch / 'disk.qcow2'), '48G' if build is not None else '8G'], deadline)
+        tool([QEMU_IMG, 'create', '-q', '-f', 'qcow2', '-F', 'qcow2', '-b', str(base), str(scratch / 'disk.qcow2'), '48G' if build is not None or quick is not None else '8G'], deadline)
         tool([GENISOIMAGE, '-output', str(scratch / 'seed.iso'), '-volid', 'cidata', '-joliet', '-rock',
               str(scratch / 'user-data'), str(scratch / 'meta-data')], deadline)
-        args = [QEMU, '-no-user-config', '-nodefaults', '-machine', 'q35,accel=kvm', '-cpu', 'host', '-smp', '2', '-m', '4096' if build is not None else '1024',
+        args = [QEMU, '-no-user-config', '-nodefaults', '-machine', 'q35,accel=kvm', '-cpu', 'host', '-smp', '2', '-m', '4096' if build is not None or quick is not None else '1024',
                 # Leave room beneath TasksMax for vCPUs, supervision and bounded I/O workers.
                 '-object', 'main-loop,id=main-loop,thread-pool-min=0,thread-pool-max=8',
                 '-nic', 'none', '-display', 'none', '-monitor', 'none', '-serial', 'stdio', '-no-reboot',
@@ -544,7 +572,13 @@ def run_vm(value, connection, control='pass', build=None, formatting=None):
                 # Explicit qualification control: bypass Python finally, exercising systemd's
                 # cgroup kill and ExecStopPost rather than the controller's normal cleanup.
                 os.kill(os.getpid(), signal.SIGKILL)
-        if formatting is not None:
+        if quick is not None:
+            detail={}
+            report['exit_code']=supervise(args,scratch,job/'serial.log',connection,deadline,run_id,started,quick_result=detail)
+            report.update({key:detail[key] for key in ('selected_checks','completed_checks','failed_checks','unavailable_checks','skipped_checks','checks','native_scope')})
+            report['timings']=dict(boot_seconds=detail.get('boot_seconds',0),preparation_seconds=detail.get('preparation_seconds',0))
+            if report['implementation_sha256']!=implementation_identity(value):raise RuntimeError('Worker implementation changed during quick checks')
+        elif formatting is not None:
             detail = {}
             report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started,
                                             format_result=detail)
@@ -573,6 +607,9 @@ def run_vm(value, connection, control='pass', build=None, formatting=None):
             report['cleanup_error'] = str(error)[:1000]
         if formatting is not None:
             report.update(changed_files=[], output_snapshot_sha256=formatting['input_snapshot_sha256'])
+        if quick is not None:
+            from quick_guest import unavailable
+            report.update(unavailable(error))
     finally:
         try:
             if 'cleanup_error' not in report:
@@ -581,9 +618,9 @@ def run_vm(value, connection, control='pass', build=None, formatting=None):
                 report['cleanup_complete'] = True
         except Exception as error:
             report['cleanup_error'] = str(error)[:1000]; report['exit_code'] = 2
-        if formatting is not None:
+        if formatting is not None or quick is not None:
             report.setdefault('timings', {})['total_seconds'] = round(time.monotonic() - started_at, 3)
-            if report['exit_code'] != 0:
+            if formatting is not None and report['exit_code'] != 0:
                 report.update(changed_files=[], output_snapshot_sha256=formatting['input_snapshot_sha256'])
         if job.exists():
             atomic_json(state / 'last-result.json', persisted_report(report))
@@ -629,6 +666,22 @@ def request(connection, value):
             raise ValueError('Malformed build request')
         connection.settimeout(None)
         return run_vm(value, connection, build=data)
+    if data.get('operation')=='quick':
+        from snapshot import RUST_INPUT_SHA256
+        if (set(data)!={'version','operation','base','head','input_snapshot_sha256','recipe_sha256','files','bytes','sha256'}
+                or any(not isinstance(data.get(key),str) or not re.fullmatch('[a-f0-9]{40}',data[key]) for key in ('base','head'))
+                or any(not isinstance(data.get(key),str) or not re.fullmatch('[a-f0-9]{64}',data[key]) for key in ('input_snapshot_sha256','recipe_sha256','sha256'))
+                or type(data['bytes']) is not int or not 0<data['bytes']<=PAYLOAD_LIMIT
+                or not isinstance(data['files'],dict) or set(data['files'])!={'snapshot.json','eqemu.tar','websocketpp.tar','native.iso','rust-inputs.tar'}
+                or any(not isinstance(entry,dict) or set(entry)!={'bytes','sha256'} or type(entry['bytes']) is not int
+                       or not 0<entry['bytes']<=PAYLOAD_LIMIT or not isinstance(entry['sha256'],str)
+                       or not re.fullmatch('[a-f0-9]{64}',entry['sha256']) for entry in data['files'].values())
+                or data['files']['rust-inputs.tar']['sha256']!=RUST_INPUT_SHA256
+                or data['files']['native.iso']['sha256']!='02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4'
+                or data['files']['snapshot.json']['bytes']>4*1024**2 or data['files']['eqemu.tar']['bytes']>272*1024**2):
+            raise ValueError('Malformed quick request')
+        connection.settimeout(None)
+        return run_vm(value,connection,quick=data)
     if data.get('operation') in ('format', 'check'):
         from snapshot import RUST_INPUT_SHA256 as RUST_SHA
         if (set(data) != {'version', 'operation', 'base', 'head', 'input_snapshot_sha256', 'recipe_sha256', 'files', 'bytes', 'sha256'}

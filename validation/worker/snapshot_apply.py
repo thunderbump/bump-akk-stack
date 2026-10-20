@@ -172,3 +172,21 @@ def _apply_result(repo, base, artifact, identity, expected_input, publish_receip
                     except FileNotFoundError:
                         pass
             os.close(item['fd'])
+
+
+def publish(path, result, limit=RESULT_LIMIT):
+    """A private fresh artifact; never replace an existing receipt or follow its link."""
+    encoded = canonical(result) + b'\n'
+    if len(encoded) > limit:
+        raise ValueError('Formatter result size limit exceeded')
+    directory = parent_fd('/', path.absolute().as_posix().lstrip('/'))
+    try:
+        fd = os.open(path.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+        try:
+            with os.fdopen(fd, 'wb') as stream:
+                stream.write(encoded); stream.flush(); os.fsync(stream.fileno())
+        except BaseException:
+            os.unlink(path.name, dir_fd=directory)
+            raise
+    finally:
+        os.close(directory)

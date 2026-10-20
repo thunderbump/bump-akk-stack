@@ -149,3 +149,64 @@ candidate failure, and 2 means unavailable infrastructure, invalid/stale data,
 interruption or unconfirmed cleanup. Error and check results never return edits.
 Artifacts must be outside the checkout. The operator must activate the reviewed
 worker implementation separately; an older worker rejects the new operations.
+
+## Advisory quick checks
+
+`scripts/quick-worker-snapshot` runs a fixed check-only workload before a commit
+is published. It captures tracked files and new nonignored regular files, raw
+bytes, executable modes, deletions and pinned submodule identities. Ignored files
+are omitted except applicable ancestor Cargo/rustfmt configuration. New target,
+vendor, generated, CMakeFiles, Python cache and local `.env`/runtime-config files
+are excluded. Tracked files in those locations remain source inputs. The source
+limit is 256 MiB/10,000 files, 16 MiB per file; the manifest limit is 4 MiB.
+Submodule working copies are excluded and verified fixed inputs supply them.
+
+```sh
+scripts/quick-worker-snapshot --identity
+scripts/quick-worker-snapshot --repo /absolute/eqemu --base FULL_BASE_SHA --snapshot-identity
+scripts/quick-worker-snapshot --repo /absolute/eqemu --base FULL_BASE_SHA \
+  --expected-input INPUT_SNAPSHOT_SHA256 --output /private/fresh-quick.json \
+  --websocketpp /absolute/pinned-websocketpp
+```
+
+Queries boot no VM and invoke no candidate tools. Execution checks the expected
+snapshot before packaging, before submission and after completion. It never
+writes the caller's source or index. The exact input identity covers native and
+Rust source together. Returned output identity equals input identity.
+
+The six fixed checks are Rust formatting, offline dependency availability,
+Clippy, workspace library/tests, native configuration and affected native
+objects. Format and Clippy failures do not prevent independent tests. Dependency
+failure skips Clippy/tests and reports unavailable infrastructure, matching full
+validation. This deliberately classifies metadata syntax errors conservatively
+as unavailable too; the formatter's separate feedback can still identify them.
+Independent native feedback continues when its prerequisites permit.
+
+Native compilation uses CMake's generated compiler database to find each changed
+C++ source's actual object outputs, then asks the generated Ninja build to build
+those exact object targets. Ninja retains its PCH/generated-header prerequisites;
+the client does not execute compiler argument text from an agent. At most eight
+objects are selected. New translation units absent from the generated database,
+changed headers/build inputs, deleted or renamed translation units, and Rust
+bridge/build inputs report native coverage unavailable. A cold build has no
+trustworthy header dependency database. Rust core internals alone do not select
+native objects; that omission is explicit in the stage results.
+
+The result is advisory, with one status and timing per selected check, explicit
+completed/failed/unavailable/skipped lists, actual selected object paths and
+bounded private compiler/Rust diagnostics including available file/line context.
+It is at most 64 KiB. Stdout and last-result observations omit source diagnostics.
+Exit 1 identifies source failures; exit 2 covers unavailable input/scope,
+staleness, malformed evidence, cancellation or unconfirmed cleanup. Exit 0 never
+substitutes for final linking, server startup, utility or in-server tests.
+
+The worker uses the existing offline provisioning, disposable VM, resource
+limits and owned cancellation/cleanup. Its fixed deadline is 3600 seconds and
+client deadline 3630 seconds; callers allow the existing cleanup grace. It has no
+persistent VM/cache. Cold provisioning, configuration and PCH generation may be
+expensive. Actual VM qualification and comparison with full-validation timing
+are required before claiming a feedback speed improvement.
+Native path/reason details have explicit encoded-byte caps and omitted counts.
+Omitted translation units force unavailable coverage. Diagnostics use a 3000-byte
+JSON budget per stage, including Unicode escaping. Last-result native scope is
+counts only, preserving its existing 16 KiB protocol.
