@@ -391,5 +391,23 @@ class FormatCLI(unittest.TestCase):
             link=Path(tmp)/'link';link.symlink_to(path)
             with self.assertRaises(FileExistsError):self.cli.publish(link,{'exit_code':0})
 
+    def test_cli_rejected_output_paths_never_receive_success_or_error_artifacts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);repo,base=source_fixture(root)
+            destination=root/'destination';destination.mkdir()
+            link=root/'linked-parent';link.symlink_to(destination,target_is_directory=True)
+            existing=root/'existing.json';existing.write_text('preserve')
+            for output in (repo/'forbidden.json',link/'forbidden.json',existing):
+                with self.subTest(output=output),patch.object(self.cli,'exchange') as exchange, \
+                        patch.object(self.cli,'prepare') as prepare,contextlib.redirect_stdout(io.StringIO()) as public:
+                    self.assertEqual(self.cli.main(['--repo',str(repo),'--base',base,'--output',str(output)]),2)
+                    exchange.assert_not_called();prepare.assert_not_called()
+                    self.assertEqual(json.loads(public.getvalue())['error'],'Output artifact path rejected')
+            self.assertFalse((repo/'forbidden.json').exists())
+            self.assertFalse((destination/'forbidden.json').exists())
+            self.assertEqual(existing.read_text(),'preserve')
+            with self.assertRaises(OSError):self.cli.publish(link/'direct.json',{'exit_code':2})
+            self.assertFalse((destination/'direct.json').exists())
+
 
 if __name__=='__main__':unittest.main()

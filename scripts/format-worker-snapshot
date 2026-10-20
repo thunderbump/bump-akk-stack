@@ -14,7 +14,7 @@ sys.path.insert(0, str(ROOT / 'validation/worker'))
 from client import CONFIG, exchange
 from format_prepare import prepare, tool_identity
 from snapshot import capture, snapshot_identity, indexed_paths, canonical, validate_result, RESULT_LIMIT
-from snapshot_apply import apply_result
+from snapshot_apply import apply_result, parent_fd
 
 
 def publish(path, result):
@@ -22,13 +22,17 @@ def publish(path, result):
     encoded = canonical(result) + b'\n'
     if len(encoded) > RESULT_LIMIT:
         raise ValueError('Formatter result size limit exceeded')
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600)
+    directory = parent_fd('/', path.absolute().as_posix().lstrip('/'))
     try:
-        with os.fdopen(fd, 'wb') as stream:
-            stream.write(encoded); stream.flush(); os.fsync(stream.fileno())
-    except BaseException:
-        path.unlink(missing_ok=True)
-        raise
+        fd = os.open(path.name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
+        try:
+            with os.fdopen(fd, 'wb') as stream:
+                stream.write(encoded); stream.flush(); os.fsync(stream.fileno())
+        except BaseException:
+            os.unlink(path.name, dir_fd=directory)
+            raise
+    finally:
+        os.close(directory)
 
 
 def failure_report(operation, error, snapshot=None, identity=None, verified=None, submitted=False):
@@ -70,6 +74,17 @@ def main(argv=None):
         parser.error('Execution requires --output with a fresh absolute result path')
     if args.apply_result and not all((args.expected_input, args.expected_recipe, args.expected_implementation)):
         parser.error('--apply-result requires --expected-input, --expected-recipe, --expected-implementation')
+    # A rejected destination is never eligible for the error-artifact path.
+    if args.output:
+        try:
+            if (not args.output.is_absolute() or args.output.parent.resolve() != args.output.parent.absolute()
+                    or args.output.resolve().is_relative_to(args.repo.resolve())
+                    or args.output.exists() or args.output.is_symlink()):
+                raise ValueError('Invalid output destination')
+        except Exception:
+            print(json.dumps(dict(version=1, scope='working-snapshot-format', exit_code=2,
+                                  error='Output artifact path rejected')))
+            return 2
     started = time.monotonic()
     operation = 'check' if args.check else 'format'
     snapshot = identity = verified = None
@@ -80,11 +95,6 @@ def main(argv=None):
         identity = tool_identity(ROOT)
         if args.identity:
             print(json.dumps(identity, separators=(',', ':'))); return 0
-        if args.output and (args.output.parent.resolve() != args.output.parent.absolute()
-                            or args.output.resolve().is_relative_to(args.repo.resolve())):
-            raise ValueError('Result must be outside the checkout and not traverse symlinks')
-        if args.output and (args.output.exists() or args.output.is_symlink()):
-            raise ValueError('Output artifact already exists')
         if args.apply_result:
             report = dict(version=1, scope='working-snapshot-apply', exit_code=2, vm_started=False, applied_paths=[])
             if (args.expected_recipe != identity['recipe_sha256']
