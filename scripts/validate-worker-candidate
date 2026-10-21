@@ -2,6 +2,7 @@
 """Build/test one clean committed candidate inside the dedicated offline VM worker."""
 import argparse
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
@@ -11,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'validation/worker'
 from client import CONFIG, exchange
 from prepare import prepare
 from identity import identity
+from normal_world import export_failure
 
 
 def main():
@@ -50,6 +52,15 @@ def main():
                 print(json.dumps(dict(scope='prepared-input-only', executed=False, request=request)))
                 return 0
             report = exchange(config['socket'], request, output)
+            directory = os.environ.get('VALIDATION_AFK_EVIDENCE_DIR')
+            if report.get('exit_code') in (1, 2) and report.get('guest', {}).get('normal_world'):
+                directory = directory or Path.home()/'.local/state/eqemu-rust-validator/runs'/report['run_id']
+                try:
+                    artifact = export_failure(report, request['candidate'], directory)
+                    if artifact:
+                        report['diagnostic_artifact'] = str(artifact)
+                except Exception as error:
+                    report.update(exit_code=2, diagnostic_export_error=str(error)[:500])
     except KeyboardInterrupt:
         report = {'version': 1, 'exit_code': 2, 'error': 'Client interrupted; owned worker cancellation requested by socket close'}
     except Exception as error:

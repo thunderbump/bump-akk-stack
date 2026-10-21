@@ -14,6 +14,7 @@ import re
 import stat
 import signal
 import socket
+import shutil
 import struct
 import subprocess
 import sys
@@ -23,6 +24,7 @@ SECONDS = 1800
 OBSERVE_SECONDS = 120
 BASELINE_SECONDS = 5
 INSERVER_LIMIT = 4096
+EVIDENCE_LIMIT = 16384
 
 
 class InserverFailure(Exception):
@@ -124,7 +126,7 @@ def world_connected(world, zone):
     return False
 
 
-def probe(port=7000):
+def probe(port=7000, *, diagnostics=None):
     """A fresh random session must be echoed by the live zone's EQ stream handler."""
     challenge = os.urandom(4)
     with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as stream:
@@ -133,9 +135,109 @@ def probe(port=7000):
         stream.send(b'\x00\x01' + struct.pack('!I', 2) + challenge + struct.pack('!I', 512))
         try:
             response = stream.recv(512)
-        except (TimeoutError, ConnectionRefusedError):
+        except (TimeoutError, ConnectionRefusedError) as error:
+            if diagnostics is not None:
+                diagnostics['condition'] = 'udp-timeout' if isinstance(error, TimeoutError) else 'udp-refused'
             return False
-        return len(response) >= 6 and response[:2] == b'\x00\x02' and response[2:6] == challenge
+        valid = len(response) >= 6 and response[:2] == b'\x00\x02' and response[2:6] == challenge
+        if diagnostics is not None:
+            diagnostics['condition'] = 'responsive' if valid else 'udp-malformed-reply'
+        return valid
+
+
+
+def encoded(value):
+    return json.dumps(value, separators=(',', ':'), ensure_ascii=True).encode()
+
+
+def bounded_text(value, limit):
+    return str(value).encode('utf-8', 'replace')[-limit:].decode('utf-8', 'ignore') if limit > 0 else ''
+
+
+
+def bounded_json_text(value, limit):
+    """Keep error metadata bounded after JSON escaping, even for control characters."""
+    value = bounded_text(value, limit)
+    while len(encoded(value)) > limit:
+        value = value[max(1, len(value)//2):]
+    return value
+
+
+def console_bytes(path):
+    """Candidate-controlled paths must never redirect the observer into devices."""
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_size > 1024**2:
+            raise ValueError('Console is not a bounded regular file')
+        return stream.read(1024**2 + 1)
+
+
+def case_progress(data, run_id):
+    """Progress is advisory. Ignore malformed/stale events, never accept a suite."""
+    active = completed = None
+    rejected = 0
+    for line in data.splitlines():
+        if not line.startswith(b'EQEMU_INSERVER_PROGRESS '):
+            continue
+        try:
+            if len(line) > 4096:
+                raise ValueError('Oversized progress')
+            value = json.loads(line.removeprefix(b'EQEMU_INSERVER_PROGRESS '), object_pairs_hook=unique_object)
+            end = value.get('event') == 'case-end'
+            fields = {'version', 'run_id', 'event', 'name', 'elapsed_ms'} | ({'passed', 'diagnostic'} if end else set())
+            if (set(value) != fields or type(value['version']) is not int or value['version'] != 1
+                    or value['run_id'] != run_id or value['event'] not in ('case-start', 'case-end')
+                    or not isinstance(value['name'], str) or not 1 <= len(value['name']) <= 64
+                    or type(value['elapsed_ms']) is not int or not 0 <= value['elapsed_ms'] <= 2**64-1
+                    or (end and (type(value['passed']) is not bool or not isinstance(value['diagnostic'], str)
+                                 or len(value['diagnostic']) > 256))):
+                raise ValueError('Malformed progress')
+            if end:
+                if active is None or active['name'] != value['name']:
+                    raise ValueError('Unmatched case end')
+                completed, active = value, None
+            else:
+                active = value
+        except (ValueError, TypeError, AttributeError, KeyError):
+            rejected += 1
+    return dict(active_case=active, last_completed_case=completed, rejected_events=rejected)
+
+
+def failure_snapshot(processes, logs, run_id, start, observation):
+    """Snapshot before TERM/KILL; later shutdown chatter cannot replace this evidence."""
+    evidence = dict(version=1, run_id=run_id, elapsed_ms=max(0, int((time.monotonic()-start)*1000)),
+                    observation=dict(observation), processes=[], console={}, console_truncated={},
+                    progress=dict(active_case=None, last_completed_case=None, rejected_events=0),
+                    stack_capture=dict(available=shutil.which('gdb') is not None, captured=False,
+                                       reason='deferred-no-reviewed-attachment'))
+    for name, process in zip(('world', 'zone'), processes[:2]):
+        item = dict(name=name, pid=process.pid, returncode=process.poll())
+        try:
+            item['state'] = Path('/proc', str(process.pid), 'stat').read_text().rsplit(')', 1)[1].split()[0]
+            item['wait'] = Path('/proc', str(process.pid), 'wchan').read_text().strip()[:48]
+        except (OSError, ValueError, IndexError):
+            item['state'] = 'unavailable'
+        evidence['processes'].append(item)
+    for path in logs[:2]:
+        try:
+            data = console_bytes(path)
+            evidence['console'][path.name] = bounded_text(data.decode(errors='replace'), 2500)
+            evidence['console_truncated'][path.name] = len(data) > 2500
+            if path.name == 'zone-console.log':
+                evidence['progress'] = case_progress(data, run_id)
+        except (OSError, ValueError) as error:
+            evidence['console'][path.name] = bounded_text('unavailable: ' + str(error), 256)
+    # Bound JSON-encoded bytes, including escaping of hostile console text.
+    evidence['truncated'] = False
+    while len(encoded(evidence)) > 12000:
+        evidence['truncated'] = True
+        name = max(evidence['console'], key=lambda name: len(evidence['console'][name]), default=None)
+        if name is None or not evidence['console'][name]:
+            raise ValueError('Failure metadata exceeds evidence budget')
+        evidence['console'][name] = bounded_text(evidence['console'][name], len(evidence['console'][name].encode())//2)
+        evidence['console_truncated'][name] = True
+    return evidence
 
 
 def owned_members():
@@ -241,6 +343,7 @@ def observe(binary_dir, server, control):
     run_id = os.urandom(16).hex()
     result_path = server / ('inserver-' + run_id + '.json')
     suite_snapshot = None
+    observation = dict(condition="starting", last_success_ms=None)
     def cancel(*_):
         nonlocal cancelled
         cancelled = True
@@ -250,15 +353,28 @@ def observe(binary_dir, server, control):
     try:
         def guard():
             if cancelled:
+                observation['condition'] = 'cancelled'
                 raise RuntimeError('Normal-world cancellation')
             if time.monotonic() - start >= OBSERVE_SECONDS:
+                observation['condition'] = 'deadline'
                 error = InserverFailure if ready and control != 'cancel' else RuntimeError
                 raise error('Normal-world deadline or missing in-server completion')
             if any(p.poll() is not None for p in processes):
+                observation['condition'] = 'child-exit'
                 error = InserverFailure if ready else RuntimeError
                 raise error('Normal server exited before assertion completed')
             if any(path.stat().st_size > 1024**2 for path in logs):
+                observation['condition'] = 'console-budget'
                 raise RuntimeError('Normal server console budget')
+        def responsive():
+            if not world_connected(processes[0].pid, processes[1].pid):
+                observation['condition'] = 'world-connection-lost'
+                return False
+            observation['condition'] = 'udp-rejected'
+            if not probe(diagnostics=observation):
+                return False
+            observation.update(condition='responsive', last_success_ms=max(0, int((time.monotonic()-start)*1000)))
+            return True
         if result_path.exists() or result_path.is_symlink():
             raise RuntimeError('In-server result path is not fresh')
         for name, args in (('world', []), ('zone', ['poknowledge', '7000'])):
@@ -279,7 +395,7 @@ def observe(binary_dir, server, control):
                     stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT))
         while True:
             guard()
-            if world_connected(processes[0].pid, processes[1].pid) and probe():
+            if responsive():
                 break
             time.sleep(.1)
         ready = True
@@ -289,7 +405,7 @@ def observe(binary_dir, server, control):
         baseline = time.monotonic(); samples = 0
         while time.monotonic() - baseline < BASELINE_SECONDS or control == 'cancel':
             guard()
-            if not world_connected(processes[0].pid, processes[1].pid) or not probe():
+            if not responsive():
                 raise InserverFailure('Normal zone lost world connection or application responsiveness')
             samples += 1
             time.sleep(.1)
@@ -300,7 +416,7 @@ def observe(binary_dir, server, control):
             guard()
             suite_snapshot = read_inserver(result_path, run_id)
             if suite_snapshot is None:
-                if not world_connected(processes[0].pid, processes[1].pid) or not probe():
+                if not responsive():
                     raise InserverFailure('Normal zone lost responsiveness before suite completion')
                 time.sleep(.1)
         suite = suite_snapshot[0]
@@ -314,11 +430,19 @@ def observe(binary_dir, server, control):
         else:
             result['exit_code'] = 0
     except Exception as error:
-        result.update(exit_code=1 if isinstance(error, InserverFailure) else 2, error=str(error)[-500:])
+        result.update(exit_code=1 if isinstance(error, InserverFailure) else 2, error=bounded_json_text(error, 500))
     finally:
         try:
+            try:
+                before_cleanup = failure_snapshot(processes, logs, run_id, start, observation)
+            except Exception as error:
+                before_cleanup = dict(version=1, run_id=run_id, capture_error=bounded_text(error, 256))
             cleanup = {}
-            result['cleanup_complete'] = stop(processes, diagnostics=cleanup)
+            try:
+                result['cleanup_complete'] = stop(processes, diagnostics=cleanup)
+            except Exception as error:
+                result.update(exit_code=2, cleanup_complete=False, cleanup_error=bounded_json_text(error, 500))
+                cleanup['error'] = result['cleanup_error']
             if result['cleanup_complete'] is not True:
                 result['cleanup_diagnostics'] = cleanup
             if suite_snapshot is not None:
@@ -327,18 +451,70 @@ def observe(binary_dir, server, control):
                     if final is None or final != suite_snapshot:
                         raise InserverFailure('In-server result changed or disappeared after completion')
                 except Exception as error:
-                    result.update(exit_code=1, error=str(error)[-500:])
+                    result.update(exit_code=1, error=bounded_json_text(error, 500))
         finally:
             for sig, handler in prior.items():
                 signal.signal(sig, handler)
-            for path in logs:
-                # The root adapter scrubs credentials before persisting or exporting these tails.
-                with path.open('rb') as log:
-                    log.seek(max(0, path.stat().st_size - 1200))
-                    print(path.name + ': ' + log.read(1200).decode(errors='replace'), flush=True)
+            for name, text in before_cleanup.get('console', {}).items():
+                # The root adapter scrubs before persisting or exporting these bytes.
+                print(name + ': ' + text, flush=True)
         if not result['cleanup_complete']:
             result['exit_code'] = 2
+        if result['exit_code'] != 0:
+            result['failure_evidence'] = before_cleanup
     print('NORMAL_WORLD_RESULT ' + json.dumps(result, separators=(',', ':')), flush=True)
+
+
+
+def export_failure(report, head, directory):
+    """Retain one private exact-candidate diagnostic using AFK's existing file contract."""
+    if report.get('exit_code') not in (1, 2):
+        return None
+    if (not isinstance(head, str) or not re.fullmatch('[a-f0-9]{40}', head)
+            or report.get('candidate') != head or not isinstance(report.get('run_id'), str)
+            or not re.fullmatch('[a-f0-9]{32}', report['run_id'])):
+        raise ValueError('Failure artifact candidate/run identity mismatch')
+    normal = report.get('guest', {}).get('normal_world')
+    if not isinstance(normal, dict):
+        return None
+    artifact = dict(schema_version=1, head=head, worker_run_id=report['run_id'],
+                    exit_code=report['exit_code'], vm_cleanup_complete=report.get('cleanup_complete'),
+                    normal_world=normal, advisory=True, truncated=False)
+    artifact = json.loads(json.dumps(artifact))
+    detail = artifact['normal_world'].get('failure_evidence', {})
+    console = detail.get('console', {})
+    while len(encoded(artifact)) + 1 > EVIDENCE_LIMIT:
+        artifact['truncated'] = True
+        if isinstance(console, dict) and any(isinstance(text, str) and text for text in console.values()):
+            name = max(console, key=lambda name: len(console[name]) if isinstance(console[name], str) else 0)
+            console[name] = bounded_text(console[name], len(console[name].encode())//2)
+            detail.setdefault('console_truncated', {})[name] = True
+        else:
+            raise ValueError('Structured native failure exceeds artifact budget')
+    directory = Path(directory)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    # Hold the owned directory inode while writing fixed filenames. No final links,
+    # devices or replacement of a previous invocation's evidence are permitted.
+    directory_fd = os.open(directory, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    def write(name, value):
+        fd = os.open(name, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory_fd)
+        with os.fdopen(fd, 'wb') as stream:
+            stream.write(encoded(value) + b'\n')
+    try:
+        info = os.fstat(directory_fd)
+        if info.st_uid != os.geteuid() or info.st_mode & 0o022:
+            raise ValueError('Failure evidence directory must be owned and nonwritable by others')
+        write('normal-world-failure.json', artifact)
+        write('diagnostic-files.json', dict(schema_version=1, head=head, files=['normal-world-failure.json']))
+        condition = detail.get('observation', {}).get('condition')
+        allowed = {'world-connection-lost', 'udp-timeout', 'udp-refused', 'udp-malformed-reply',
+                   'udp-rejected', 'child-exit', 'deadline', 'cancelled', 'console-budget'}
+        code = 'native-' + condition if condition in allowed else 'native-nonpass'
+        write('public-summary.json', dict(schema_version=1, head=head, profile='eqemu-worker', status='failed',
+            step='normal-world', diagnostic_codes=[code], timings_ms=dict(validation=None, restore=None)))
+    finally:
+        os.close(directory_fd)
+    return directory/'normal-world-failure.json'
 
 
 def run(build, identity):
@@ -406,7 +582,7 @@ def run(build, identity):
                   if line.startswith('NORMAL_WORLD_RESULT ')]
         if len(frames) != 1:
             raise RuntimeError('Missing/duplicate normal-world assertion completion')
-        result = frames[0]
+        result = json.loads(runtime.scrub(json.dumps(frames[0], separators=(',', ':'))))
         if (not isinstance(result, dict) or type(result.get('exit_code')) is not int
                 or result['exit_code'] not in (0, 1, 2) or result.get('cleanup_complete') is not True):
             # Keep the observer's own cleanup evidence. Host VM destruction is a
@@ -438,16 +614,28 @@ def run(build, identity):
     finally:
         try:
             clean = runtime.cleanup()
+        except Exception as exc:
+            clean = False
+            error = runtime.scrub(str(exc))[-1000:]
         finally:
             for sig, handler in prior.items():
                 signal.signal(sig, handler)
+    if isinstance(result, dict):
+        result.update(fixture_manifest_sha256=fixture['manifest_sha256'], binaries=binaries, database_cleanup=clean)
+        if error:
+            result['adapter_error'] = bounded_json_text(error, 1000)
     if error or not clean or result is None:
-        raise RuntimeError('Normal-world fixture: ' + (error or 'Database/native cleanup incomplete'))
-    result.update(fixture_manifest_sha256=fixture['manifest_sha256'], binaries=binaries, database_cleanup=clean)
+        failure = RuntimeError('Normal-world fixture: ' + (error or 'Database/native cleanup incomplete'))
+        failure.result = result
+        raise failure
     if result['exit_code'] == 1:
-        raise build.CandidateFailure('Normal-world assertion failed: ' + runtime.scrub(output)[-3000:])
+        failure = build.CandidateFailure('Normal-world assertion failed: ' + runtime.scrub(output)[-3000:])
+        failure.result = result
+        raise failure
     if result['exit_code'] != 0:
-        raise RuntimeError('Normal-world non-pass: ' + runtime.scrub(output)[-3000:])
+        failure = RuntimeError('Normal-world non-pass: ' + runtime.scrub(output)[-3000:])
+        failure.result = result
+        raise failure
     return validate(result)
 
 

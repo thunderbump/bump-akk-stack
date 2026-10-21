@@ -270,7 +270,12 @@ def main():
         COMPLETED.append('normal-world')
         result['exit_code'] = 0
     except Exception as error:
+        if isinstance(getattr(error, 'result', None), dict):
+            result['normal_world'] = error.result
         result.update(exit_code=1 if isinstance(error, CandidateFailure) else 2, error=str(error)[-3500:])
+    # Bound encoded error bytes too; escaped Unicode must fit the 32 KiB frame.
+    while len(json.dumps(result.get('error', ''))) > 3500:
+        result['error'] = result['error'][len(result['error'])//2:]
     result['stage'] = STAGE
     print('\nEQEMU_WORKER_RESULT ' + json.dumps(result, separators=(',', ':')), flush=True)
 

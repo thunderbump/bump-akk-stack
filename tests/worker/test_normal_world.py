@@ -170,6 +170,10 @@ class Readiness(unittest.TestCase):
             if mode == 'baseline-response-loss':
                 probes = [True, False]
             connections = [True, False] if mode == 'baseline-world-loss' else None
+            if mode == 'observer-cancel':
+                def connections(*_):
+                    normal.signal.raise_signal(normal.signal.SIGTERM)
+                    return True
             children = []
             reports = []
             def launch(args, **kwargs):
@@ -183,13 +187,26 @@ class Readiness(unittest.TestCase):
                     path = Path(env['EQEMU_INSERVER_TEST_RESULT'])
                     self.assertFalse(path.exists())
                     value = suite(env['EQEMU_INSERVER_TEST_RUN'], control == 'assertion' and mode != 'unexpected-pass')
-                    if mode != 'missing':
+                    if mode not in ('missing', 'progress-hang'):
                         path.write_text('{bad' if mode == 'malformed' else json.dumps(value))
+                    if mode == 'progress-hang':
+                        events = [dict(version=1, run_id=env['EQEMU_INSERVER_TEST_RUN'], event=event,
+                                       name=name, elapsed_ms=elapsed, **extra) for event, name, elapsed, extra in (
+                            ('case-start', 'completed-case', 0, {}),
+                            ('case-end', 'completed-case', 23, dict(passed=True, diagnostic='')),
+                            ('case-start', 'hung-case', 0, {}))]
+                        kwargs['stdout'].write(b'native-before-cleanup\n' + b'\n'.join(
+                            b'EQEMU_INSERVER_PROGRESS '+json.dumps(event).encode() for event in events)+b'\n')
+                        kwargs['stdout'].flush()
                     reports.append(path)
                     process = zone
                 children.append(process)
                 return process
             def cleanup(processes, *, diagnostics):
+                if mode == 'cleanup-error':
+                    raise RuntimeError('simulated stop failure')
+                if mode == 'progress-hang':
+                    (server/'zone-console.log').write_text('shutdown-noise'*10000)
                 if mode == 'changed':
                     reports[0].write_text('{}')
                 if mode == 'disappeared':
@@ -209,7 +226,8 @@ class Readiness(unittest.TestCase):
                     patch.object(normal.time, 'monotonic', side_effect=itertools.count(0, .1)), \
                     patch.object(normal.time, 'sleep'), contextlib.redirect_stdout(output):
                 normal.observe(Path('/never-execute-candidate'), server, control)
-                stop.assert_called_once_with([world, zone], diagnostics={})
+                stop.assert_called_once_with([world, zone], diagnostics=
+                    {'error': 'simulated stop failure'} if mode == 'cleanup-error' else {})
                 for call in popen.call_args_list:
                     self.assertNotIn('start_new_session', call.kwargs)
             lines = output.getvalue().splitlines()
@@ -217,6 +235,35 @@ class Readiness(unittest.TestCase):
                       if line.startswith('NORMAL_WORLD_RESULT ')]
             self.assertEqual(len(frames), 1)
             return frames[0]
+
+    def test_direct_observer_cancellation_keeps_precleanup_state(self):
+        result = self.run_observer(mode='observer-cancel')
+        self.assertEqual(result['exit_code'], 2)
+        self.assertTrue(result['cleanup_complete'])
+        self.assertEqual(result['failure_evidence']['observation']['condition'], 'cancelled')
+        self.assertTrue(result['failure_evidence']['processes'])
+
+    def test_cleanup_exception_still_emits_precleanup_evidence_and_nonpass(self):
+        result = self.run_observer(mode='cleanup-error')
+        self.assertEqual(result['exit_code'], 2)
+        self.assertFalse(result['cleanup_complete'])
+        self.assertIn('simulated stop failure', result['cleanup_error'])
+        self.assertIn('failure_evidence', result)
+        self.assertTrue(result['failure_evidence']['processes'])
+
+    def test_hung_case_retains_progress_and_precleanup_console(self):
+        result = self.run_observer(mode='progress-hang')
+        self.assertEqual(result['exit_code'], 1)
+        self.assertTrue(result['cleanup_complete'])
+        self.assertNotIn('inserver_tests', result)
+        evidence = result['failure_evidence']
+        self.assertEqual(evidence['observation']['condition'], 'deadline')
+        self.assertIsNotNone(evidence['observation']['last_success_ms'])
+        self.assertEqual(evidence['progress']['last_completed_case']['name'], 'completed-case')
+        self.assertEqual(evidence['progress']['active_case']['name'], 'hung-case')
+        self.assertIn('native-before-cleanup', evidence['console']['zone-console.log'])
+        self.assertNotIn('shutdown-noise', json.dumps(evidence))
+        self.assertTrue(evidence['processes'])
 
     def test_startup_fault_defeats_current_and_parent_config_discovery(self):
         for control in (None, 'startup'):
