@@ -193,3 +193,36 @@ Before acceptance, a deployment must collect current positive, intended
 startup-failure, assertion-failure and readiness-cancellation evidence on the
 current worker after reviewed asset activation. Operational run identities and
 results belong in that worklog, not in this source document.
+
+## Failure evidence
+
+Before native cleanup sends any signals, the observer snapshots the exact failed
+observation, elapsed time, last successful probe, direct-child exit/process state
+and bounded world/zone console excerpts. UDP timeout, refusal and malformed
+challenge replies are distinct from loss of the owned world connection. The
+existing thresholds, probe frequency and retry policy are unchanged. Shutdown
+chatter cannot replace these pre-cleanup excerpts; cleanup diagnostics remain
+separate.
+
+The generic `EQEMU_INSERVER_PROGRESS` console protocol records version 1,
+run ID, case name, case start/end, elapsed milliseconds and terminal outcome.
+The observer records the active and last completed case, rejects malformed or
+stale events and knows no scenario names. This progress is advisory. Only the
+existing complete, fresh final report can satisfy suite acceptance. Missing,
+interrupted or hung completion remains non-pass.
+
+The root adapter scrubs guest credentials before retaining the complete
+structured failure in the guest/worker report. Candidate assertion failures
+remain exit 1 when cleanup completes; infrastructure failures and incomplete
+cleanup remain exit 2. The ordinary frontend exports that private evidence as
+described in [the AFK handoff](AFK.md). Native or controller death before a
+snapshot can be emitted may leave no observer artifact and never counts as a
+pass. The pinned runtime includes gdb; the snapshot reports executable presence
+only. Stack attachment and ptrace capability are not qualified by this change,
+and stack capture remains deferred.
+
+Trusted host tests use fake native processes and harmless Python producers to
+cover hung progress, noisy shutdown, scrubbed structured failures over 3 KiB,
+real pipe/socket transport, encoded byte limits, symlink/FIFO refusal and the
+private artifact/public-summary contract. They do not reproduce PR82's cause or
+establish live VM qualification.

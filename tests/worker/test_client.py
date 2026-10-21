@@ -87,6 +87,16 @@ class Client(unittest.TestCase):
             with self.subTest(field=field), self.assertRaisesRegex(RuntimeError, 'mismatched build'):
                 self.exchange((json.dumps(changed)+'\n').encode(), request)
 
+    def test_large_failed_native_result_survives_socket(self):
+        request = dict(version=1, operation='build', candidate='a'*40, tree='b'*40, sha256='c'*64)
+        report = dict(version=1, scope='worker-build', operation='build', exit_code=1,
+                      vm_started=True, cleanup_complete=True, candidate='a'*40,
+                      tree='b'*40, payload_sha256='c'*64,
+                      guest={'normal_world': {'exit_code': 1, 'failure_evidence': {'console': 'x'*20000}}})
+        self.assertEqual(self.exchange((json.dumps(report)+'\n').encode(), request), report)
+        self.assertEqual(self.exchange((json.dumps(dict(version=1, operation='last-result', scope='worker-observation',
+            exit_code=0, result=report))+'\n').encode(), dict(version=1, operation='last-result'))['result'], report)
+
     def test_old_build_only_worker_cannot_pass_normal_world(self):
         request = dict(version=1, operation='build', candidate='a'*40, tree='b'*40, sha256='c'*64)
         report = dict(version=1, operation='build', scope='worker-build', exit_code=0,

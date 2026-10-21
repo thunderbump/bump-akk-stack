@@ -90,6 +90,7 @@ class AdapterDiagnostics(unittest.TestCase):
         self.assertIsInstance(error, candidate_failure)
         self.assertIn('deliberate assertion', str(error))
         self.assertNotIn('guest-secret', str(error))
+        self.assertNotIn('guest-secret', json.dumps(error.result))
 
     def test_incomplete_cleanup_stays_infrastructure_and_retains_scrubbed_evidence(self):
         error, candidate_failure = self.replay(False)
@@ -98,11 +99,13 @@ class AdapterDiagnostics(unittest.TestCase):
         for evidence in ('cleanup_complete', 'forced_kill', 'python-child', 'deliberate assertion'):
             self.assertIn(evidence, str(error))
         self.assertNotIn('guest-secret', str(error))
+        self.assertNotIn('guest-secret', json.dumps(error.result))
         self.assertLessEqual(len(str(error)), 3500)
         error, _ = self.replay(False, large=True)
         self.assertIs(type(error), RuntimeError)
         self.assertIn('forced_kill', str(error))
         self.assertNotIn('guest-secret', str(error))
+        self.assertNotIn('guest-secret', json.dumps(error.result))
         self.assertLessEqual(len(str(error)), 3500)
 
 

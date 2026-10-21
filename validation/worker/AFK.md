@@ -49,3 +49,25 @@ The disposable build guest masks/stops `serial-getty@ttyS0.service` before
 opening its validation console. That login service resets/hangs up the same
 terminal and can invalidate existing writers with EIO during boot. Failure to
 stop it refuses guest launch; it changes no host service or root policy.
+
+On a normal-world failure, the frontend writes `normal-world-failure.json` into
+AFK's supplied `VALIDATION_AFK_EVIDENCE_DIR`. The private artifact contains the
+exact candidate SHA, worker run ID, structured observer result and separate VM
+cleanup outcome. `diagnostic-files.json` admits that relative file through AFK's
+existing exact-head responder contract. `public-summary.json` contains bounded
+identifiers only, so the PR receives a concise failure summary instead of raw
+native log tails. These files are advisory and cannot turn a failed run into a
+pass. A failed artifact export is infrastructure exit 2.
+
+Outside AFK, the same private artifact is retained under
+`~/.local/state/eqemu-rust-validator/runs/<worker-run-id>/`. Files are created
+once with mode 0600. Existing files, symlink targets and directories writable by
+other users are refused. The artifact is at most 16 KiB including JSON escaping
+and its final newline; shortened console excerpts carry explicit truncation
+flags. The guest completion frame is bounded at 32 KiB and the worker socket
+report at 64 KiB. The read-only last-result command uses that same 64 KiB bound.
+
+Deploy both the reviewed worker and a fresh frontend before qualifying this
+handoff against a real VM. A frontend-only update cannot add guest observation
+or extend the installed worker's completion frame limit. No new host privileges,
+artifact service or raw guest disk export are needed.

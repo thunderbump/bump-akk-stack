@@ -415,7 +415,7 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                     raise RuntimeError('Oversized formatter completion')
                 results.append(json.loads(base64.b64decode(line.removeprefix(b'EQEMU_FORMAT_RESULT ').strip(), validate=True)))
             if line.startswith(b'EQEMU_WORKER_RESULT '):
-                if len(line) > 8192:
+                if len(line) > (32768 if build_result is not None else 8192):
                     raise RuntimeError('Oversized guest completion')
                 results.append(json.loads(line.removeprefix(b'EQEMU_WORKER_RESULT ')))
     if len(results) != 1:
@@ -657,7 +657,7 @@ def request(connection, value):
         return ready(value)
     if data == {'version': 1, 'operation': 'last-result'}:
         return {'version': 1, 'operation': 'last-result', 'scope': 'worker-observation',
-                'exit_code': 0, 'result': read_json(Path(value['state_dir']) / 'last-result.json')}
+                'exit_code': 0, 'result': read_json(Path(value['state_dir']) / 'last-result.json', limit=65536)}
     if data.get('operation') == 'build':
         if (set(data) != {'version', 'operation', 'candidate', 'tree', 'bytes', 'sha256'}
                 or not all(isinstance(data[key], str) and re.fullmatch('[a-f0-9]{40}', data[key]) for key in ('candidate', 'tree'))
