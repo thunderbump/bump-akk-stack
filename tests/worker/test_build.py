@@ -1,5 +1,7 @@
 """Real local sockets/processes and source packaging; no candidate code or VM execution."""
 import hashlib
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
@@ -22,6 +24,42 @@ import test_runtime
 
 
 class Transfer(unittest.TestCase):
+    def test_guest_final_result_preserves_large_structured_native_exception(self):
+        import normal_world
+        normal = dict(exit_code=1, cleanup_complete=True,
+                      failure_evidence=dict(console={'zone': 'useful detail '+('x'*9000)}))
+        failure = build_guest.CandidateFailure('assertion ' + '\ufffd'*3500)
+        failure.result = normal
+        old = {key: getattr(build_guest, key) for key in ('WORK', 'MEDIA', 'DEADLINE', 'CHECKS', 'STAGE')}
+        self.addCleanup(lambda: [setattr(build_guest, key, value) for key, value in old.items()])
+        self.addCleanup(build_guest.COMPLETED.clear)
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            mkdir = Path.mkdir
+            def guest_mkdir(path, *args, **kwargs):
+                if str(path) == '/media/eqemu-input': return
+                return mkdir(path, *args, **kwargs)
+            def read(path, *args, **kwargs):
+                if str(path) == '/opt/eqemu-worker-nonce': return 'a'*32
+                if str(path) == '/opt/eqemu-worker-checks.json': return json.dumps(runtime.BUILD_CHECKS)
+                raise AssertionError('Unexpected read: '+str(path))
+            output = io.StringIO()
+            with patch.object(build_guest, 'WORK', root/'work'), patch.object(build_guest, 'MEDIA', root/'media'), \
+                    patch.object(build_guest, 'LOGS', root/'work/logs'), \
+                    patch.object(build_guest.os, 'geteuid', return_value=0), \
+                    patch.object(Path, 'is_file', return_value=True), patch.object(Path, 'read_text', read), \
+                    patch.object(Path, 'mkdir', guest_mkdir), patch.object(build_guest, 'command'), \
+                    patch.object(build_guest, 'provision', return_value={}), \
+                    patch.object(build_guest, 'build', return_value={}), \
+                    patch.object(normal_world, 'run', side_effect=failure), contextlib.redirect_stdout(output):
+                build_guest.main()
+            frame = next(line for line in output.getvalue().splitlines() if line.startswith('EQEMU_WORKER_RESULT '))
+            result = json.loads(frame.removeprefix('EQEMU_WORKER_RESULT '))
+            self.assertEqual(result['exit_code'], 1)
+            self.assertEqual(result['normal_world'], normal)
+            self.assertLessEqual(len(frame.encode())+1, 32768)
+            self.assertGreater(len(json.dumps(result['normal_world'])), 3000)
+
     def test_early_infrastructure_diagnostic_survives_large_read(self):
         # Coalesce real pipe reads to exercise platforms with a larger pipe buffer.
         data = b'failed to select a version for the requirement cxx\n' + b'x' * 20000

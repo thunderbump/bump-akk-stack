@@ -5,7 +5,7 @@ from pathlib import Path
 import sys
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]/'validation/worker'))
 import normal_world as normal
@@ -44,6 +44,27 @@ class Progress(unittest.TestCase):
         # Even convincing progress cannot substitute for final acceptance.
         with self.assertRaises(ValueError):
             normal.validate(dict(exit_code=0, failure_evidence=progress))
+
+    def test_error_metadata_counts_json_escaping(self):
+        text = normal.bounded_json_text('native error '+('\x00\ufffd'*1000), 500)
+        self.assertLessEqual(len(normal.encoded(text)), 500)
+        self.assertTrue(text)
+
+    def test_udp_failure_conditions_are_distinct_without_retrying(self):
+        for response, condition in ((TimeoutError(), 'udp-timeout'),
+                                    (ConnectionRefusedError(), 'udp-refused'),
+                                    (b'wrong', 'udp-malformed-reply')):
+            stream = Mock()
+            stream.__enter__ = Mock(return_value=stream)
+            stream.__exit__ = Mock(return_value=False)
+            if isinstance(response, Exception): stream.recv.side_effect = response
+            else: stream.recv.return_value = response
+            observed = {}
+            with self.subTest(condition=condition), patch.object(normal.socket, 'socket', return_value=stream):
+                self.assertIs(normal.probe(diagnostics=observed), False)
+                self.assertEqual(observed['condition'], condition)
+                stream.send.assert_called_once()
+                stream.recv.assert_called_once()
 
     def test_console_links_and_pipes_are_not_opened_or_followed(self):
         with tempfile.TemporaryDirectory() as tmp:

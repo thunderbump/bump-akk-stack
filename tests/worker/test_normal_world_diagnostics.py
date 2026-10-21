@@ -20,7 +20,7 @@ from test_normal_world import baseline
 
 
 class AdapterDiagnostics(unittest.TestCase):
-    def replay(self, cleanup, large=False):
+    def replay(self, cleanup, large=False, database_error=False, cancel_root=False):
         """Reach run's real command/pipe/scrubbing seam with a harmless Python producer."""
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -47,7 +47,8 @@ class AdapterDiagnostics(unittest.TestCase):
                     diagnostic='deliberate assertion guest-secret ' + 'x'*220) for n in range(32)]
             output = 'NORMAL_WORLD_READY\nNORMAL_WORLD_RESULT ' + json.dumps(frame) + '\n'
             class ReplayRuntime(actor_runtime.Runtime):
-                def guard(self): pass
+                def guard(self):
+                    if cancel_root and self.cancelled: return super().guard()
                 def verify_inputs(self): pass
                 def install_packages(self): pass
                 def initialize_database(self): pass
@@ -63,10 +64,17 @@ class AdapterDiagnostics(unittest.TestCase):
                     return server
                 def command(self, name, args, **kwargs):
                     if name != 'normal-world': return ''
+                    script = 'print('+repr(output)+',end="")'
+                    if cancel_root:
+                        script = ('import os,signal,time; from pathlib import Path; '
+                                  'Path('+repr(str(root/'observer.pid'))+').write_text(str(os.getpid())); '
+                                  'os.kill(os.getppid(),signal.SIGTERM); time.sleep(30)')
                     return super().command(name,
-                        [sys.executable, '-c', 'print('+repr(output)+',end="")'],
+                        [sys.executable, '-c', script],
                         on_line=kwargs['on_line'], timeout=10)
-                def cleanup(self): return True
+                def cleanup(self):
+                    if database_error: raise RuntimeError('database cleanup guest-secret failed')
+                    return True
             original_read = Path.read_text
             def read(path, *args, **kwargs):
                 if str(path) == '/opt/runtime-fixture.json':
@@ -82,8 +90,33 @@ class AdapterDiagnostics(unittest.TestCase):
                 try:
                     normal.run(build, dict(world_control='assertion'))
                 except Exception as error:
+                    if cancel_root:
+                        pid = int((root/'observer.pid').read_text())
+                        self.assertFalse(Path('/proc', str(pid)).exists())
                     return error, build.CandidateFailure
             self.fail('Assertion replay passed')
+
+    def test_guest_root_cancellation_is_infrastructure_without_invented_observer_evidence(self):
+        error, candidate_failure = self.replay(True, cancel_root=True)
+        self.assertIs(type(error), RuntimeError)
+        self.assertNotIsInstance(error, candidate_failure)
+        self.assertIsNone(error.result)
+        self.assertIn('interrupted', str(error))
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertIsNone(normal.export_failure(dict(exit_code=2, candidate='a'*40,
+                run_id='b'*32, guest={}), 'a'*40, tmp))
+            self.assertEqual(list(Path(tmp).iterdir()), [])
+
+    def test_database_cleanup_exception_preserves_scrubbed_native_result(self):
+        error, candidate_failure = self.replay(True, database_error=True)
+        self.assertIs(type(error), RuntimeError)
+        self.assertNotIsInstance(error, candidate_failure)
+        self.assertIs(error.result['database_cleanup'], False)
+        self.assertIs(error.result['cleanup_complete'], True)
+        self.assertIn('database cleanup', error.result['adapter_error'])
+        self.assertIn('deliberate assertion', json.dumps(error.result))
+        self.assertNotIn('guest-secret', json.dumps(error.result))
+        self.assertNotIn('guest-secret', str(error))
 
     def test_complete_failed_suite_with_cleanup_is_candidate_failure(self):
         error, candidate_failure = self.replay(True)

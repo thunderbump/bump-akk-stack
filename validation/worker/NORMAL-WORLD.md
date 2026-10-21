@@ -215,9 +215,13 @@ The root adapter scrubs guest credentials before retaining the complete
 structured failure in the guest/worker report. Candidate assertion failures
 remain exit 1 when cleanup completes; infrastructure failures and incomplete
 cleanup remain exit 2. The ordinary frontend exports that private evidence as
-described in [the AFK handoff](AFK.md). Native or controller death before a
+described in [the AFK handoff](AFK.md). Observer or controller death before a
 snapshot can be emitted may leave no observer artifact and never counts as a
-pass. The pinned runtime includes gdb; the snapshot reports executable presence
+pass. Direct cancellation delivered to the observer can produce a snapshot.
+Guest-root cancellation currently stops the observer through the shared runtime
+command cleanup and can lose its result; forced host VM/controller teardown can
+also remove the return channel. Evidence for those paths is best effort, and a
+cooperative guest-root handoff is deferred. The pinned runtime includes gdb; the snapshot reports executable presence
 only. Stack attachment and ptrace capability are not qualified by this change,
 and stack capture remains deferred.
 

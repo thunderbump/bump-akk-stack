@@ -170,6 +170,10 @@ class Readiness(unittest.TestCase):
             if mode == 'baseline-response-loss':
                 probes = [True, False]
             connections = [True, False] if mode == 'baseline-world-loss' else None
+            if mode == 'observer-cancel':
+                def connections(*_):
+                    normal.signal.raise_signal(normal.signal.SIGTERM)
+                    return True
             children = []
             reports = []
             def launch(args, **kwargs):
@@ -199,6 +203,8 @@ class Readiness(unittest.TestCase):
                 children.append(process)
                 return process
             def cleanup(processes, *, diagnostics):
+                if mode == 'cleanup-error':
+                    raise RuntimeError('simulated stop failure')
                 if mode == 'progress-hang':
                     (server/'zone-console.log').write_text('shutdown-noise'*10000)
                 if mode == 'changed':
@@ -220,7 +226,8 @@ class Readiness(unittest.TestCase):
                     patch.object(normal.time, 'monotonic', side_effect=itertools.count(0, .1)), \
                     patch.object(normal.time, 'sleep'), contextlib.redirect_stdout(output):
                 normal.observe(Path('/never-execute-candidate'), server, control)
-                stop.assert_called_once_with([world, zone], diagnostics={})
+                stop.assert_called_once_with([world, zone], diagnostics=
+                    {'error': 'simulated stop failure'} if mode == 'cleanup-error' else {})
                 for call in popen.call_args_list:
                     self.assertNotIn('start_new_session', call.kwargs)
             lines = output.getvalue().splitlines()
@@ -228,6 +235,21 @@ class Readiness(unittest.TestCase):
                       if line.startswith('NORMAL_WORLD_RESULT ')]
             self.assertEqual(len(frames), 1)
             return frames[0]
+
+    def test_direct_observer_cancellation_keeps_precleanup_state(self):
+        result = self.run_observer(mode='observer-cancel')
+        self.assertEqual(result['exit_code'], 2)
+        self.assertTrue(result['cleanup_complete'])
+        self.assertEqual(result['failure_evidence']['observation']['condition'], 'cancelled')
+        self.assertTrue(result['failure_evidence']['processes'])
+
+    def test_cleanup_exception_still_emits_precleanup_evidence_and_nonpass(self):
+        result = self.run_observer(mode='cleanup-error')
+        self.assertEqual(result['exit_code'], 2)
+        self.assertFalse(result['cleanup_complete'])
+        self.assertIn('simulated stop failure', result['cleanup_error'])
+        self.assertIn('failure_evidence', result)
+        self.assertTrue(result['failure_evidence']['processes'])
 
     def test_hung_case_retains_progress_and_precleanup_console(self):
         result = self.run_observer(mode='progress-hang')

@@ -25,7 +25,6 @@ OBSERVE_SECONDS = 120
 BASELINE_SECONDS = 5
 INSERVER_LIMIT = 4096
 EVIDENCE_LIMIT = 16384
-BUILD_RESULT_LIMIT = 32768
 
 
 class InserverFailure(Exception):
@@ -153,6 +152,15 @@ def encoded(value):
 
 def bounded_text(value, limit):
     return str(value).encode('utf-8', 'replace')[-limit:].decode('utf-8', 'ignore') if limit > 0 else ''
+
+
+
+def bounded_json_text(value, limit):
+    """Keep error metadata bounded after JSON escaping, even for control characters."""
+    value = bounded_text(value, limit)
+    while len(encoded(value)) > limit:
+        value = value[max(1, len(value)//2):]
+    return value
 
 
 def console_bytes(path):
@@ -422,7 +430,7 @@ def observe(binary_dir, server, control):
         else:
             result['exit_code'] = 0
     except Exception as error:
-        result.update(exit_code=1 if isinstance(error, InserverFailure) else 2, error=str(error)[-500:])
+        result.update(exit_code=1 if isinstance(error, InserverFailure) else 2, error=bounded_json_text(error, 500))
     finally:
         try:
             try:
@@ -430,7 +438,11 @@ def observe(binary_dir, server, control):
             except Exception as error:
                 before_cleanup = dict(version=1, run_id=run_id, capture_error=bounded_text(error, 256))
             cleanup = {}
-            result['cleanup_complete'] = stop(processes, diagnostics=cleanup)
+            try:
+                result['cleanup_complete'] = stop(processes, diagnostics=cleanup)
+            except Exception as error:
+                result.update(exit_code=2, cleanup_complete=False, cleanup_error=bounded_json_text(error, 500))
+                cleanup['error'] = result['cleanup_error']
             if result['cleanup_complete'] is not True:
                 result['cleanup_diagnostics'] = cleanup
             if suite_snapshot is not None:
@@ -439,7 +451,7 @@ def observe(binary_dir, server, control):
                     if final is None or final != suite_snapshot:
                         raise InserverFailure('In-server result changed or disappeared after completion')
                 except Exception as error:
-                    result.update(exit_code=1, error=str(error)[-500:])
+                    result.update(exit_code=1, error=bounded_json_text(error, 500))
         finally:
             for sig, handler in prior.items():
                 signal.signal(sig, handler)
@@ -602,14 +614,20 @@ def run(build, identity):
     finally:
         try:
             clean = runtime.cleanup()
+        except Exception as exc:
+            clean = False
+            error = runtime.scrub(str(exc))[-1000:]
         finally:
             for sig, handler in prior.items():
                 signal.signal(sig, handler)
+    if isinstance(result, dict):
+        result.update(fixture_manifest_sha256=fixture['manifest_sha256'], binaries=binaries, database_cleanup=clean)
+        if error:
+            result['adapter_error'] = bounded_json_text(error, 1000)
     if error or not clean or result is None:
         failure = RuntimeError('Normal-world fixture: ' + (error or 'Database/native cleanup incomplete'))
         failure.result = result
         raise failure
-    result.update(fixture_manifest_sha256=fixture['manifest_sha256'], binaries=binaries, database_cleanup=clean)
     if result['exit_code'] == 1:
         failure = build.CandidateFailure('Normal-world assertion failed: ' + runtime.scrub(output)[-3000:])
         failure.result = result
