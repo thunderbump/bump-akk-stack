@@ -50,14 +50,19 @@ opening its validation console. That login service resets/hangs up the same
 terminal and can invalidate existing writers with EIO during boot. Failure to
 stop it refuses guest launch; it changes no host service or root policy.
 
-On a normal-world failure, the frontend writes `normal-world-failure.json` into
+After a normal-world run, the frontend writes `normal-world-success.json` or
+`normal-world-failure.json` into
 AFK's supplied `VALIDATION_AFK_EVIDENCE_DIR`. The private artifact contains the
-exact candidate SHA, worker run ID, structured observer result and separate VM
-cleanup outcome. `diagnostic-files.json` admits that relative file through AFK's
-existing exact-head responder contract. `public-summary.json` contains bounded
-identifiers only, so the PR receives a concise failure summary instead of raw
+exact candidate SHA, worker run ID, structured observer result including source-owned bounded test diagnostics,
+and separate VM cleanup outcome. Successful measurements use the existing suite
+report; no new guest protocol or scenario knowledge is added to the validator. `diagnostic-files.json` admits that relative file through AFK's
+existing exact-head responder contract. The manifest includes a SHA-256 digest
+for consistency checking; this does not authenticate an advisory artifact or
+replace AFK's authoritative execution evidence. `public-summary.json` contains bounded
+identifiers only, so the PR receives a concise outcome summary instead of raw
 native log tails. These files are advisory and cannot turn a failed run into a
-pass. A failed artifact export is infrastructure exit 2.
+pass. Responses receive manifested success measurements only for unchanged,
+sealed exact-head validation; raw wrapper logs remain failure-only. A failed artifact export is infrastructure exit 2.
 
 Outside AFK, the same private artifact is retained under
 `~/.local/state/eqemu-rust-validator/runs/<worker-run-id>/`. Files are created
@@ -67,7 +72,8 @@ and its final newline; shortened console excerpts carry explicit truncation
 flags. The guest completion frame is bounded at 32 KiB and the worker socket
 report at 64 KiB. The read-only last-result command uses that same 64 KiB bound.
 
-Deploy both the reviewed worker and a fresh frontend before qualifying this
-handoff against a real VM. A frontend-only update cannot add guest observation
-or extend the installed worker's completion frame limit. No new host privileges,
+Deploy a fresh reviewed frontend before qualifying success handoff against a
+real VM. This export change reuses the existing worker report and needs no
+worker, guest observation, completion limit or privilege changes. Earlier failure
+observation support still requires the corresponding reviewed worker baseline. No new host privileges,
 artifact service or raw guest disk export are needed.

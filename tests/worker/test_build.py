@@ -284,7 +284,7 @@ class BuildRuntime(unittest.TestCase):
         self.assertTrue(report['cleanup_complete'])
         self.assertEqual(report['guest']['normal_world'], detail['normal_world'])
         self.assertEqual(json.loads((self.state/'last-result.json').read_text())['guest'], detail)
-        artifact = normal_world.export_failure(report, 'a'*40, self.root/'evidence')
+        artifact = normal_world.export_evidence(report, 'a'*40, self.root/'evidence')
         self.assertGreater(artifact.stat().st_size, 3000)
         self.assertEqual(json.loads(artifact.read_text())['normal_world'], detail['normal_world'])
 

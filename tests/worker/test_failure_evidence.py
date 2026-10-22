@@ -1,4 +1,7 @@
 """Bounded advisory diagnostics; trusted Python fakes only, never candidate execution."""
+import hashlib
+import importlib.machinery
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -85,7 +88,7 @@ class Export(unittest.TestCase):
                 if noisy:
                     report['guest']['normal_world']['failure_evidence']['console']['zone'] = '\x00\ufffd'*20000
                 before = json.dumps(report)
-                path = normal.export_failure(report, 'a'*40, tmp)
+                path = normal.export_evidence(report, 'a'*40, tmp)
                 raw = path.read_bytes()
                 self.assertLessEqual(len(raw), 16384)
                 self.assertGreater(len(raw), 3000)
@@ -97,22 +100,73 @@ class Export(unittest.TestCase):
                 self.assertEqual(json.dumps(report), before)
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
                 self.assertEqual(json.loads((Path(tmp)/'diagnostic-files.json').read_text()),
-                    dict(schema_version=1, head='a'*40, files=['normal-world-failure.json']))
+                    dict(schema_version=1, head='a'*40, files=[path.name],
+                         sha256={path.name: hashlib.sha256(raw).hexdigest()}))
                 public = (Path(tmp)/'public-summary.json').read_text()
                 self.assertNotIn('useful-native-detail', public)
                 self.assertIn('native-udp-timeout', public)
                 self.assertLess(len(public), 500)
 
+    def test_success_retains_source_measurements_without_changing_outcome(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            report = dict(exit_code=0, candidate='a'*40, run_id='b'*32, cleanup_complete=True,
+                guest=dict(normal_world=dict(exit_code=0, cleanup_complete=True, database_cleanup=True,
+                    inserver_tests=dict(run_id='c'*32, tests=[dict(name='source.case', passed=True,
+                        diagnostic='metrics1 xy=.25 z=.12 terminal_ms=33 drift=.01')]))))
+            before = json.dumps(report)
+            path = normal.export_evidence(report, 'a'*40, tmp)
+            record = json.loads(path.read_text())
+            self.assertEqual(path.name, 'normal-world-success.json')
+            self.assertEqual(record['exit_code'], 0)
+            self.assertIs(record['vm_cleanup_complete'], True)
+            self.assertEqual(record['normal_world'], report['guest']['normal_world'])
+            self.assertEqual(json.dumps(report), before)
+            self.assertLessEqual(path.stat().st_size, 16384)
+            self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            public = json.loads((Path(tmp)/'public-summary.json').read_text())
+            self.assertEqual(public['status'], 'passed')
+            self.assertEqual(public['diagnostic_codes'], [])
+            self.assertNotIn('metrics1', json.dumps(public))
+            manifest = json.loads((Path(tmp)/'diagnostic-files.json').read_text())
+            self.assertEqual(manifest['sha256'][path.name], hashlib.sha256(path.read_bytes()).hexdigest())
+
+    def test_frontend_exports_success_and_failure_without_rewriting_worker_result(self):
+        root = Path(__file__).resolve().parents[2]
+        loader = importlib.machinery.SourceFileLoader('evidence_candidate_cli', str(root/'scripts/validate-worker-candidate'))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        cli = importlib.util.module_from_spec(spec)
+        loader.exec_module(cli)
+        for code in (0, 1, 2):
+            with self.subTest(code=code), tempfile.TemporaryDirectory() as tmp:
+                directory = Path(tmp)
+                config = directory/'config.json'; config.write_text('{"socket":"fake"}')
+                report = failure(); report['exit_code'] = code
+                report['guest']['normal_world']['exit_code'] = code
+                if code == 0:
+                    report['guest']['normal_world'].pop('failure_evidence')
+                before = json.dumps(report)
+                readiness = dict(exit_code=0, observed=dict(resources={'memory.max': str(6*1024**3)}))
+                with patch.object(sys, 'argv', ['validate-worker-candidate', '--config', str(config)]), \
+                        patch.dict(os.environ, {'VALIDATION_AFK_EVIDENCE_DIR': str(directory/'evidence')}), \
+                        patch.object(cli, 'exchange', side_effect=[readiness, report]), \
+                        patch.object(cli, 'prepare', return_value={'candidate': 'a'*40}), \
+                        patch('builtins.print'):
+                    self.assertEqual(cli.main(), code)
+                exported = report.pop('diagnostic_artifact')
+                self.assertEqual(json.dumps(report), before)
+                self.assertTrue(Path(exported).is_file())
+                self.assertEqual(json.loads(Path(exported).read_text())['exit_code'], code)
+
     def test_missing_wrong_identity_and_existing_symlink_never_export_pass(self):
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertIsNone(normal.export_failure(dict(exit_code=0), 'a'*40, tmp))
-            self.assertIsNone(normal.export_failure(dict(exit_code=1, candidate='a'*40, run_id='b'*32), 'a'*40, tmp))
+            self.assertIsNone(normal.export_evidence(dict(exit_code=0), 'a'*40, tmp))
+            self.assertIsNone(normal.export_evidence(dict(exit_code=1, candidate='a'*40, run_id='b'*32), 'a'*40, tmp))
             with self.assertRaises(ValueError):
-                normal.export_failure(failure(), 'd'*40, tmp)
+                normal.export_evidence(failure(), 'd'*40, tmp)
             outside = Path(tmp)/'outside'; outside.write_text('untouched')
             (Path(tmp)/'normal-world-failure.json').symlink_to(outside)
             with self.assertRaises(FileExistsError):
-                normal.export_failure(failure(), 'a'*40, tmp)
+                normal.export_evidence(failure(), 'a'*40, tmp)
             self.assertEqual(outside.read_text(), 'untouched')
 
 

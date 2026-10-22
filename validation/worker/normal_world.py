@@ -4,6 +4,7 @@ Root prepares public data; the observer and all three native executables run as
 nobody in the offline guest. The observer uses kernel-owned socket identities and
 an echoed EQ stream session challenge, not startup log strings.
 """
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -466,17 +467,18 @@ def observe(binary_dir, server, control):
 
 
 
-def export_failure(report, head, directory):
+def export_evidence(report, head, directory):
     """Retain one private exact-candidate diagnostic using AFK's existing file contract."""
-    if report.get('exit_code') not in (1, 2):
+    if type(report.get('exit_code')) is not int or report['exit_code'] not in (0, 1, 2):
+        return None
+    normal = report.get('guest', {}).get('normal_world')
+    if not isinstance(normal, dict):
         return None
     if (not isinstance(head, str) or not re.fullmatch('[a-f0-9]{40}', head)
             or report.get('candidate') != head or not isinstance(report.get('run_id'), str)
             or not re.fullmatch('[a-f0-9]{32}', report['run_id'])):
-        raise ValueError('Failure artifact candidate/run identity mismatch')
-    normal = report.get('guest', {}).get('normal_world')
-    if not isinstance(normal, dict):
-        return None
+        raise ValueError('Native artifact candidate/run identity mismatch')
+    passed = report['exit_code'] == 0
     artifact = dict(schema_version=1, head=head, worker_run_id=report['run_id'],
                     exit_code=report['exit_code'], vm_cleanup_complete=report.get('cleanup_complete'),
                     normal_world=normal, advisory=True, truncated=False)
@@ -490,7 +492,7 @@ def export_failure(report, head, directory):
             console[name] = bounded_text(console[name], len(console[name].encode())//2)
             detail.setdefault('console_truncated', {})[name] = True
         else:
-            raise ValueError('Structured native failure exceeds artifact budget')
+            raise ValueError('Structured native evidence exceeds artifact budget')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     # Hold the owned directory inode while writing fixed filenames. No final links,
@@ -503,18 +505,20 @@ def export_failure(report, head, directory):
     try:
         info = os.fstat(directory_fd)
         if info.st_uid != os.geteuid() or info.st_mode & 0o022:
-            raise ValueError('Failure evidence directory must be owned and nonwritable by others')
-        write('normal-world-failure.json', artifact)
-        write('diagnostic-files.json', dict(schema_version=1, head=head, files=['normal-world-failure.json']))
+            raise ValueError('Native evidence directory must be owned and nonwritable by others')
+        name = 'normal-world-success.json' if passed else 'normal-world-failure.json'
+        write(name, artifact)
+        write('diagnostic-files.json', dict(schema_version=1, head=head, files=[name],
+            sha256={name: hashlib.sha256(encoded(artifact) + b'\n').hexdigest()}))
         condition = detail.get('observation', {}).get('condition')
         allowed = {'world-connection-lost', 'udp-timeout', 'udp-refused', 'udp-malformed-reply',
                    'udp-rejected', 'child-exit', 'deadline', 'cancelled', 'console-budget'}
         code = 'native-' + condition if condition in allowed else 'native-nonpass'
-        write('public-summary.json', dict(schema_version=1, head=head, profile='eqemu-worker', status='failed',
-            step='normal-world', diagnostic_codes=[code], timings_ms=dict(validation=None, restore=None)))
+        write('public-summary.json', dict(schema_version=1, head=head, profile='eqemu-worker', status='passed' if passed else 'failed',
+            step='normal-world', diagnostic_codes=[] if passed else [code], timings_ms=dict(validation=None, restore=None)))
     finally:
         os.close(directory_fd)
-    return directory/'normal-world-failure.json'
+    return directory/name
 
 
 def run(build, identity):

@@ -103,7 +103,7 @@ class AdapterDiagnostics(unittest.TestCase):
         self.assertIsNone(error.result)
         self.assertIn('interrupted', str(error))
         with tempfile.TemporaryDirectory() as tmp:
-            self.assertIsNone(normal.export_failure(dict(exit_code=2, candidate='a'*40,
+            self.assertIsNone(normal.export_evidence(dict(exit_code=2, candidate='a'*40,
                 run_id='b'*32, guest={}), 'a'*40, tmp))
             self.assertEqual(list(Path(tmp).iterdir()), [])
 

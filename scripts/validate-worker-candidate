@@ -12,7 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'validation/worker'
 from client import CONFIG, exchange
 from prepare import prepare
 from identity import identity
-from normal_world import export_failure
+from normal_world import export_evidence
 
 
 def main():
@@ -53,10 +53,10 @@ def main():
                 return 0
             report = exchange(config['socket'], request, output)
             directory = os.environ.get('VALIDATION_AFK_EVIDENCE_DIR')
-            if report.get('exit_code') in (1, 2) and report.get('guest', {}).get('normal_world'):
+            if report.get('exit_code') in (0, 1, 2) and report.get('guest', {}).get('normal_world'):
                 directory = directory or Path.home()/'.local/state/eqemu-rust-validator/runs'/report['run_id']
                 try:
-                    artifact = export_failure(report, request['candidate'], directory)
+                    artifact = export_evidence(report, request['candidate'], directory)
                     if artifact:
                         report['diagnostic_artifact'] = str(artifact)
                 except Exception as error:
