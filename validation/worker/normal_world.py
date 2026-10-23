@@ -4,6 +4,7 @@ Root prepares public data; the observer and all three native executables run as
 nobody in the offline guest. The observer uses kernel-owned socket identities and
 an echoed EQ stream session challenge, not startup log strings.
 """
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -25,6 +26,8 @@ OBSERVE_SECONDS = 120
 BASELINE_SECONDS = 5
 INSERVER_LIMIT = 4096
 EVIDENCE_LIMIT = 16384
+PROBE_ALLOCATION_ATTEMPTS = 16
+PROBE_PORT_LIMIT = 1200
 
 
 class InserverFailure(Exception):
@@ -126,23 +129,42 @@ def world_connected(world, zone):
     return False
 
 
-def probe(port=7000, *, diagnostics=None):
-    """A fresh random session must be echoed by the live zone's EQ stream handler."""
-    challenge = os.urandom(4)
-    with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as stream:
-        stream.connect(('127.0.0.1', port))
-        stream.settimeout(.25)
-        stream.send(b'\x00\x01' + struct.pack('!I', 2) + challenge + struct.pack('!I', 512))
-        try:
-            response = stream.recv(512)
-        except (TimeoutError, ConnectionRefusedError) as error:
-            if diagnostics is not None:
-                diagnostics['condition'] = 'udp-timeout' if isinstance(error, TimeoutError) else 'udp-refused'
-            return False
-        valid = len(response) >= 6 and response[:2] == b'\x00\x02' and response[2:6] == challenge
-        if diagnostics is not None:
-            diagnostics['condition'] = 'responsive' if valid else 'udp-malformed-reply'
-        return valid
+def probe(port=7000, *, used_ports=None, diagnostics=None):
+    """Echo a fresh session; the observer retains used source ports for its lifetime."""
+    if used_ports is None:
+        used_ports = set()
+    if diagnostics is not None:
+        diagnostics.update(source_port=None, discarded_allocations=0)
+    # EQ streams retain endpoint/session identity after the UDP client closes.
+    # Never transmit a new challenge on an endpoint used by an earlier sample.
+    if len(used_ports) < PROBE_PORT_LIMIT:
+        for attempt in range(PROBE_ALLOCATION_ATTEMPTS):
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as stream:
+                stream.connect(('127.0.0.1', port))
+                source_port = stream.getsockname()[1]
+                if diagnostics is not None:
+                    diagnostics['source_port'] = source_port
+                if source_port in used_ports:
+                    if diagnostics is not None:
+                        diagnostics['discarded_allocations'] = attempt + 1
+                    continue
+                used_ports.add(source_port)
+                challenge = os.urandom(4)
+                stream.settimeout(.25)
+                stream.send(b'\x00\x01' + struct.pack('!I', 2) + challenge + struct.pack('!I', 512))
+                try:
+                    response = stream.recv(512)
+                except (TimeoutError, ConnectionRefusedError) as error:
+                    if diagnostics is not None:
+                        diagnostics['condition'] = 'udp-timeout' if isinstance(error, TimeoutError) else 'udp-refused'
+                    return False
+                valid = len(response) >= 6 and response[:2] == b'\x00\x02' and response[2:6] == challenge
+                if diagnostics is not None:
+                    diagnostics['condition'] = 'responsive' if valid else 'udp-malformed-reply'
+                return valid
+    if diagnostics is not None:
+        diagnostics['condition'] = 'udp-allocation-exhausted'
+    raise RuntimeError('Unused UDP probe source port allocation exhausted')
 
 
 
@@ -344,6 +366,7 @@ def observe(binary_dir, server, control):
     result_path = server / ('inserver-' + run_id + '.json')
     suite_snapshot = None
     observation = dict(condition="starting", last_success_ms=None)
+    used_probe_ports = set()
     def cancel(*_):
         nonlocal cancelled
         cancelled = True
@@ -371,7 +394,7 @@ def observe(binary_dir, server, control):
                 observation['condition'] = 'world-connection-lost'
                 return False
             observation['condition'] = 'udp-rejected'
-            if not probe(diagnostics=observation):
+            if not probe(used_ports=used_probe_ports, diagnostics=observation):
                 return False
             observation.update(condition='responsive', last_success_ms=max(0, int((time.monotonic()-start)*1000)))
             return True
@@ -466,17 +489,18 @@ def observe(binary_dir, server, control):
 
 
 
-def export_failure(report, head, directory):
+def export_evidence(report, head, directory):
     """Retain one private exact-candidate diagnostic using AFK's existing file contract."""
-    if report.get('exit_code') not in (1, 2):
+    if type(report.get('exit_code')) is not int or report['exit_code'] not in (0, 1, 2):
+        return None
+    normal = report.get('guest', {}).get('normal_world')
+    if not isinstance(normal, dict):
         return None
     if (not isinstance(head, str) or not re.fullmatch('[a-f0-9]{40}', head)
             or report.get('candidate') != head or not isinstance(report.get('run_id'), str)
             or not re.fullmatch('[a-f0-9]{32}', report['run_id'])):
-        raise ValueError('Failure artifact candidate/run identity mismatch')
-    normal = report.get('guest', {}).get('normal_world')
-    if not isinstance(normal, dict):
-        return None
+        raise ValueError('Native artifact candidate/run identity mismatch')
+    passed = report['exit_code'] == 0
     artifact = dict(schema_version=1, head=head, worker_run_id=report['run_id'],
                     exit_code=report['exit_code'], vm_cleanup_complete=report.get('cleanup_complete'),
                     normal_world=normal, advisory=True, truncated=False)
@@ -490,7 +514,7 @@ def export_failure(report, head, directory):
             console[name] = bounded_text(console[name], len(console[name].encode())//2)
             detail.setdefault('console_truncated', {})[name] = True
         else:
-            raise ValueError('Structured native failure exceeds artifact budget')
+            raise ValueError('Structured native evidence exceeds artifact budget')
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
     # Hold the owned directory inode while writing fixed filenames. No final links,
@@ -503,18 +527,20 @@ def export_failure(report, head, directory):
     try:
         info = os.fstat(directory_fd)
         if info.st_uid != os.geteuid() or info.st_mode & 0o022:
-            raise ValueError('Failure evidence directory must be owned and nonwritable by others')
-        write('normal-world-failure.json', artifact)
-        write('diagnostic-files.json', dict(schema_version=1, head=head, files=['normal-world-failure.json']))
+            raise ValueError('Native evidence directory must be owned and nonwritable by others')
+        name = 'normal-world-success.json' if passed else 'normal-world-failure.json'
+        write(name, artifact)
+        write('diagnostic-files.json', dict(schema_version=1, head=head, files=[name],
+            sha256={name: hashlib.sha256(encoded(artifact) + b'\n').hexdigest()}))
         condition = detail.get('observation', {}).get('condition')
         allowed = {'world-connection-lost', 'udp-timeout', 'udp-refused', 'udp-malformed-reply',
-                   'udp-rejected', 'child-exit', 'deadline', 'cancelled', 'console-budget'}
+                   'udp-rejected', 'udp-allocation-exhausted', 'child-exit', 'deadline', 'cancelled', 'console-budget'}
         code = 'native-' + condition if condition in allowed else 'native-nonpass'
-        write('public-summary.json', dict(schema_version=1, head=head, profile='eqemu-worker', status='failed',
-            step='normal-world', diagnostic_codes=[code], timings_ms=dict(validation=None, restore=None)))
+        write('public-summary.json', dict(schema_version=1, head=head, profile='eqemu-worker', status='passed' if passed else 'failed',
+            step='normal-world', diagnostic_codes=[] if passed else [code], timings_ms=dict(validation=None, restore=None)))
     finally:
         os.close(directory_fd)
-    return directory/'normal-world-failure.json'
+    return directory/name
 
 
 def run(build, identity):

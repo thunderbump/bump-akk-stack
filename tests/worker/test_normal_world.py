@@ -122,6 +122,7 @@ class Readiness(unittest.TestCase):
     def test_udp_socket_or_wrong_session_is_not_application_readiness(self):
         stream = Mock()
         stream.__enter__ = Mock(return_value=stream); stream.__exit__ = Mock(return_value=False)
+        stream.getsockname.return_value = ('127.0.0.1', 40000)
         challenge = b'abcd'
         for response, expected in [(b'', False), (b'\x00\x02xxxx', False), (b'\x00\x01abcd', False),
                                    (b'\x00\x02abcd', True)]:
@@ -169,6 +170,11 @@ class Readiness(unittest.TestCase):
             probes = [True, RuntimeError('cancelled')] if interrupt else None
             if mode == 'baseline-response-loss':
                 probes = [True, False]
+            if mode == 'probe-allocation-exhausted':
+                def probes(*, used_ports, diagnostics):
+                    diagnostics.update(condition='udp-allocation-exhausted', source_port=40000,
+                                       discarded_allocations=normal.PROBE_ALLOCATION_ATTEMPTS)
+                    raise RuntimeError('Unused UDP probe source port allocation exhausted')
             connections = [True, False] if mode == 'baseline-world-loss' else None
             if mode == 'observer-cancel':
                 def connections(*_):
@@ -220,7 +226,7 @@ class Readiness(unittest.TestCase):
                     patch.object(normal.resource, 'setrlimit'), patch.object(normal.Path, 'is_file', return_value=True), \
                     patch.object(normal.subprocess, 'Popen', side_effect=launch) as popen, \
                     patch.object(normal, 'world_connected', side_effect=connections, return_value=True), \
-                    patch.object(normal, 'probe', side_effect=probes, return_value=True), \
+                    patch.object(normal, 'probe', side_effect=probes, return_value=True) as probe, \
                     patch.object(normal, 'cpu_ticks', side_effect=[0, 0, 1, 4]), \
                     patch.object(normal, 'stop', side_effect=cleanup) as stop, \
                     patch.object(normal.time, 'monotonic', side_effect=itertools.count(0, .1)), \
@@ -230,6 +236,10 @@ class Readiness(unittest.TestCase):
                     {'error': 'simulated stop failure'} if mode == 'cleanup-error' else {})
                 for call in popen.call_args_list:
                     self.assertNotIn('start_new_session', call.kwargs)
+                if probe.call_args_list:
+                    ports = probe.call_args_list[0].kwargs['used_ports']
+                    self.assertIsInstance(ports, set)
+                    self.assertTrue(all(call.kwargs['used_ports'] is ports for call in probe.call_args_list))
             lines = output.getvalue().splitlines()
             frames = [json.loads(line.removeprefix('NORMAL_WORLD_RESULT ')) for line in lines
                       if line.startswith('NORMAL_WORLD_RESULT ')]
@@ -242,6 +252,14 @@ class Readiness(unittest.TestCase):
         self.assertTrue(result['cleanup_complete'])
         self.assertEqual(result['failure_evidence']['observation']['condition'], 'cancelled')
         self.assertTrue(result['failure_evidence']['processes'])
+
+    def test_probe_allocation_exhaustion_is_infrastructure_with_private_diagnostics(self):
+        result = self.run_observer(mode='probe-allocation-exhausted')
+        self.assertEqual(result['exit_code'], 2)
+        self.assertTrue(result['cleanup_complete'])
+        self.assertEqual(result['failure_evidence']['observation'], dict(
+            condition='udp-allocation-exhausted', last_success_ms=None, source_port=40000,
+            discarded_allocations=normal.PROBE_ALLOCATION_ATTEMPTS))
 
     def test_cleanup_exception_still_emits_precleanup_evidence_and_nonpass(self):
         result = self.run_observer(mode='cleanup-error')
