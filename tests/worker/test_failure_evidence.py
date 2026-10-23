@@ -26,7 +26,8 @@ def failure(head='a'*40):
     return dict(exit_code=1, candidate=head, run_id='b'*32, cleanup_complete=True,
         guest=dict(normal_world=dict(exit_code=1, cleanup_complete=True,
             failure_evidence=dict(version=1, run_id='c'*32, observation=dict(condition='udp-timeout',
-                last_success_ms=5001), console={'zone': 'useful-native-detail\n'*300},
+                last_success_ms=5001, source_port=40001, discarded_allocations=1),
+                console={'zone': 'useful-native-detail\n'*300},
                 console_truncated={'zone': False}, progress=dict(active_case=event('case-start'),
                     last_completed_case=event('case-end', passed=True, diagnostic=''), rejected_events=0)))))
 
@@ -60,6 +61,7 @@ class Progress(unittest.TestCase):
             stream = Mock()
             stream.__enter__ = Mock(return_value=stream)
             stream.__exit__ = Mock(return_value=False)
+            stream.getsockname.return_value = ('127.0.0.1', 40000)
             if isinstance(response, Exception): stream.recv.side_effect = response
             else: stream.recv.return_value = response
             observed = {}
@@ -96,6 +98,8 @@ class Export(unittest.TestCase):
                 self.assertEqual(record['head'], 'a'*40)
                 self.assertEqual(record['worker_run_id'], 'b'*32)
                 self.assertTrue(record['advisory'])
+                self.assertEqual(record['normal_world']['failure_evidence']['observation'],
+                    report['guest']['normal_world']['failure_evidence']['observation'])
                 self.assertEqual(record['truncated'], noisy)
                 self.assertEqual(json.dumps(report), before)
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)

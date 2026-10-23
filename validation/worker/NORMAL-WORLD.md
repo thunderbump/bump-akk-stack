@@ -66,6 +66,16 @@ cannot pass. The fixed legacy EQ stream handshake and native command arguments
 must be confirmed against the selected native revision in VM qualification;
 incompatible behavior refuses instead of falling back to startup log strings.
 
+Each probe uses a source port not previously used by this observer. EQ streams
+retain the source endpoint and session challenge after a UDP client closes;
+reusing that endpoint with a new challenge can be ignored by a responsive server.
+The observer discards reused socket allocations before sending, with at most 16
+allocations per probe and 1200 retained port identities per observation. Discarded
+sockets close immediately, so only one probe socket is open at a time. Allocation
+exhaustion is infrastructure exit 2. Once a packet is sent, the probe still makes
+one receive attempt with the same 250 ms timeout; dropped, refused, malformed or
+wrong-challenge replies remain non-pass. No transmitted probe is retried.
+
 After readiness the observer repeatedly checks the connection and application
 response for at least five seconds, retaining readiness latency, successful
 samples, elapsed baseline time and world/zone CPU scheduler tick deltas plus
@@ -197,10 +207,11 @@ results belong in that worklog, not in this source document.
 ## Failure evidence
 
 Before native cleanup sends any signals, the observer snapshots the exact failed
-observation, elapsed time, last successful probe, direct-child exit/process state
+observation, elapsed time, last successful probe, the latest allocated source port
+and discarded-allocation count, direct-child exit/process state
 and bounded world/zone console excerpts. UDP timeout, refusal and malformed
 challenge replies are distinct from loss of the owned world connection. The
-existing thresholds, probe frequency and retry policy are unchanged. Shutdown
+existing response thresholds, probe frequency and single-response policy are unchanged. Shutdown
 chatter cannot replace these pre-cleanup excerpts; cleanup diagnostics remain
 separate.
 

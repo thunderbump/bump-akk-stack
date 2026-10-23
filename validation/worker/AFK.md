@@ -77,3 +77,9 @@ real VM. This export change reuses the existing worker report and needs no
 worker, guest observation, completion limit or privilege changes. Earlier failure
 observation support still requires the corresponding reviewed worker baseline. No new host privileges,
 artifact service or raw guest disk export are needed.
+
+The source-port allocation repair in `normal_world.py` separately requires that
+reviewed helper in both the fixed frontend and installed worker closure before a
+new VM run. The existing worker copies it into the disposable guest. Its changed
+bytes change validator identity, preventing reuse of an older fixture result.
+No new host privilege, policy, input image or execution permission is required.
