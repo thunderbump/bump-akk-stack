@@ -16,6 +16,9 @@ RECIPE = {
     'bots': False, 'initial_zone_state': 'empty', 'external_sinks': False,
     'scenario': 'tests:actor-lifecycle', 'runtime_seconds': RUNTIME_SECONDS,
     'zone_seconds': ZONE_SECONDS,
+    'additional_zone': {'zone': 'qeynos2', 'zone_id': 2, 'version_id': 0,
+                        'cancombat': 1, 'spawn2_id': 10863,
+                        'spawngroup_id': 7678, 'npc_id': 2011},
 }
 CASES = {'create-duplicate', 'name-collision', 'native-processing',
          'retire-recreate', 'external-removal-id-reuse', 'save-fresh-zone'}
@@ -25,7 +28,7 @@ PUBLIC_STAGES = {
     'actor-perl-modules', 'actor-db-init', 'actor-db-create',
     'actor-import-content', 'actor-import-login', 'actor-import-player',
     'actor-import-state', 'actor-import-system', 'actor-tables', 'actor-version',
-    'actor-empty', 'actor-content', 'actor-state', 'actor-fixture',
+    'actor-empty', 'actor-content', 'actor-qeynos-content', 'actor-state', 'actor-fixture',
     'actor-fixture-checked', 'actor-account', 'actor-shared-memory', 'actor-lifecycle',
     'actor-debugger-gdb', 'actor-debugger-addr2line', 'actor-debugger-readelf', 'actor-debugger-python',
 }

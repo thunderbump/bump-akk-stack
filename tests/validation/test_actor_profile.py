@@ -295,8 +295,10 @@ class Processes(unittest.TestCase):
     def test_missing_map_refuses_before_shared_memory_or_actor_execution(self):
         fake=self.root/'runtime';fake.mkdir()
         maps=self.root/'media/maps';maps.mkdir(parents=True)
-        for directory,file in [('base','poknowledge.map'),('water','poknowledge.wtr'),('nav','poknowledge.nav')]:
-            (maps/directory).mkdir();(maps/directory/file).write_bytes(b'fixture')
+        for zone in ('poknowledge', 'qeynos2'):
+            for directory,ext in [('base','map'),('water','wtr'),('nav','nav')]:
+                (maps/directory).mkdir(exist_ok=True)
+                (maps/directory/(zone+'.'+ext)).write_bytes(b'fixture')
         (self.root/'media/opcodes').mkdir();(self.root/'media/quests').mkdir()
         import tarfile
         prefix='projecteqquests-b3e34b84457d570401ea954ddd66de19179d0e41'
@@ -307,9 +309,183 @@ class Processes(unittest.TestCase):
              patch.object(self.runtime,'query') as query,self.assertRaisesRegex(RuntimeError,'map missing'):
             self.runtime.configure()
         query.assert_not_called()
+        import shutil
+        shutil.rmtree(fake/'server')
+        self.runtime.control=None
+        with patch.object(actor_runtime,'ROOT',fake),patch.object(actor_runtime,'MEDIA',self.root/'media'),\
+             patch.object(self.runtime,'query') as query:
+            self.runtime.configure()
+        query.assert_called_once()
+        shutil.rmtree(fake/'server')
+        for path in sorted(maps.rglob('*')):
+            if not path.is_file(): continue
+            data=path.read_bytes();path.unlink()
+            with self.subTest(map=path.name),patch.object(actor_runtime,'ROOT',fake),\
+                 patch.object(actor_runtime,'MEDIA',self.root/'media'),\
+                 patch.object(self.runtime,'query') as query,self.assertRaisesRegex(RuntimeError,'map missing'):
+                self.runtime.configure()
+            query.assert_not_called()
+            path.write_bytes(data);shutil.rmtree(fake/'server')
+
+
+class QeynosContent(unittest.TestCase):
+    """Execute the maintained SQL predicates against disposable synthetic rows."""
+    def setUp(self):
+        import sqlite3
+        self.db = sqlite3.connect(':memory:')
+        self.addCleanup(self.db.close)
+        self.db.executescript("""
+CREATE TABLE zone (zoneidnumber, version, short_name, long_name, cancombat);
+INSERT INTO zone VALUES (2,0,'qeynos2','North Qeynos',1);
+CREATE TABLE spawn2 (id,zone,version,spawngroupID,x,y,z,pathgrid,_condition,
+ cond_value,enabled,min_expansion,max_expansion,content_flags,content_flags_disabled);
+INSERT INTO spawn2 VALUES (10863,'qeynos2',0,7678,-935,1194,9,0,0,1,1,-1,-1,'','');
+INSERT INTO spawn2 SELECT 99,'qeynos2',1,spawngroupID,x,y,z,pathgrid,_condition,
+ cond_value,enabled,min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2;
+INSERT INTO spawn2 SELECT 100,'poknowledge',0,spawngroupID,x,y,z,pathgrid,_condition,
+ cond_value,enabled,min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2 LIMIT 1;
+INSERT INTO spawn2 SELECT 101,'other',0,spawngroupID,x,y,z,pathgrid,_condition,
+ cond_value,enabled,min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2 LIMIT 1;
+CREATE TABLE spawnentry (spawngroupID,npcID,chance,condition_value,min_time,max_time,
+ min_expansion,max_expansion,content_flags,content_flags_disabled);
+INSERT INTO spawnentry VALUES (7678,2011,100,1,0,0,-1,-1,'','');
+CREATE TABLE spawngroup (id,roamdist,min_x,max_x,min_y,max_y);
+INSERT INTO spawngroup VALUES (7678,0,0,0,0,0);
+CREATE TABLE npc_types (id,level,hp,mindmg,maxdmg,class,race,bodytype,npc_spells_id,
+ npc_spells_effects_id,merchant_id,untargetable,isquest,special_abilities,npcspecialattks);
+INSERT INTO npc_types VALUES (2011,1,11,1,6,1,36,21,0,0,0,0,0,'','');
+CREATE TABLE rule_values (ruleset_id,rule_name,rule_value);
+INSERT INTO rule_values VALUES (1,'Zone:UseZoneController','true'),(1,'Bots:Enabled','false'),
+ (1,'Analytics:CrashReporting','true'),(1,'Zone:StateSavingOnShutdown','true');
+CREATE TABLE variables (value,varname);
+CREATE TABLE logsys_categories (log_to_file,log_to_gmsay,log_to_discord,discord_webhook_id,
+ log_to_console,log_category_description);
+CREATE TABLE discord_webhooks (webhook_url);
+""")
+        self.runtime = actor_runtime.Runtime.__new__(actor_runtime.Runtime)
+        self.calls = []
+        def query(name, sql):
+            self.calls.append((name, sql))
+            if name == 'tables': return '\n'.join('table'+str(i) for i in range(221))
+            if name == 'version': return '9328\t0\t0'
+            if name == 'empty': return 'player\t0'
+            if name == 'content': return '202\t0\tpoknowledge\n1\n1\ndefault\nfalse'
+            if name == 'state': return '0'
+            rows = []
+            for statement in sql.split(';'):
+                if statement.strip():
+                    rows.extend(self.db.execute(statement).fetchall())
+            return '\n'.join('\t'.join(str(v) for v in row) for row in rows)
+        self.runtime.query = query
+
+    def test_exact_plain_rat_and_zone_are_required(self):
+        self.runtime.check_qeynos_content()
+        mutations = [
+            "UPDATE zone SET short_name='wrong'", "UPDATE zone SET cancombat=0",
+            "UPDATE zone SET version=1", "UPDATE zone SET zoneidnumber=3",
+            "UPDATE spawn2 SET spawngroupID=1 WHERE id=10863",
+            "UPDATE spawn2 SET zone='other' WHERE id=10863",
+            "UPDATE spawn2 SET x=0 WHERE id=10863",
+            "UPDATE spawn2 SET pathgrid=1 WHERE id=10863",
+            "UPDATE spawn2 SET _condition=1 WHERE id=10863",
+            "UPDATE spawn2 SET min_expansion=1 WHERE id=10863",
+            "UPDATE spawn2 SET content_flags='gate' WHERE id=10863",
+            "UPDATE spawnentry SET npcID=2030", "UPDATE spawnentry SET chance=50",
+            "INSERT INTO spawnentry SELECT * FROM spawnentry",
+            "UPDATE spawnentry SET condition_value=2", "UPDATE spawnentry SET min_time=1",
+            "UPDATE spawnentry SET max_expansion=1",
+            "UPDATE spawngroup SET roamdist=10", "UPDATE spawngroup SET max_x=1",
+            "UPDATE npc_types SET isquest=1", "UPDATE npc_types SET level=2",
+            "UPDATE npc_types SET hp=12", "UPDATE npc_types SET maxdmg=7",
+            "UPDATE npc_types SET npc_spells_id=1", "UPDATE npc_types SET merchant_id=1",
+            "UPDATE npc_types SET special_abilities='1'", "UPDATE npc_types SET npcspecialattks='S'",
+        ]
+        for sql in mutations:
+            with self.subTest(sql=sql):
+                self.db.execute('SAVEPOINT mutation')
+                self.db.execute(sql)
+                with self.assertRaisesRegex(RuntimeError, 'content mismatch'):
+                    self.runtime.check_qeynos_content()
+                self.db.execute('ROLLBACK TO mutation')
+                self.db.execute('RELEASE mutation')
+
+    def import_fixture(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as tmp:
+            media = Path(tmp)
+            (media/'provenance').mkdir(); (media/'database').mkdir()
+            inventory = {'members': [], 'import_order': ['content','login','player','state','system'],
+                         'groups': {'player': {'tables': ['player']}, 'login': {'tables': []},
+                                    'content': {'tables': ['table'+str(i) for i in range(221)]}}}
+            # The inventory includes player, so use it as one of the 221 expected names.
+            inventory['groups']['content']['tables'][0] = 'player'
+            original = self.runtime.query
+            self.runtime.query = lambda name, sql: ('player\n'+'\n'.join('table'+str(i) for i in range(1,221))
+                                                     if name == 'tables' else original(name, sql))
+            (media/'provenance/database-inspection.json').write_text(json.dumps(inventory))
+            (media/'runtime-input-contract.json').write_text(json.dumps({'database': {'import_members': []}}))
+            with zipfile.ZipFile(media/'database/peq-1787356814.zip','w'): pass
+            with patch.object(actor_runtime, 'MEDIA', media):
+                self.runtime.import_database()
+
+    def test_import_derives_only_isolated_qeynos_and_empty_pok(self):
+        self.import_fixture()
+        self.assertEqual(self.db.execute('SELECT id,zone FROM spawn2 ORDER BY id').fetchall(),
+                         [(101,'other'),(10863,'qeynos2')])
+        self.assertEqual(self.db.execute('SELECT cancombat FROM zone').fetchone(), (1,))
+        self.assertEqual(self.db.execute('SELECT hp FROM npc_types').fetchone(), (11,))
+        self.assertLess([n for n,_ in self.calls].index('qeynos-content'),
+                        [n for n,_ in self.calls].index('fixture'))
+
+    def test_bad_content_refuses_before_derivation(self):
+        self.db.execute('UPDATE spawnentry SET npcID=2030')
+        with self.assertRaisesRegex(RuntimeError, 'content mismatch'):
+            self.import_fixture()
+        self.assertNotIn('fixture', [n for n,_ in self.calls])
+        self.assertEqual(self.db.execute('SELECT COUNT(*) FROM spawn2').fetchone(), (4,))
+
+    def test_missing_extra_or_nonempty_pok_derived_spawn_is_refused(self):
+        original = self.runtime.query
+        for sql in ("DELETE FROM spawn2 WHERE id=10863",
+                    "INSERT INTO spawn2 SELECT 999,zone,version,spawngroupID,x,y,z,pathgrid,"
+                    "_condition,cond_value,enabled,min_expansion,max_expansion,content_flags,"
+                    "content_flags_disabled FROM spawn2 WHERE id=10863",
+                    "UPDATE spawn2 SET zone='poknowledge' WHERE id=101"):
+            def query(name, statement):
+                if name == 'fixture-checked': self.db.execute(sql)
+                return original(name, statement)
+            self.runtime.query = query
+            self.db.execute('SAVEPOINT derived')
+            with self.subTest(sql=sql),self.assertRaisesRegex(RuntimeError, 'derived fixture preconditions'):
+                self.import_fixture()
+            self.db.execute('ROLLBACK TO derived')
+            self.db.execute('RELEASE derived')
 
 
 class InputSeals(unittest.TestCase):
+    def test_prepared_qeynos_descriptor_and_default_pok_recipe(self):
+        fixture=json.loads((ROOT/'validation/runtime-fixture.json').read_text())
+        self.assertEqual(fixture['iso'], {
+            'path':'runtime-qeynos2-inputs-20261025/runtime-inputs.iso', 'bytes':197267456,
+            'sha256':'b1128187a1b39dc9d38b981160248ed45bdc854efa559b549b047dda5e981ed4'})
+        self.assertEqual(fixture['manifest_sha256'],
+                         'fc65960b85310ca9f1e7f5d681fbd558a1210272d63144c76f4e080d06cf0bac')
+        rows=fixture['manifest']['files']; files={row['path']:row for row in rows}
+        self.assertEqual([row['path'] for row in rows], sorted(files))
+        for path,size,sha in [
+            ('maps/base/qeynos2.map',131984,'040343c54e3b02bfd1637ce8fca8839dd676e17c41fb24c042ccfa0bd649435c'),
+            ('maps/nav/qeynos2.nav',232993,'9e528179eb619005301d6d34566471a8e264c1282235c624382cfaecdc973a08'),
+            ('maps/water/qeynos2.wtr',236286,'237d114e3b60a839c9ee0b2cba23dc4221057afc7add8aabae55ee61e89c4bdc'),
+            ('provenance/qeynos2-inputs.json',1370,'fa7ce6b308d14f2302be07ea09723b713ff03ba35aec1cb8810375e59b0a14f9'),
+            ('runtime-input-contract.json',5149,'ff7ab576532ed8c2616e4982f695b86f4c7704b02bb11956fe5b93ab61e41d21')]:
+            self.assertEqual((files[path]['bytes'],files[path]['sha256']), (size,sha))
+        for path in ('base/poknowledge.map','nav/poknowledge.nav','water/poknowledge.wtr'):
+            self.assertIn('maps/'+path,files)
+        self.assertEqual((actor.RECIPE['zone'],actor.RECIPE['zone_id']), ('poknowledge',202))
+        self.assertEqual(actor.RECIPE['additional_zone'],
+                         dict(zone='qeynos2',zone_id=2,version_id=0,cancombat=1,
+                              spawn2_id=10863,spawngroup_id=7678,npc_id=2011))
+
     def test_media_hash_manifest_and_member_refusals_precede_any_execution(self):
         import hashlib
         entries=[{'path':'data/'+str(i),'bytes':1,'sha256':hashlib.sha256(b'x').hexdigest()} for i in range(47)]
