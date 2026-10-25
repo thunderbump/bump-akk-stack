@@ -329,7 +329,13 @@ class Processes(unittest.TestCase):
 
 
 class QeynosContent(unittest.TestCase):
-    """Execute the maintained SQL predicates against disposable synthetic rows."""
+    """Resolve production SQL against sealed-schema names and synthetic rows.
+
+    spawn2/spawnentry/spawngroup columns below are the reported projections of
+    peq-1787356814.zip's peq-dump/create_tables_content.sql (SHA256
+    5dc2f9787d19243b421cd0e497f075a413297bd060d5c9ac3fcc11e4056fc147).
+    zone/npc_types use only the relevant projection. This is not runtime proof.
+    """
     def setUp(self):
         import sqlite3
         self.db = sqlite3.connect(':memory:')
@@ -337,23 +343,30 @@ class QeynosContent(unittest.TestCase):
         self.db.executescript("""
 CREATE TABLE zone (zoneidnumber, version, short_name, long_name, cancombat);
 INSERT INTO zone VALUES (2,0,'qeynos2','North Qeynos',1);
-CREATE TABLE spawn2 (id,zone,version,spawngroupID,x,y,z,pathgrid,_condition,
- cond_value,enabled,min_expansion,max_expansion,content_flags,content_flags_disabled);
-INSERT INTO spawn2 VALUES (10863,'qeynos2',0,7678,-935,1194,9,0,0,1,1,-1,-1,'','');
-INSERT INTO spawn2 SELECT 99,'qeynos2',1,spawngroupID,x,y,z,pathgrid,_condition,
- cond_value,enabled,min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2;
-INSERT INTO spawn2 SELECT 100,'poknowledge',0,spawngroupID,x,y,z,pathgrid,_condition,
- cond_value,enabled,min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2 LIMIT 1;
-INSERT INTO spawn2 SELECT 101,'other',0,spawngroupID,x,y,z,pathgrid,_condition,
- cond_value,enabled,min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2 LIMIT 1;
-CREATE TABLE spawnentry (spawngroupID,npcID,chance,condition_value,min_time,max_time,
+CREATE TABLE spawn2 (id,spawngroupID,zone,version,x,y,z,heading,respawntime,
+ variance,pathgrid,path_when_zone_idle,_condition,cond_value,animation,
+ min_expansion,max_expansion,content_flags,content_flags_disabled);
+INSERT INTO spawn2 (id,zone,version,spawngroupID,x,y,z,pathgrid,_condition,
+ cond_value,min_expansion,max_expansion,content_flags,content_flags_disabled)
+ VALUES (10863,'qeynos2',0,7678,-935,1194,9,0,0,1,-1,-1,'','');
+INSERT INTO spawn2 SELECT 99,spawngroupID,'qeynos2',1,x,y,z,heading,respawntime,
+ variance,pathgrid,path_when_zone_idle,_condition,cond_value,animation,
+ min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2;
+INSERT INTO spawn2 SELECT 100,spawngroupID,'poknowledge',0,x,y,z,heading,respawntime,
+ variance,pathgrid,path_when_zone_idle,_condition,cond_value,animation,
+ min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2 LIMIT 1;
+INSERT INTO spawn2 SELECT 101,spawngroupID,'other',0,x,y,z,heading,respawntime,
+ variance,pathgrid,path_when_zone_idle,_condition,cond_value,animation,
+ min_expansion,max_expansion,content_flags,content_flags_disabled FROM spawn2 LIMIT 1;
+CREATE TABLE spawnentry (spawngroupID,npcID,chance,condition_value_filter,min_time,max_time,
  min_expansion,max_expansion,content_flags,content_flags_disabled);
 INSERT INTO spawnentry VALUES (7678,2011,100,1,0,0,-1,-1,'','');
-CREATE TABLE spawngroup (id,roamdist,min_x,max_x,min_y,max_y);
-INSERT INTO spawngroup VALUES (7678,0,0,0,0,0);
-CREATE TABLE npc_types (id,level,hp,mindmg,maxdmg,class,race,bodytype,npc_spells_id,
+CREATE TABLE spawngroup (id,name,spawn_limit,dist,max_x,min_x,max_y,min_y,
+ delay,mindelay,despawn,despawn_timer,wp_spawns);
+INSERT INTO spawngroup VALUES (7678,'a_rat',0,0,0,0,0,0,0,0,0,0,0);
+CREATE TABLE npc_types (id,level,maxlevel,hp,mindmg,maxdmg,class,race,bodytype,npc_spells_id,
  npc_spells_effects_id,merchant_id,untargetable,isquest,special_abilities,npcspecialattks);
-INSERT INTO npc_types VALUES (2011,1,11,1,6,1,36,21,0,0,0,0,0,'','');
+INSERT INTO npc_types VALUES (2011,1,0,11,1,6,1,36,21,0,0,0,0,0,'','');
 CREATE TABLE rule_values (ruleset_id,rule_name,rule_value);
 INSERT INTO rule_values VALUES (1,'Zone:UseZoneController','true'),(1,'Bots:Enabled','false'),
  (1,'Analytics:CrashReporting','true'),(1,'Zone:StateSavingOnShutdown','true');
@@ -392,10 +405,13 @@ CREATE TABLE discord_webhooks (webhook_url);
             "UPDATE spawn2 SET content_flags='gate' WHERE id=10863",
             "UPDATE spawnentry SET npcID=2030", "UPDATE spawnentry SET chance=50",
             "INSERT INTO spawnentry SELECT * FROM spawnentry",
-            "UPDATE spawnentry SET condition_value=2", "UPDATE spawnentry SET min_time=1",
+            "UPDATE spawnentry SET condition_value_filter=2", "UPDATE spawnentry SET min_time=1",
             "UPDATE spawnentry SET max_expansion=1",
-            "UPDATE spawngroup SET roamdist=10", "UPDATE spawngroup SET max_x=1",
+            "UPDATE spawngroup SET dist=10", "UPDATE spawngroup SET max_x=1",
+            "UPDATE spawngroup SET spawn_limit=1", "UPDATE spawngroup SET despawn=1",
+            "UPDATE spawngroup SET wp_spawns=1",
             "UPDATE npc_types SET isquest=1", "UPDATE npc_types SET level=2",
+            "UPDATE npc_types SET maxlevel=2",
             "UPDATE npc_types SET hp=12", "UPDATE npc_types SET maxdmg=7",
             "UPDATE npc_types SET npc_spells_id=1", "UPDATE npc_types SET merchant_id=1",
             "UPDATE npc_types SET special_abilities='1'", "UPDATE npc_types SET npcspecialattks='S'",
@@ -447,8 +463,9 @@ CREATE TABLE discord_webhooks (webhook_url);
     def test_missing_extra_or_nonempty_pok_derived_spawn_is_refused(self):
         original = self.runtime.query
         for sql in ("DELETE FROM spawn2 WHERE id=10863",
-                    "INSERT INTO spawn2 SELECT 999,zone,version,spawngroupID,x,y,z,pathgrid,"
-                    "_condition,cond_value,enabled,min_expansion,max_expansion,content_flags,"
+                    "INSERT INTO spawn2 SELECT 999,spawngroupID,zone,version,x,y,z,heading,"
+                    "respawntime,variance,pathgrid,path_when_zone_idle,_condition,cond_value,"
+                    "animation,min_expansion,max_expansion,content_flags,"
                     "content_flags_disabled FROM spawn2 WHERE id=10863",
                     "UPDATE spawn2 SET zone='poknowledge' WHERE id=101"):
             def query(name, statement):

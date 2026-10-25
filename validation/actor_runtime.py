@@ -299,17 +299,18 @@ SELECT COUNT(*) FROM zone WHERE zoneidnumber=2 AND version=0
  AND short_name='qeynos2' AND long_name='North Qeynos' AND cancombat=1;
 SELECT COUNT(*) FROM spawn2 WHERE id=10863 AND zone='qeynos2' AND version=0
  AND spawngroupID=7678 AND x=-935 AND y=1194 AND z=9 AND pathgrid=0
- AND _condition=0 AND cond_value=1 AND enabled=1
+ AND _condition=0 AND cond_value=1
  AND min_expansion=-1 AND max_expansion=-1
  AND COALESCE(content_flags,'')='' AND COALESCE(content_flags_disabled,'')='';
 SELECT COUNT(*) FROM spawnentry WHERE spawngroupID=7678;
 SELECT COUNT(*) FROM spawnentry WHERE spawngroupID=7678 AND npcID=2011
- AND chance=100 AND condition_value=1 AND min_time=0 AND max_time=0
+ AND chance=100 AND condition_value_filter=1 AND min_time=0 AND max_time=0
  AND min_expansion=-1 AND max_expansion=-1
  AND COALESCE(content_flags,'')='' AND COALESCE(content_flags_disabled,'')='';
-SELECT COUNT(*) FROM spawngroup WHERE id=7678 AND roamdist=0
- AND min_x=0 AND max_x=0 AND min_y=0 AND max_y=0;
-SELECT COUNT(*) FROM npc_types WHERE id=2011 AND level=1 AND hp=11
+SELECT COUNT(*) FROM spawngroup WHERE id=7678 AND dist=0
+ AND min_x=0 AND max_x=0 AND min_y=0 AND max_y=0
+ AND spawn_limit=0 AND despawn=0 AND wp_spawns=0;
+SELECT COUNT(*) FROM npc_types WHERE id=2011 AND level=1 AND maxlevel=0 AND hp=11
  AND mindmg=1 AND maxdmg=6 AND class=1 AND race=36 AND bodytype=21
  AND npc_spells_id=0 AND npc_spells_effects_id=0 AND merchant_id=0
  AND untargetable=0 AND isquest=0
