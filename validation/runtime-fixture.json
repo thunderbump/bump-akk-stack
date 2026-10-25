@@ -1,8 +1,8 @@
 {
   "iso": {
-    "path": "runtime-debugger-inputs-20261008/runtime-inputs.iso",
-    "bytes": 196659200,
-    "sha256": "a714115dcd1c654df9fcbdad41d41d367cebf042f57b8813b8dee7d203f731bb"
+    "path": "runtime-qeynos2-inputs-20261025/runtime-inputs.iso",
+    "bytes": 197267456,
+    "sha256": "b1128187a1b39dc9d38b981160248ed45bdc854efa559b549b047dda5e981ed4"
   },
   "manifest": {
     "files": [
@@ -217,15 +217,33 @@
         "role": "public-fixture"
       },
       {
+        "path": "maps/base/qeynos2.map",
+        "bytes": 131984,
+        "sha256": "040343c54e3b02bfd1637ce8fca8839dd676e17c41fb24c042ccfa0bd649435c",
+        "role": "public-fixture"
+      },
+      {
         "path": "maps/nav/poknowledge.nav",
         "bytes": 1210906,
         "sha256": "edf48789922d0de8a7b30ee47b8fe023c89c07cebd014f399dd6202ee7752b24",
         "role": "public-fixture"
       },
       {
+        "path": "maps/nav/qeynos2.nav",
+        "bytes": 232993,
+        "sha256": "9e528179eb619005301d6d34566471a8e264c1282235c624382cfaecdc973a08",
+        "role": "public-fixture"
+      },
+      {
         "path": "maps/water/poknowledge.wtr",
         "bytes": 129726,
         "sha256": "78596081d06ca3027ddf68c0b6bbaec291833d9ad2c238b4165a5a2313362045",
+        "role": "public-fixture"
+      },
+      {
+        "path": "maps/water/qeynos2.wtr",
+        "bytes": 236286,
+        "sha256": "237d114e3b60a839c9ee0b2cba23dc4221057afc7add8aabae55ee61e89c4bdc",
         "role": "public-fixture"
       },
       {
@@ -301,6 +319,12 @@
         "role": "provenance"
       },
       {
+        "path": "provenance/qeynos2-inputs.json",
+        "bytes": 1370,
+        "sha256": "fa7ce6b308d14f2302be07ea09723b713ff03ba35aec1cb8810375e59b0a14f9",
+        "role": "provenance"
+      },
+      {
         "path": "provenance/quest-inspection.json",
         "bytes": 1781750,
         "sha256": "2f1d960a10308562554572d1960e207b5fea5f50d6927db1a0a1729a5548b230",
@@ -332,8 +356,8 @@
       },
       {
         "path": "runtime-input-contract.json",
-        "bytes": 5056,
-        "sha256": "4c6372d62faf682c1400bc60a5bd8f792b0d270997cd14fe9c1eca32c5addc54",
+        "bytes": 5149,
+        "sha256": "ff7ab576532ed8c2616e4982f695b86f4c7704b02bb11956fe5b93ab61e41d21",
         "role": "runtime-data"
       },
       {
@@ -345,8 +369,8 @@
     ],
     "requires_build_iso_sha256": "02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4",
     "schema": 1,
-    "scope": "Authenticated offline runtime plus debugger closure; guest proof pending",
+    "scope": "Authenticated PoK runtime/debugger plus pinned North Qeynos assets; guest proof pending",
     "status": "prepared-unexecuted"
   },
-  "manifest_sha256": "445828ddd3600d72ed885fb9cfbc3a223ab165856f2af5ee94d147a903f2e023"
+  "manifest_sha256": "fc65960b85310ca9f1e7f5d681fbd558a1210272d63144c76f4e080d06cf0bac"
 }

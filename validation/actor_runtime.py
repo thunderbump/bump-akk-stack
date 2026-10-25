@@ -291,6 +291,34 @@ APT::Install-Recommends "false";
         else: raise RuntimeError('Database socket readiness missing')
         self.query('db-create', 'CREATE DATABASE eqemu_actor CHARACTER SET latin1;', db=False)
 
+    def check_qeynos_content(self):
+        # Read-only assertions against the sealed public content, before derivation.
+        # Level alone is not a safe target selector (city quest NPCs can be level 1).
+        checks = """
+SELECT COUNT(*) FROM zone WHERE zoneidnumber=2 AND version=0
+ AND short_name='qeynos2' AND long_name='North Qeynos' AND cancombat=1;
+SELECT COUNT(*) FROM spawn2 WHERE id=10863 AND zone='qeynos2' AND version=0
+ AND spawngroupID=7678 AND x=-935 AND y=1194 AND z=9 AND pathgrid=0
+ AND _condition=0 AND cond_value=1
+ AND min_expansion=-1 AND max_expansion=-1
+ AND COALESCE(content_flags,'')='' AND COALESCE(content_flags_disabled,'')='';
+SELECT COUNT(*) FROM spawnentry WHERE spawngroupID=7678;
+SELECT COUNT(*) FROM spawnentry WHERE spawngroupID=7678 AND npcID=2011
+ AND chance=100 AND condition_value_filter=1 AND min_time=0 AND max_time=0
+ AND min_expansion=-1 AND max_expansion=-1
+ AND COALESCE(content_flags,'')='' AND COALESCE(content_flags_disabled,'')='';
+SELECT COUNT(*) FROM spawngroup WHERE id=7678 AND dist=0
+ AND min_x=0 AND max_x=0 AND min_y=0 AND max_y=0
+ AND spawn_limit=0 AND despawn=0 AND wp_spawns=0;
+SELECT COUNT(*) FROM npc_types WHERE id=2011 AND level=1 AND maxlevel=0 AND hp=11
+ AND mindmg=1 AND maxdmg=6 AND class=1 AND race=36 AND bodytype=21
+ AND npc_spells_id=0 AND npc_spells_effects_id=0 AND merchant_id=0
+ AND untargetable=0 AND isquest=0
+ AND COALESCE(special_abilities,'')='' AND COALESCE(npcspecialattks,'')='';
+"""
+        if self.query('qeynos-content', checks).strip() != '1\n1\n1\n1\n1\n1':
+            raise RuntimeError('North Qeynos public content mismatch')
+
     def import_database(self):
         inventory = json.loads((MEDIA/'provenance/database-inspection.json').read_text())
         expected = {m['path']: m for m in inventory['members']}
@@ -325,8 +353,9 @@ APT::Install-Recommends "false";
             raise RuntimeError('Required actor public content or ruleset missing')
         if self.query('state', 'SELECT COUNT(*) FROM zone_state_spawns;').strip() != '0':
             raise RuntimeError('Actor fixture zone state is not empty')
-        self.query('fixture', "DELETE FROM spawn2 WHERE zone='poknowledge'; UPDATE rule_values SET rule_value='false' WHERE ruleset_id=1 AND rule_name IN ('Zone:UseZoneController','Bots:Enabled','Analytics:CrashReporting','Zone:StateSavingOnShutdown'); UPDATE variables SET value='default' WHERE varname='RuleSet'; UPDATE logsys_categories SET log_to_file=0,log_to_gmsay=0,log_to_discord=0,discord_webhook_id=0; UPDATE logsys_categories SET log_to_console=1 WHERE log_category_description IN ('Info','Error','MySQL Error','QuestErrors','Quests','Crash'); UPDATE logsys_categories SET log_to_console=0 WHERE log_category_description='MySQL Query';")
-        if self.query('fixture-checked', "SELECT COUNT(*) FROM spawn2 WHERE zone='poknowledge'; SELECT COUNT(*) FROM rule_values WHERE ruleset_id=1 AND rule_name IN ('Zone:UseZoneController','Bots:Enabled','Analytics:CrashReporting','Zone:StateSavingOnShutdown') AND rule_value='false'; SELECT COUNT(*) FROM discord_webhooks WHERE COALESCE(webhook_url,'')<>'';").strip() != '0\n4\n0':
+        self.check_qeynos_content()
+        self.query('fixture', "DELETE FROM spawn2 WHERE zone='qeynos2' AND NOT (id=10863 AND version=0); DELETE FROM spawn2 WHERE zone='poknowledge'; UPDATE rule_values SET rule_value='false' WHERE ruleset_id=1 AND rule_name IN ('Zone:UseZoneController','Bots:Enabled','Analytics:CrashReporting','Zone:StateSavingOnShutdown'); UPDATE variables SET value='default' WHERE varname='RuleSet'; UPDATE logsys_categories SET log_to_file=0,log_to_gmsay=0,log_to_discord=0,discord_webhook_id=0; UPDATE logsys_categories SET log_to_console=1 WHERE log_category_description IN ('Info','Error','MySQL Error','QuestErrors','Quests','Crash'); UPDATE logsys_categories SET log_to_console=0 WHERE log_category_description='MySQL Query';")
+        if self.query('fixture-checked', "SELECT COUNT(*) FROM spawn2 WHERE zone='poknowledge'; SELECT COUNT(*) FROM rule_values WHERE ruleset_id=1 AND rule_name IN ('Zone:UseZoneController','Bots:Enabled','Analytics:CrashReporting','Zone:StateSavingOnShutdown') AND rule_value='false'; SELECT COUNT(*) FROM discord_webhooks WHERE COALESCE(webhook_url,'')<>''; SELECT COUNT(*) FROM spawn2 WHERE zone='qeynos2'; SELECT COUNT(*) FROM spawn2 WHERE zone='qeynos2' AND version=0 AND id=10863 AND spawngroupID=7678;").strip() != '0\n4\n0\n1\n1':
             raise RuntimeError('Actor derived fixture preconditions')
 
     def configure(self):
@@ -338,8 +367,9 @@ APT::Install-Recommends "false";
         for name in ('shared', 'logs'): (server/name).mkdir()
         if self.control == 'missing-map': (server/'maps/base/poknowledge.map').unlink()
         # All required maps are a gate. Native boot tolerating a missing map cannot pass.
-        for name in ('base/poknowledge.map', 'water/poknowledge.wtr', 'nav/poknowledge.nav'):
-            if not (server/'maps'/name).is_file(): raise RuntimeError('Required actor map missing: '+name)
+        for zone in ('poknowledge', 'qeynos2'):
+            for name in ('base/'+zone+'.map', 'water/'+zone+'.wtr', 'nav/'+zone+'.nav'):
+                if not (server/'maps'/name).is_file(): raise RuntimeError('Required actor map missing: '+name)
         password = secrets.token_hex(24); key = secrets.token_hex(24)
         self.secrets.extend((password, key))
         self.query('account', "CREATE USER 'eqemu'@'127.0.0.1' IDENTIFIED BY '"+password+"'; GRANT ALL ON eqemu_actor.* TO 'eqemu'@'127.0.0.1';", db=False)
