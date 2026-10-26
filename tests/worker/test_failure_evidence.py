@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import Mock, patch
 
@@ -30,6 +31,121 @@ def failure(head='a'*40):
                 console={'zone': 'useful-native-detail\n'*300},
                 console_truncated={'zone': False}, progress=dict(active_case=event('case-start'),
                     last_completed_case=event('case-end', passed=True, diagnostic=''), rejected_events=0)))))
+
+
+class SourceDiagnostics(unittest.TestCase):
+    def snapshot(self, root, zone, world=b'world console\n'):
+        logs = [root/name for name in ('world-console.log', 'zone-console.log')]
+        for path, data in zip(logs, (world, zone)):
+            path.write_bytes(data)
+        processes = [Mock(pid=2000000000, poll=Mock(return_value=None)),
+                     Mock(pid=2000000001, poll=Mock(return_value=1))]
+        return normal.failure_snapshot(processes, logs, 'a'*32, time.monotonic(),
+                                       dict(condition='udp-timeout', last_success_ms=5000))
+
+    def test_latest_context_and_stack_survive_large_later_console_independently(self):
+        data = (b'EQEMU_NATIVE_DIAGNOSTIC_CONTEXT old\n'
+                b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN\nold frame\nEQEMU_NATIVE_DIAGNOSTIC_STACK_END\n'
+                b'EQEMU_NATIVE_DIAGNOSTIC_CONTEXT result=failed original reason\n'
+                b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN\n#0 native_function\nEQEMU_NATIVE_DIAGNOSTIC_STACK_END\n'
+                b'EQEMU_NATIVE_DIAGNOSTIC_CONTEXT latest context\n' + b'later console\n'*11000)
+        with tempfile.TemporaryDirectory() as tmp:
+            evidence = self.snapshot(Path(tmp), data)
+        source = evidence['source_diagnostics']
+        self.assertEqual(source, dict(advisory=True, context='latest context',
+            stack='#0 native_function\n', stack_complete=True, stack_truncated=False))
+        self.assertNotIn('native_function', evidence['console']['zone-console.log'])
+        self.assertTrue(evidence['console_truncated']['zone-console.log'])
+        self.assertEqual(evidence['run_id'], 'a'*32)
+        self.assertEqual([p['pid'] for p in evidence['processes']], [2000000000, 2000000001])
+        self.assertFalse(evidence['stack_capture']['captured'])
+        self.assertLessEqual(len(normal.encoded(evidence)), 12000)
+
+    def test_missing_end_latest_start_and_exact_marker_lines(self):
+        cases = [
+            (b'EQEMU_NATIVE_DIAGNOSTIC_CONTEXT context only\n', dict(advisory=True, context='context only')),
+            (b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN\nframe\nEQEMU_NATIVE_DIAGNOSTIC_STACK_END\n',
+             dict(advisory=True, stack='frame\n', stack_complete=True, stack_truncated=False)),
+            (b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN\nold\nEQEMU_NATIVE_DIAGNOSTIC_STACK_END\n'
+             b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN\nnew\n',
+             dict(advisory=True, stack='new\n', stack_complete=False, stack_truncated=False)),
+            (b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN\r\nframe\r\nEQEMU_NATIVE_DIAGNOSTIC_STACK_END\r\n',
+             dict(advisory=True, stack='frame\n', stack_complete=True, stack_truncated=False)),
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            for data, expected in cases:
+                with self.subTest(data=data):
+                    self.assertEqual(self.snapshot(Path(tmp), data)['source_diagnostics'], expected)
+            unrelated = (b'prefix EQEMU_NATIVE_DIAGNOSTIC_CONTEXT ignore\n'
+                         b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN extra\n'
+                         b'EQEMU_NATIVE_DIAGNOSTIC_STACK_END\nDIAG_QEYNOS_SCENARIO_RESULT passed\n')
+            self.assertNotIn('source_diagnostics', self.snapshot(Path(tmp), unrelated))
+            # Identical markers in another owned console are not zone diagnostics.
+            self.assertNotIn('source_diagnostics', self.snapshot(Path(tmp), b'ordinary zone', cases[0][0]))
+
+    def test_noisy_and_incomplete_stacks_bound_frames_raw_bytes_and_encoded_json(self):
+        cases = (b'x'*20000, b'frame\n'*10000, ('\x00\ufffd\U0001f600\\\"'*2000).encode())
+        with tempfile.TemporaryDirectory() as tmp:
+            for frames in cases:
+                for end in (b'', b'\nEQEMU_NATIVE_DIAGNOSTIC_STACK_END\n'):
+                    with self.subTest(frames=frames[:30], complete=bool(end)):
+                        evidence = self.snapshot(Path(tmp),
+                            b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN\n'+frames+end)
+                        source = evidence['source_diagnostics']
+                        self.assertEqual(source['stack_complete'], bool(end))
+                        self.assertTrue(source['stack_truncated'])
+                        self.assertLessEqual(len(source['stack'].splitlines()), 32)
+                        self.assertLessEqual(len(normal.encoded(source['stack'])), 3000)
+                        self.assertLessEqual(len(normal.encoded(evidence)), 12000)
+
+    def test_hostile_json_escaping_retains_diagnostics_without_exhausting_snapshot(self):
+        hostile = ('\x00\x01\ufffd\U0001f600\\\"'*3000).encode()
+        progress = lines(event('case-start', name='\x00'*64),
+                         event('case-end', name='\x00'*64, passed=True, diagnostic='\x00'*256),
+                         event('case-start', name='\ufffd'*64))
+        data = (progress + b'\nEQEMU_NATIVE_DIAGNOSTIC_CONTEXT ' + hostile +
+                b'\nEQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN\n' + hostile +
+                b'\nEQEMU_NATIVE_DIAGNOSTIC_STACK_END\n' + hostile)
+        with tempfile.TemporaryDirectory() as tmp:
+            evidence = self.snapshot(Path(tmp), data, hostile)
+        source = evidence['source_diagnostics']
+        self.assertTrue(source['stack'])
+        self.assertTrue(source['context'])
+        self.assertLessEqual(len(normal.encoded(source['context'])), 500)
+        self.assertLessEqual(len(normal.encoded(source['stack'])), 3000)
+        self.assertLessEqual(len(normal.encoded(evidence)), 12000)
+        self.assertEqual(evidence['progress']['last_completed_case']['diagnostic'], '\x00'*256)
+
+    def test_source_text_cannot_set_completion_or_verdict_fields(self):
+        text = b'{"passed":true,"finalized":true,"completed":32,"exit_code":0}'
+        with tempfile.TemporaryDirectory() as tmp:
+            evidence = self.snapshot(Path(tmp), b'EQEMU_NATIVE_DIAGNOSTIC_CONTEXT '+text+b'\n')
+        self.assertEqual(evidence['source_diagnostics'], dict(advisory=True, context=text.decode()))
+        self.assertIsNone(evidence['progress']['active_case'])
+        for validate in (normal.validate, normal.validate_inserver):
+            with self.assertRaises(ValueError):
+                validate(evidence['source_diagnostics'])
+
+    def test_snapshot_refuses_symlink_fifo_and_oversized_console(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            outside = root/'outside'
+            outside.write_bytes(b'EQEMU_NATIVE_DIAGNOSTIC_CONTEXT private\n')
+            path = root/'zone-console.log'
+            path.symlink_to(outside)
+            for kind in ('symlink', 'fifo', 'oversize'):
+                if kind != 'symlink':
+                    path.unlink()
+                    if kind == 'fifo':
+                        os.mkfifo(path)
+                    else:
+                        path.write_bytes(outside.read_bytes() + b'x'*1024**2)
+                with self.subTest(kind=kind):
+                    evidence = normal.failure_snapshot([], [path], 'a'*32, time.monotonic(), {})
+                    self.assertNotIn('source_diagnostics', evidence)
+                    self.assertTrue(evidence['console'][path.name].startswith('unavailable:'))
+                    self.assertNotIn('private', evidence['console'][path.name])
+                    self.assertLessEqual(len(normal.encoded(evidence)), 12000)
 
 
 class Progress(unittest.TestCase):

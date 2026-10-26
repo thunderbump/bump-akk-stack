@@ -262,11 +262,20 @@ class BuildRuntime(unittest.TestCase):
 
     def test_large_native_failure_survives_serial_and_owned_vm_cleanup(self):
         import normal_world
+        import test_client
+        import test_normal_world_diagnostics
+        with patch.object(runtime.shutil, 'disk_usage', return_value=SimpleNamespace(free=100*1024**3, used=0)):
+            error, candidate_failure = test_normal_world_diagnostics.AdapterDiagnostics().replay(True, source=True)
+        self.assertIsInstance(error, candidate_failure)
+        self.assertNotIn('guest-secret', json.dumps(error.result))
+        source = error.result['failure_evidence']['source_diagnostics']
+        self.assertEqual(source['context'], 'result=failed [redacted]')
+        self.assertEqual(source['stack'], '#0 native_function [redacted]\n')
+        self.assertTrue(source['advisory'])
+        self.assertFalse(error.result['failure_evidence']['stack_capture']['captured'])
         detail = dict(version=1, nonce='a'*32, scope='worker-build', exit_code=1,
             stage='normal-world', error='udp-timeout', selected_checks=list(runtime.BUILD_CHECKS),
-            completed_checks=list(runtime.BUILD_CHECKS[:-1]), normal_world=dict(exit_code=1,
-                cleanup_complete=True, failure_evidence=dict(run_id='d'*32,
-                    console={'zone': 'native-before-cleanup ' + 'x'*9000})))
+            completed_checks=list(runtime.BUILD_CHECKS[:-1]), normal_world=error.result)
         script = self.root/'large-failure.py'
         script.write_text('print('+repr('EQEMU_WORKER_RESULT '+json.dumps(detail))+')\n')
         retained = {}
@@ -284,9 +293,20 @@ class BuildRuntime(unittest.TestCase):
         self.assertTrue(report['cleanup_complete'])
         self.assertEqual(report['guest']['normal_world'], detail['normal_world'])
         self.assertEqual(json.loads((self.state/'last-result.json').read_text())['guest'], detail)
-        artifact = normal_world.export_evidence(report, 'a'*40, self.root/'evidence')
+        received = test_client.Client().exchange((json.dumps(report)+'\n').encode(), self.build_request())
+        self.assertEqual(received, report)
+        artifact = normal_world.export_evidence(received, 'a'*40, self.root/'evidence')
         self.assertGreater(artifact.stat().st_size, 3000)
+        self.assertLessEqual(artifact.stat().st_size, normal_world.EVIDENCE_LIMIT)
+        self.assertNotIn('guest-secret', artifact.read_text())
         self.assertEqual(json.loads(artifact.read_text())['normal_world'], detail['normal_world'])
+        public = json.loads((artifact.parent/'public-summary.json').read_text())
+        self.assertEqual(public['status'], 'failed')
+        self.assertNotIn('native_function', json.dumps(public))
+        # A source diagnostic cannot replace the client's independent pass gate.
+        with self.assertRaises(ValueError):
+            test_client.Client().exchange((json.dumps(dict(report, exit_code=0))+'\n').encode(),
+                                          self.build_request())
 
     def test_build_completion_preserves_infrastructure_details(self):
         result = dict(version=1, nonce='a'*32, scope='worker-build', exit_code=2,

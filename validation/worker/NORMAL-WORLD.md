@@ -222,6 +222,39 @@ stale events and knows no scenario names. This progress is advisory. Only the
 existing complete, fresh final report can satisfy suite acceptance. Missing,
 interrupted or hung completion remains non-pass.
 
+The zone console can also carry untrusted native diagnostic text:
+
+```text
+EQEMU_NATIVE_DIAGNOSTIC_CONTEXT <raw one-line text>
+EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN
+<frame lines>
+EQEMU_NATIVE_DIAGNOSTIC_STACK_END
+```
+
+The observer retains the latest context and latest stack independently under
+`failure_evidence.source_diagnostics`, with `advisory: true`. It reads only the
+existing owned run's `zone-console.log`, using the same no-follow regular-file
+reader with a 1 MiB limit. Extraction uses that full bounded read independently
+of the 2500-byte console display tails. Source text supplies no run identity,
+suite verdict, test count or completion evidence and cannot satisfy acceptance.
+
+Context starts at a line's first byte. Stack markers must occupy an entire line.
+LF and CRLF are accepted. A new begin marker replaces the previous stack, even
+if the new stack never ends. An unmatched end is ignored. Context lines do not
+become frames. Each stack retains at most its first 32 frame lines and 4096 raw
+bytes, then bounds the decoded JSON string to 3000 encoded bytes. Context is
+bounded to 500 encoded JSON bytes. These string limits include quotes and escaping
+of Unicode and controls; text can be shortened further by the existing bounding
+helper. `stack_complete` means an exact end marker followed the latest begin,
+including after the retention caps were reached. `stack_truncated` records frame,
+raw-byte or encoded-string truncation. A missing end leaves a bounded incomplete
+stack. The complete snapshot remains at most 12000 encoded JSON bytes, shrinking
+display tails as needed without removing the retained source fields.
+
+These records can describe best-effort source sampling. They do not establish
+debugger attachment, thread coverage or a trustworthy stack. The independent
+`stack_capture` record continues to report trusted attachment as deferred.
+
 The root adapter scrubs guest credentials before retaining the complete
 structured failure in the guest/worker report. Candidate assertion failures
 remain exit 1 when cleanup completes; infrastructure failures and incomplete
