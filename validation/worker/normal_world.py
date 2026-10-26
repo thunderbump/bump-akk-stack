@@ -226,6 +226,40 @@ def case_progress(data, run_id):
     return dict(active_case=active, last_completed_case=completed, rejected_events=rejected)
 
 
+def source_diagnostics(data):
+    """Retain advisory text from this run's zone console, never suite evidence."""
+    result = dict(advisory=True)
+    stack = None
+    collecting = complete = truncated = False
+    frames = 0
+    for line in data.removesuffix(b'\n').split(b'\n'):
+        line = line.removesuffix(b'\r')
+        if line.startswith(b'EQEMU_NATIVE_DIAGNOSTIC_CONTEXT '):
+            result['context'] = bounded_json_text(
+                line.removeprefix(b'EQEMU_NATIVE_DIAGNOSTIC_CONTEXT ').decode(errors='replace'), 500)
+        elif line == b'EQEMU_NATIVE_DIAGNOSTIC_STACK_BEGIN':
+            stack = bytearray()
+            collecting, complete, truncated, frames = True, False, False, 0
+        elif line == b'EQEMU_NATIVE_DIAGNOSTIC_STACK_END':
+            if collecting:
+                complete, collecting = True, False
+        elif collecting:
+            frame = line + b'\n'
+            if frames < 32:
+                remaining = 4096 - len(stack)
+                stack.extend(frame[:remaining])
+                truncated |= len(frame) > remaining
+            else:
+                truncated = True
+            frames += 1
+    if stack is not None:
+        text = stack.decode(errors='replace')
+        result['stack'] = bounded_json_text(text, 3000)
+        result['stack_complete'] = complete
+        result['stack_truncated'] = truncated or result['stack'] != text
+    return result if len(result) > 1 else None
+
+
 def failure_snapshot(processes, logs, run_id, start, observation):
     """Snapshot before TERM/KILL; later shutdown chatter cannot replace this evidence."""
     evidence = dict(version=1, run_id=run_id, elapsed_ms=max(0, int((time.monotonic()-start)*1000)),
@@ -248,6 +282,9 @@ def failure_snapshot(processes, logs, run_id, start, observation):
             evidence['console_truncated'][path.name] = len(data) > 2500
             if path.name == 'zone-console.log':
                 evidence['progress'] = case_progress(data, run_id)
+                source = source_diagnostics(data)
+                if source is not None:
+                    evidence['source_diagnostics'] = source
         except (OSError, ValueError) as error:
             evidence['console'][path.name] = bounded_text('unavailable: ' + str(error), 256)
     # Bound JSON-encoded bytes, including escaping of hostile console text.
