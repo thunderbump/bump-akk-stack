@@ -8,3 +8,6 @@ code/
 .dropbox_uploader
 .bash_history
 assets/ssh/
+
+# Host Python source controls create local bytecode caches.
+__pycache__/
