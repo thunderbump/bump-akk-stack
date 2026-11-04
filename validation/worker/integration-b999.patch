@@ -1,0 +1,632 @@
+--- a/validation/worker/runtime.py
++++ b/validation/worker/runtime.py
+@@ -36,12 +36,7 @@
+ CONTROLS = ('pass', 'assertion', 'missing-result', 'deadline', 'controller-death')
+ OWNED_CONTROLS = (*CONTROLS, 'build', 'format', 'check-format', 'quick')
+ FORMAT_SECONDS = 900
+-IMPLEMENTATION_FILES = ('validation/worker/runtime.py', 'validation/worker/guest.py',
+-    'validation/worker/build_guest.py', 'validation/worker/normal_world.py', 'validation/actor.py',
+-    'validation/actor_runtime.py', 'validation/debugger.py', 'validation/runtime-fixture.json',
+-    'validation/worker/client.py', 'scripts/check-validation-worker',
+-    'validation/worker/format_guest.py', 'validation/worker/snapshot.py',
+-    'validation/worker/quick_guest.py', 'validation/worker/quick_snapshot.py')
++from integration_artifacts import INSTALLED_FILES as IMPLEMENTATION_FILES
+ 
+ 
+ class CleanupError(RuntimeError):
+@@ -172,6 +167,9 @@
+ 
+ def persisted_report(report):
+     """Last-result is an observation, never a second export of source bytes."""
++    if report.get('integration'):
++        from integration_artifacts import validate_outer
++        validate_outer(report)
+     if report.get('scope') not in ('working-snapshot-format','working-snapshot-quickcheck'):
+         return report
+     value = dict(report)
+@@ -272,8 +270,19 @@
+                 report['scratch_removed'] = True
+             except (OSError, ValueError, CleanupError) as error:
+                 report['cleanup_error'] = str(error)[:1000]
++            integration_pending=(job/'integration').exists() or (job/'previous-integration').exists()
++            if integration_pending:
++                from integration_artifacts import recover_pending, retain, SELECTION
++                report['integration']=SELECTION
++                try:
++                    if (job/'integration').exists():
++                        report['integration_receipt']=recover_pending(job/'integration',record['run_id'])
++                    retain(job,Path(value['state_dir']),record['run_id'])
++                    report['integration_retention_complete']=True
++                except Exception:
++                    report['integration_retention_complete']=False
+             atomic_json(Path(value['state_dir']) / 'last-result.json', report)
+-            if not report['scratch_removed']:
++            if not report['scratch_removed'] or report.get('integration_retention_complete') is False:
+                 return 2  # Retain the active marker and scratch when process absence is uncertain.
+             if (job / 'serial.log').exists():
+                 os.replace(job / 'serial.log', Path(value['state_dir']) / 'last-serial.log')
+@@ -331,20 +340,20 @@
+         raise CleanupError('Owned process cleanup could not be confirmed') from error
+ 
+ 
+-def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None, format_result=None, quick_result=None):
+-    process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+-                               cwd=scratch, start_new_session=True, close_fds=True,
+-                               env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': str(scratch)})
++def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None, format_result=None, quick_result=None, integration_sink=None):
+     output = bytearray()
+     pending = bytearray()
+     discarding = False
+     notified = False
+     started_at = time.monotonic()
++    process = subprocess.Popen(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
++                               cwd=scratch, start_new_session=True, close_fds=True,
++                               env={'PATH': '/usr/bin:/bin', 'LANG': 'C.UTF-8', 'HOME': str(scratch)})
+     try:
+         if on_started is not None:
+-            if process.poll() is not None:
+-                raise RuntimeError('QEMU exited before ownership was recorded')
+             on_started(process.pid)
++        if process.poll() is not None:
++            raise RuntimeError('QEMU exited after launch ownership was recorded')
+         os.set_blocking(process.stdout.fileno(), False)
+         with selectors.DefaultSelector() as selector, log.open('xb') as stream:
+             selector.register(process.stdout, selectors.EVENT_READ)
+@@ -381,6 +390,11 @@
+                                     connection.sendall(b'{"version":1,"kind":"progress","name":"normal-world-ready"}\n')
+                                 finally:
+                                     connection.settimeout(None)
++                            if line.startswith(b'EQEMU_INTEGRATION '):
++                                from integration_artifacts import FRAME_CAP, PREFIX, decode
++                                if discarding or integration_sink is None or len(line) + 1 > FRAME_CAP:
++                                    raise ValueError('integration-frame-invalid')
++                                integration_sink.accept(decode(line[len(PREFIX):]))
+                             discarding = False
+                         # Ignore oversized serial lines; never forward guest text.
+                         if len(pending) > 65536:
+@@ -421,6 +435,9 @@
+     if len(results) != 1:
+         raise RuntimeError('Missing or duplicate guest completion')
+     result = results[0]
++    if integration_sink is not None:
++        from integration_artifacts import validate_guest
++        validate_guest(result)
+     if quick_result is not None:
+         from quick_snapshot import validate_detail
+         validate_detail(result)
+@@ -442,16 +459,21 @@
+         format_result.update(result)
+         return result['exit_code']
+     if (not isinstance(result, dict) or (set(result) != {'version', 'nonce', 'scope', 'exit_code'} if build_result is None
+-                                                else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities', 'normal_world', 'selected_checks', 'completed_checks'})
++                                                else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities', 'normal_world', 'selected_checks', 'completed_checks',
++                                                    *(['integration'] if integration_sink is not None else []),
++                                                    })
+             or type(result.get('version')) is not int or result['version'] != 1 or result.get('nonce') != nonce or result.get('scope') != ('worker-smoke' if build_result is None else 'worker-build')
+             or type(result.get('exit_code')) is not int or result['exit_code'] not in ((0, 1) if build_result is None else (0, 1, 2))):
+         raise RuntimeError('Malformed guest completion')
+     if build_result is not None:
++        selected = BUILD_CHECKS
++        if integration_sink is not None:
++            selected = (*selected[:-1], 'actor-population-integration')
+         completed = result.get('completed_checks')
+-        if (result.get('selected_checks') != list(BUILD_CHECKS) or not isinstance(completed, list)
++        if (result.get('selected_checks') != list(selected) or not isinstance(completed, list)
+                 or not all(isinstance(name, str) for name in completed)
+-                or len(completed) != len(set(completed)) or not set(completed) <= set(BUILD_CHECKS)
+-                or (result['exit_code'] == 0 and completed != list(BUILD_CHECKS))):
++                or len(completed) != len(set(completed)) or not set(completed) <= set(selected)
++                or (result['exit_code'] == 0 and completed != list(selected))):
+             raise RuntimeError('Incomplete or malformed build check evidence')
+         if not isinstance(result.get('stage'), str) or len(result['stage']) > 100:
+             raise RuntimeError('Build stage missing or oversized')
+@@ -461,10 +483,18 @@
+                 or not re.fullmatch('[a-f0-9]{64}', result['zone_sha256']) or not isinstance(result.get('utilities'), dict)):
+             raise RuntimeError('Build completion missing zone or utility evidence')
+         if result['exit_code'] == 0:
+-            from normal_world import validate
++            from actor_integration import validate_result as validate
++            if integration_sink is None:
++                from normal_world import validate
+             normal = validate(result.get('normal_world'))
+             if normal['binaries']['zone'] != result['zone_sha256']:
+                 raise RuntimeError('Normal-world zone differs from built candidate')
++        if integration_sink is not None:
++            from integration_artifacts import SELECTION
++            if result.get('integration') != SELECTION:
++                raise ValueError('integration-selection-mismatch')
++            if result['exit_code'] == 0 and not integration_sink.valid:
++                raise ValueError('integration-transfer-incomplete')
+         build_result.update(result)
+     return result['exit_code']
+ 
+@@ -490,6 +520,8 @@
+ 
+ def implementation_identity(value):
+     """Digest the finite reviewed worker implementation, independent of candidate inputs."""
++    from integration_artifacts import installed_inventory
++    installed_inventory(Path(value['code_dir']))
+     digests = {}
+     for name in IMPLEMENTATION_FILES:
+         with (Path(value['code_dir']) / name).open('rb') as stream:
+@@ -499,6 +531,7 @@
+ 
+ def run_vm(value, connection, control='pass', build=None, formatting=None, quick=None):
+     started_at = time.monotonic()
++    integration_sink = None
+     lock = acquire(value)
+     state = Path(value['state_dir']); active = state / 'active.json'
+     run_id = uuid.uuid4().hex; job = state / run_id
+@@ -510,6 +543,9 @@
+         report.update(operation='build', scope='worker-build', control='build',
+                       candidate=build['candidate'], tree=build['tree'], payload_sha256=build['sha256'],
+                       coverage=[], selected_checks=list(BUILD_CHECKS), completed_checks=[])
++        if build.get('integration'):
++            report['integration'] = build['integration']
++            report['selected_checks'] = [*report['selected_checks'][:-1], 'actor-population-integration']
+     if formatting is not None:
+         control = 'format' if formatting['operation'] == 'format' else 'check-format'
+         report.update(operation=formatting['operation'], scope='working-snapshot-format', control=control,
+@@ -540,6 +576,13 @@
+         active_record = {'run_id': run_id, 'invocation_id': invocation(), 'control': control, 'qemu_pid': None}
+         atomic_json(active, active_record)
+         job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
++        if build is not None and build.get('integration'):
++            from integration_artifacts import Sink, retained
++            if (state/'last-integration').exists():
++                _, previous_receipt = retained(state/'last-integration')
++                if previous_receipt['original_transfer'] != 'durable':
++                    raise ValueError('integration-previous-transfer-uncertain')
++            integration_sink = Sink(job/'integration', build['candidate'], run_id)
+         deadline = time.monotonic() + (BUILD_SECONDS if build is not None else 3600 if quick is not None else FORMAT_SECONDS if formatting is not None else SECONDS)
+         base = root_file(value['base_image'])
+         with base.open('rb') as stream:
+@@ -547,7 +590,7 @@
+         payload = build if build is not None else quick if quick is not None else formatting
+         if payload is not None:
+             receive_payload(connection, scratch / 'payload.iso', payload, time.monotonic() + 120)
+-        (scratch / 'user-data').write_text(build_user_data(run_id) if build is not None else
++        (scratch / 'user-data').write_text((build_user_data(run_id, integration=build['integration']) if build.get('integration') else build_user_data(run_id)) if build is not None else
+                                          quick_user_data(run_id,quick) if quick is not None else
+                                          format_user_data(run_id, formatting) if formatting is not None else user_data(run_id, control))
+         (scratch / 'meta-data').write_text('instance-id: eqemu-smoke-' + run_id + '\n')
+@@ -593,13 +636,14 @@
+             report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started)
+         else:
+             detail = {}
+-            report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started, detail)
++            options = {'integration_sink': integration_sink} if integration_sink is not None else {}
+             report['guest'] = detail
++            report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started, detail, **options)
+             report['completed_checks'] = detail['completed_checks']
+             if report['implementation_sha256'] != implementation_identity(value):
+                 raise RuntimeError('Worker implementation changed during the job')
+             if report['exit_code'] == 0:
+-                report['coverage'] = ['rust-checks', 'server-build', 'native-utilities', 'normal-world']
++                report['coverage'] = ['rust-checks', 'server-build', 'native-utilities', 'actor-population-integration' if integration_sink else 'normal-world']
+     except Exception as error:
+         report['error'] = str(error)[:1000]
+         report['exit_code'] = 2
+@@ -612,25 +656,70 @@
+             report.update(unavailable(error))
+     finally:
+         try:
+-            if 'cleanup_error' not in report:
+-                if job.exists():
+-                    scratch_cleanup(job)
+-                report['cleanup_complete'] = True
+-        except Exception as error:
+-            report['cleanup_error'] = str(error)[:1000]; report['exit_code'] = 2
+-        if formatting is not None or quick is not None:
+-            report.setdefault('timings', {})['total_seconds'] = round(time.monotonic() - started_at, 3)
+-            if formatting is not None and report['exit_code'] != 0:
+-                report.update(changed_files=[], output_snapshot_sha256=formatting['input_snapshot_sha256'])
+-        if job.exists():
+-            atomic_json(state / 'last-result.json', persisted_report(report))
+-            if (job / 'serial.log').exists():
+-                os.replace(job / 'serial.log', state / 'last-serial.log')
+-            if report['cleanup_complete']:
+-                job.rmdir()
+-        if active.exists() and read_json(active).get('run_id') == run_id and report['cleanup_complete']:
+-            active.unlink()
+-        os.close(lock)
++            try:
++                if 'cleanup_error' not in report:
++                    if job.exists():
++                        scratch_cleanup(job)
++                    report['cleanup_complete'] = True
++            except Exception as error:
++                report['cleanup_error'] = str(error)[:1000]; report['exit_code'] = 2
++            if formatting is not None or quick is not None:
++                report.setdefault('timings', {})['total_seconds'] = round(time.monotonic() - started_at, 3)
++                if formatting is not None and report['exit_code'] != 0:
++                    report.update(changed_files=[], output_snapshot_sha256=formatting['input_snapshot_sha256'])
++            if job.exists():
++                atomic_json(state / 'last-result.json', persisted_report(report))
++                if (job / 'serial.log').exists():
++                    os.replace(job / 'serial.log', state / 'last-serial.log')
++                if report['cleanup_complete'] and integration_sink is None:
++                    job.rmdir()
++            if integration_sink is not None:
++                from integration_artifacts import frames, wire, decode, retain
++                detail=report.get('guest',{}).get('normal_world',{})
++                execution=dict(workload_exit_code=detail.get('exit_code'),validator_exit_code=report['exit_code'],
++                               native_cleanup=detail.get('native_cleanup','unknown'),database_cleanup=detail.get('database_cleanup','unknown'),
++                               vm_cleanup=report['cleanup_complete'])
++                try:
++                    integration_sink.stream.flush()
++                    raw = (job/'integration'/'central-cdau-integration-v1.json').read_bytes()
++                    if raw:
++                        from actor_integration import validate_artifact
++                        artifact=validate_artifact(raw)
++                        if artifact['manifest']['server_commit']!=build['candidate'] or artifact['manifest']['server_tree']!=build['tree'] or artifact['manifest']['run']!=run_id:
++                            raise ValueError('integration-artifact-binding')
++                    connection.settimeout(10)
++                    for frame in frames(raw, build['candidate'], run_id, complete=integration_sink.valid,
++                                        gaps=not integration_sink.ended, overflow=False):
++                        connection.sendall(wire(frame))
++                    ack = bytearray()
++                    while not ack.endswith(b'\n'):
++                        chunk = connection.recv(1)
++                        if not chunk or len(ack) >= 256:
++                            raise ValueError('integration-ack-uncertain')
++                        ack.extend(chunk)
++                    report['integration_receipt'] = integration_sink.finish(decode(ack),execution=execution)
++                    if not report['integration_receipt']['complete']:
++                        report['exit_code'] = 2
++                except Exception:
++                    report['exit_code'] = 2
++                    if not integration_sink.finalized:
++                        try: report['integration_receipt'] = integration_sink.finish(execution=execution)
++                        except Exception: report['integration_finalization_error']='integration-receipt-write-failed'
++                finally:
++                    connection.settimeout(None)
++                    integration_sink.close()
++                try:
++                    if not integration_sink.finalized: raise ValueError('integration-finalization-pending')
++                    retain(job,state,run_id)
++                    report['integration_retention_complete']=True
++                    if job.exists(): job.rmdir()
++                except Exception:
++                    report['integration_retention_complete']=False;report['exit_code']=2
++                atomic_json(state/'last-result.json', persisted_report(report))
++            if active.exists() and read_json(active).get('run_id') == run_id and report['cleanup_complete'] and (integration_sink is None or report.get('integration_retention_complete') is True):
++                active.unlink()
++        finally:
++            os.close(lock)
+     return report
+ 
+ 
+@@ -658,12 +747,23 @@
+     if data == {'version': 1, 'operation': 'last-result'}:
+         return {'version': 1, 'operation': 'last-result', 'scope': 'worker-observation',
+                 'exit_code': 0, 'result': read_json(Path(value['state_dir']) / 'last-result.json', limit=65536)}
++    if data.get('operation')=='integration-artifacts':
++        if set(data)!={'version','operation','run_id'} or not isinstance(data['run_id'],str) or not re.fullmatch('[a-f0-9]{32}',data['run_id']):
++            raise ValueError('Exact integration run ID required')
++        from integration_artifacts import replay
++        lock=acquire(value)
++        try: return replay(Path(value['state_dir'])/'last-integration',data['run_id'],connection)
++        finally: os.close(lock)
+     if data.get('operation') == 'build':
+-        if (set(data) != {'version', 'operation', 'candidate', 'tree', 'bytes', 'sha256'}
++        if (set(data) != {'version', 'operation', 'candidate', 'tree', 'bytes', 'sha256'} | ({'integration'} if 'integration' in data else set())
++                or ('integration' in data and data['integration'] != 'central-cdau-integration-v1')
+                 or not all(isinstance(data[key], str) and re.fullmatch('[a-f0-9]{40}', data[key]) for key in ('candidate', 'tree'))
+                 or not isinstance(data['sha256'], str) or not re.fullmatch('[a-f0-9]{64}', data['sha256'])
+                 or type(data['bytes']) is not int or not 0 < data['bytes'] <= PAYLOAD_LIMIT):
+             raise ValueError('Malformed build request')
++        if data.get('integration'):
++            from actor_integration import validate_build_binding
++            validate_build_binding(data)
+         connection.settimeout(None)
+         return run_vm(value, connection, build=data)
+     if data.get('operation')=='quick':
+@@ -728,6 +828,9 @@
+         except Exception as error:
+             result = {'version': 1, 'exit_code': 2, 'error': str(error)[:1000], 'scope': 'worker-smoke'}
+         try:
++            if result.get('integration'):
++                from integration_artifacts import validate_outer
++                validate_outer(result)
+             connection.settimeout(5)
+             connection.sendall((json.dumps(result, separators=(',', ':')) + '\n').encode())
+         except OSError:
+--- a/validation/worker/guest.py
++++ b/validation/worker/guest.py
+@@ -26,12 +26,19 @@
+     }) + '\n'
+ 
+ 
+-def build_user_data(nonce):
++def build_user_data(nonce, integration=None):
+     """The reviewed guest command travels in seed data, never executes on the host."""
+     from pathlib import Path
++    selected = BUILD_CHECKS
++    if integration is not None:
++        from integration_artifacts import SELECTION
++        if integration != SELECTION:
++            raise ValueError('Unknown or incompatible integration selection')
++        selected = (*selected[:-1], 'actor-population-integration')
+     failure = dict(version=1, nonce=nonce, scope='worker-build', exit_code=2,
+-                   stage='guest-launcher', selected_checks=list(BUILD_CHECKS), completed_checks=[],
++                   stage='guest-launcher', selected_checks=list(selected), completed_checks=[],
+                    error='Guest command exited with status %s before normal completion')
++    if integration: failure['integration'] = integration
+     # Keep a shell parent alive if Python dies before it can report a result.
+     # The shell owns shutdown for both normal completion and abrupt process death.
+     # A getty hangup invalidates already-open ttyS0 writers with EIO. Remove
+@@ -47,13 +54,17 @@
+     helpers = [('normal_world.py', Path(__file__).with_name('normal_world.py')),
+                *[(name, Path(__file__).parents[1] / name) for name in
+                  ('actor.py', 'actor_runtime.py', 'debugger.py', 'runtime-fixture.json')]]
++    if integration is not None:
++        helpers += [(name, Path(__file__).with_name(name)) for name in ('actor_integration.py', 'integration_artifacts.py', 'integration-v1.4.json')]
++        helpers.append(('actor-integration-fixture.json', Path(__file__).parents[1] / 'actor-integration-fixture.json'))
+     return '#cloud-config\n' + json.dumps({
+         'hostname': 'eqemu-worker-build', 'ssh_pwauth': False, 'disable_root': True,
+         'write_files': [
+             {'path': '/opt/eqemu-worker-build-guest', 'permissions': '0600',
+              'content': Path(__file__).with_name('build_guest.py').read_text()},
+             {'path': '/opt/eqemu-worker-nonce', 'permissions': '0600', 'content': nonce},
+-            {'path': '/opt/eqemu-worker-checks.json', 'permissions': '0600', 'content': json.dumps(BUILD_CHECKS)},
++            {'path': '/opt/eqemu-worker-checks.json', 'permissions': '0600', 'content': json.dumps(selected)},
++            *([{'path': '/opt/eqemu-worker-integration', 'permissions': '0600', 'content': integration}] if integration else []),
+             *[{'path': '/opt/' + name, 'permissions': '0644', 'content': path.read_text()} for name, path in helpers],
+         ],
+         'runcmd': [['/bin/sh', '-c', launcher]],
+--- a/validation/worker/build_guest.py
++++ b/validation/worker/build_guest.py
+@@ -30,6 +30,7 @@
+ DEADLINE = 0
+ CHECKS = ()
+ COMPLETED = []
++INTEGRATION = None
+ INFRASTRUCTURE = re.compile(
+     r'out of memory|cannot allocate memory|no space left|killed signal|command not found|'
+     r'failed to download|no matching package named|attempting to make an HTTP request|'
+@@ -113,6 +114,11 @@
+     global STAGE
+     STAGE = 'input-verification'
+     identity = json.loads(Path('/media/eqemu-input/identity.json').read_text())
++    selected=Path('/opt/eqemu-worker-integration').read_text() if Path('/opt/eqemu-worker-integration').exists() else None
++    if identity.get('integration')!=selected: raise RuntimeError('Guest integration selection mismatch')
++    if selected is not None:
++        from actor_integration import validate_input_identity
++        validate_input_identity(identity)
+     for name, expected in identity['files'].items():
+         path = Path('/media/eqemu-input') / name
+         if path.stat().st_size != expected['bytes'] or sha(path) != expected['sha256']:
+@@ -218,6 +224,9 @@
+ 
+ def build():
+     source, registry = prepare_source()
++    if INTEGRATION:
++        from actor_integration import verify_dependencies
++        verify_dependencies(json.loads(Path('/media/eqemu-input/identity.json').read_text()), source)
+     cargo = prepare_rust()
+     workspace = source / 'rust/actors'
+     command('rust-format', [cargo, 'fmt', '--all', '--check'], cwd=workspace, candidate=True)
+@@ -247,7 +256,7 @@
+ 
+ 
+ def main():
+-    global DEADLINE, CHECKS, STAGE
++    global DEADLINE, CHECKS, STAGE, INTEGRATION
+     if os.geteuid() != 0 or not Path('/opt/eqemu-worker-build-guest').is_file():
+         raise RuntimeError('Disposable build guest only')
+     nonce = Path('/opt/eqemu-worker-nonce').read_text().strip()
+@@ -255,19 +264,29 @@
+     COMPLETED.clear()
+     result = dict(version=1, scope='worker-build', nonce=nonce, exit_code=2,
+                   selected_checks=list(CHECKS), completed_checks=COMPLETED)
++    if Path('/opt/eqemu-worker-integration').exists():
++        from integration_artifacts import SELECTION
++        result['integration']=SELECTION
+     DEADLINE = time.monotonic() + 17400
+     try:
+         WORK.mkdir(); MEDIA.mkdir()
+         Path('/media/eqemu-input').mkdir(parents=True)
+         command('mount-job', ['mount', '-o', 'ro,nosuid,nodev', '/dev/sr1', '/media/eqemu-input'])
+         identity = provision()
++        integration=identity.get('integration')
++        INTEGRATION=integration
++        if integration is not None:
++            from integration_artifacts import SELECTION
++            if integration!=SELECTION or identity.get('diagnostic_profile') is not None or identity.get('profiling') is not None:
++                raise RuntimeError('Invalid fixed integration selection')
++            result['integration']=integration
+         result.update(build())
+-        STAGE = 'normal-world'
+-        print('EQEMU_STAGE normal-world', flush=True)
++        STAGE = 'actor-population-integration' if identity.get('integration') else 'normal-world'
++        print('EQEMU_STAGE '+STAGE, flush=True)
+         LOGS.mkdir()
+         from normal_world import run
+         result['normal_world'] = run(sys.modules[__name__], identity)
+-        COMPLETED.append('normal-world')
++        COMPLETED.append('actor-population-integration' if identity.get('integration') else 'normal-world')
+         result['exit_code'] = 0
+     except Exception as error:
+         if isinstance(getattr(error, 'result', None), dict):
+@@ -277,6 +296,9 @@
+     while len(json.dumps(result.get('error', ''))) > 3500:
+         result['error'] = result['error'][len(result['error'])//2:]
+     result['stage'] = STAGE
++    if result.get('integration'):
++        from integration_artifacts import validate_guest
++        validate_guest(result)
+     print('\nEQEMU_WORKER_RESULT ' + json.dumps(result, separators=(',', ':')), flush=True)
+ 
+ 
+--- a/validation/worker/normal_world.py
++++ b/validation/worker/normal_world.py
+@@ -582,6 +582,9 @@
+ 
+ def run(build, identity):
+     """Reuse the identified public fixture; preparation is never a host recipe."""
++    if identity.get('integration'):
++        from actor_integration import run
++        return run(build, identity)
+     from actor_runtime import Runtime, ROOT, MEDIA
+     if os.geteuid() != 0 or not Path('/opt/eqemu-worker-build-guest').is_file():
+         raise RuntimeError('Disposable build guest only')
+--- a/validation/worker/client.py
++++ b/validation/worker/client.py
+@@ -1,5 +1,6 @@
+ """Ordinary-user client for the fixed worker socket. Never invokes sudo."""
+ import argparse
++from contextlib import ExitStack
+ import json
+ from pathlib import Path
+ import socket
+@@ -10,12 +11,12 @@
+ REPORT_LIMIT = 16384
+ 
+ 
+-def exchange(path, request, payload=None):
++def exchange(path, request, payload=None, *, integration_output=None):
+     """Read-only probes may briefly race systemd's previous connection teardown."""
+     deadline = time.monotonic() + 2
+     while True:
+         try:
+-            return exchange_once(path, request, payload)
++            return exchange_once(path, request, payload, integration_output=integration_output)
+         except (ConnectionResetError, BrokenPipeError):
+             # Never retry a build/smoke request: it may already have started a VM.
+             if (request not in ({'version': 1, 'operation': 'check'}, {'version': 1, 'operation': 'last-result'})
+@@ -24,10 +25,19 @@
+             time.sleep(.1)
+ 
+ 
+-def exchange_once(path, request, payload=None):
++def exchange_once(path, request, payload=None, *, integration_output=None):
+     from snapshot import RESULT_LIMIT
++    integration_requested=bool(request.get('integration')) or request['operation']=='integration-artifacts'
++    if integration_requested:
++        from integration_artifacts import SELECTION
++        if (request.get('integration') not in (None,SELECTION) or integration_output is None):
++            raise ValueError('Fixed integration requires a private output')
++    elif integration_output is not None:
++        raise ValueError('Unrequested integration output')
++    integration_sink = None
++    integration_receipt = None
+     report_limit = 65536 if request['operation'] in ('quick', 'build', 'last-result') else RESULT_LIMIT if 'input_snapshot_sha256' in request else REPORT_LIMIT
+-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
++    with ExitStack() as retained, socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+         formatting = 'input_snapshot_sha256' in request
+         connection.settimeout(18330 if request['operation'] == 'build' else 3630 if request['operation']=='quick' else 930 if formatting else 330 if request['operation'] == 'smoke' else 15)
+         connection.connect(str(path))
+@@ -47,6 +57,35 @@
+                 if len(data) > report_limit:
+                     raise RuntimeError('Worker report size limit exceeded')
+             line, _, rest = data.partition(b'\n')
++            if line.startswith(b'EQEMU_INTEGRATION '):
++                from integration_artifacts import Sink, decode, PREFIX, FRAME_CAP
++                if not integration_requested or len(line) + 1 > FRAME_CAP:
++                    raise ValueError('Unrequested or oversized integration frame')
++                frame = decode(line[len(PREFIX):])
++                if integration_sink is None:
++                    if frame.get('kind') != 'begin':
++                        raise ValueError('Missing integration begin')
++                    integration_sink = Sink(integration_output, request.get('candidate',frame.get('candidate')), request.get('run_id',frame['run_id']))
++                    retained.callback(integration_sink.abandon)
++                try:
++                    integration_sink.accept(frame)
++                    if integration_sink.ended:
++                        from actor_integration import validate_artifact
++                        artifact=validate_artifact((integration_sink.directory/__import__('integration_artifacts').NAME).read_bytes())
++                        if (artifact['manifest']['server_commit']!=integration_sink.fixed['candidate']
++                                or ('tree' in request and artifact['manifest']['server_tree']!=request['tree'])
++                                or artifact['manifest']['run']!=integration_sink.fixed['run_id']):
++                            raise ValueError('Integration artifact binding mismatch')
++                        ack = integration_sink.ack()
++                        connection.sendall(__import__('integration_artifacts').encoded(ack) + b'\n')
++                        integration_receipt = integration_sink.finish(ack)
++                except BaseException:
++                    if not integration_sink.finalized:
++                        integration_sink.finish()
++                    integration_sink.close()
++                    raise
++                data = bytearray(rest)
++                continue
+             result = json.loads(line)
+             if isinstance(result, dict) and result.get('kind') == 'progress':
+                 if (request['operation'] != 'build' or notified or result !=
+@@ -70,12 +109,14 @@
+                     or result.get('tree') != request['tree'] or result.get('payload_sha256') != request['sha256']):
+                 raise RuntimeError('Incomplete or mismatched build result')
+             if request['operation'] == 'build' and result['exit_code'] == 0:
+-                from normal_world import validate
++                from actor_integration import validate_result as validate
++                if not request.get('integration'):
++                    from normal_world import validate
+                 detail = result.get('guest', {})
+                 normal = validate(detail.get('normal_world'))
+                 if normal['binaries']['zone'] != detail.get('zone_sha256'):
+                     raise RuntimeError('Normal-world zone differs from built candidate')
+-                if 'normal-world' not in result.get('coverage', []):
++                if ('actor-population-integration' if request.get('integration') else 'normal-world') not in result.get('coverage', []):
+                     raise RuntimeError('Installed worker lacks reviewed normal-world coverage')
+             if request['operation'] == 'smoke' and (result.get('scope') != 'worker-smoke'
+                     or result.get('operation') != 'smoke' or result.get('cleanup_complete') is not True
+@@ -89,6 +130,18 @@
+                     or not isinstance(result.get('checks'), dict) or not result['checks']
+                     or any(value is not True for value in result['checks'].values())):
+                 raise RuntimeError('Incomplete readiness result')
++        if integration_requested:
++            if integration_sink is not None:
++                try:
++                    if not integration_sink.finalized:
++                        integration_receipt = integration_sink.finish()
++                    if result.get('run_id') != integration_sink.fixed['run_id']:
++                        raise ValueError('Integration run mismatch')
++                finally:
++                    integration_sink.close()
++            if result['exit_code'] == 0 and (not integration_receipt or not integration_receipt['complete']
++                    or (result.get('reexport_complete') is not True if request['operation']=='integration-artifacts' else result.get('integration_receipt', {}).get('complete') is not True)):
++                raise ValueError('Integration export incomplete')
+         return result
+ 
+ 
+--- a/validation/actor_runtime.py
++++ b/validation/actor_runtime.py
+@@ -25,7 +25,8 @@
+ 
+ 
+ class Runtime:
+-    def __init__(self, build, control, fixture):
++    def __init__(self, build, control, fixture, *, integration=None):
++        self.integration = integration
+         self.build = build
+         self.control = control
+         self.fixture = fixture
+@@ -354,6 +355,10 @@
+         if self.query('state', 'SELECT COUNT(*) FROM zone_state_spawns;').strip() != '0':
+             raise RuntimeError('Actor fixture zone state is not empty')
+         self.check_qeynos_content()
++        if self.integration is not None:
++            from actor_integration import derive_fixture
++            derive_fixture(self, self.integration)
++            return
+         self.query('fixture', "DELETE FROM spawn2 WHERE zone='qeynos2' AND NOT (id=10863 AND version=0); DELETE FROM spawn2 WHERE zone='poknowledge'; UPDATE rule_values SET rule_value='false' WHERE ruleset_id=1 AND rule_name IN ('Zone:UseZoneController','Bots:Enabled','Analytics:CrashReporting','Zone:StateSavingOnShutdown'); UPDATE variables SET value='default' WHERE varname='RuleSet'; UPDATE logsys_categories SET log_to_file=0,log_to_gmsay=0,log_to_discord=0,discord_webhook_id=0; UPDATE logsys_categories SET log_to_console=1 WHERE log_category_description IN ('Info','Error','MySQL Error','QuestErrors','Quests','Crash'); UPDATE logsys_categories SET log_to_console=0 WHERE log_category_description='MySQL Query';")
+         if self.query('fixture-checked', "SELECT COUNT(*) FROM spawn2 WHERE zone='poknowledge'; SELECT COUNT(*) FROM rule_values WHERE ruleset_id=1 AND rule_name IN ('Zone:UseZoneController','Bots:Enabled','Analytics:CrashReporting','Zone:StateSavingOnShutdown') AND rule_value='false'; SELECT COUNT(*) FROM discord_webhooks WHERE COALESCE(webhook_url,'')<>''; SELECT COUNT(*) FROM spawn2 WHERE zone='qeynos2'; SELECT COUNT(*) FROM spawn2 WHERE zone='qeynos2' AND version=0 AND id=10863 AND spawngroupID=7678;").strip() != '0\n4\n0\n1\n1':
+             raise RuntimeError('Actor derived fixture preconditions')
+@@ -363,11 +368,16 @@
+         with tarfile.open(MEDIA/'quests/quests-b3e34b8.tar.gz') as archive:
+             archive.extractall(server, filter='data')
+         (server/'projecteqquests-b3e34b84457d570401ea954ddd66de19179d0e41').rename(server/'quests')
++        if self.integration is not None:
++            shutil.copytree(self.integration/'maps', server/'integration-maps')
+         shutil.copytree(MEDIA/'maps', server/'maps'); shutil.copytree(MEDIA/'opcodes', server/'opcodes')
+         for name in ('shared', 'logs'): (server/name).mkdir()
++        if self.integration is not None:
++            for kind, suffix in (('base','map'), ('water','wtr'), ('nav','nav')):
++                shutil.copyfile(server/'integration-maps'/kind/('qeytoqrg.'+suffix), server/'maps'/kind/('qeytoqrg.'+suffix))
+         if self.control == 'missing-map': (server/'maps/base/poknowledge.map').unlink()
+         # All required maps are a gate. Native boot tolerating a missing map cannot pass.
+-        for zone in ('poknowledge', 'qeynos2'):
++        for zone in (('poknowledge', 'qeynos2', 'qeytoqrg') if self.integration is not None else ('poknowledge', 'qeynos2')):
+             for name in ('base/'+zone+'.map', 'water/'+zone+'.wtr', 'nav/'+zone+'.nav'):
+                 if not (server/'maps'/name).is_file(): raise RuntimeError('Required actor map missing: '+name)
+         password = secrets.token_hex(24); key = secrets.token_hex(24)

@@ -98,7 +98,7 @@ class Transport(unittest.TestCase):
 
 class TypedEvents(unittest.TestCase):
     def context(self):
-        return [0,0,*(['0']*7),1,1,140,2,0,1]
+        return [0,1,*(['0']*7),1,1,140,2,0,1]
 
     def test_width_and_lossless_u64(self):
         scalar(str(2**64-1),'u64')
@@ -122,3 +122,21 @@ class TypedEvents(unittest.TestCase):
 
 
 if __name__=='__main__': unittest.main()
+
+
+class PathRaces(unittest.TestCase):
+    def test_replaced_owned_directory_or_file_never_gets_durable_ack(self):
+        for replaced in ('directory','file'):
+            with self.subTest(replaced=replaced),tempfile.TemporaryDirectory() as root:
+                sink=a.Sink(Path(root)/'output',CANDIDATE,RUN)
+                try:
+                    for frame in a.frames(b'prefix',CANDIDATE,RUN,complete=True,gaps=False,overflow=False): sink.accept(frame)
+                    if replaced=='directory':
+                        sink.directory.rename(Path(root)/'moved');sink.directory.mkdir(mode=0o700)
+                    else:
+                        (sink.directory/a.NAME).rename(sink.directory/'moved')
+                        (sink.directory/a.NAME).write_bytes(b'prefix')
+                    with self.assertRaises(ValueError): sink.ack()
+                    receipt=sink.finish()
+                    self.assertFalse(receipt['complete']);self.assertFalse(receipt['client_durable'])
+                finally: sink.close()

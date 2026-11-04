@@ -1073,6 +1073,9 @@ def export_evidence(report, head, directory):
 
 def run(build, identity):
     """Reuse the identified public fixture; preparation is never a host recipe."""
+    if identity.get('integration'):
+        from actor_integration import run
+        return run(build, identity)
     from actor_runtime import Runtime, ROOT, MEDIA
     if os.geteuid() != 0 or not Path('/opt/eqemu-worker-build-guest').is_file():
         raise RuntimeError('Disposable build guest only')

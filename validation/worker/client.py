@@ -27,9 +27,10 @@ def exchange(path, request, payload=None, profile_output=None, *, integration_ou
 
 def exchange_once(path, request, payload=None, profile_output=None, *, integration_output=None):
     from snapshot import RESULT_LIMIT
-    if request.get('integration'):
+    integration_requested=bool(request.get('integration')) or request['operation']=='integration-artifacts'
+    if integration_requested:
         from integration_artifacts import SELECTION
-        if request['integration'] != SELECTION or integration_output is None or profile_output is not None:
+        if (request.get('integration') not in (None,SELECTION) or integration_output is None or profile_output is not None):
             raise ValueError('Fixed integration requires a private output')
     elif integration_output is not None:
         raise ValueError('Unrequested integration output')
@@ -62,17 +63,23 @@ def exchange_once(path, request, payload=None, profile_output=None, *, integrati
             line, _, rest = data.partition(b'\n')
             if line.startswith(b'EQEMU_INTEGRATION '):
                 from integration_artifacts import Sink, decode, PREFIX, FRAME_CAP
-                if not request.get('integration') or len(line) + 1 > FRAME_CAP:
+                if not integration_requested or len(line) + 1 > FRAME_CAP:
                     raise ValueError('Unrequested or oversized integration frame')
                 frame = decode(line[len(PREFIX):])
                 if integration_sink is None:
                     if frame.get('kind') != 'begin':
                         raise ValueError('Missing integration begin')
-                    integration_sink = Sink(integration_output, request['candidate'], frame['run_id'])
+                    integration_sink = Sink(integration_output, request.get('candidate',frame.get('candidate')), request.get('run_id',frame['run_id']))
                     retained.callback(integration_sink.abandon)
                 try:
                     integration_sink.accept(frame)
                     if integration_sink.ended:
+                        from actor_integration import validate_artifact
+                        artifact=validate_artifact((integration_sink.directory/__import__('integration_artifacts').NAME).read_bytes())
+                        if (artifact['manifest']['server_commit']!=integration_sink.fixed['candidate']
+                                or ('tree' in request and artifact['manifest']['server_tree']!=request['tree'])
+                                or artifact['manifest']['run']!=integration_sink.fixed['run_id']):
+                            raise ValueError('Integration artifact binding mismatch')
                         ack = integration_sink.ack()
                         connection.sendall(__import__('integration_artifacts').encoded(ack) + b'\n')
                         integration_receipt = integration_sink.finish(ack)
@@ -120,7 +127,7 @@ def exchange_once(path, request, payload=None, profile_output=None, *, integrati
                 normal = validate(detail.get('normal_world'))
                 if normal['binaries']['zone'] != detail.get('zone_sha256'):
                     raise RuntimeError('Normal-world zone differs from built candidate')
-                if 'normal-world' not in result.get('coverage', []):
+                if ('actor-population-integration' if request.get('integration') else 'normal-world') not in result.get('coverage', []):
                     raise RuntimeError('Installed worker lacks reviewed normal-world coverage')
             if request['operation'] == 'smoke' and (result.get('scope') != 'worker-smoke'
                     or result.get('operation') != 'smoke' or result.get('cleanup_complete') is not True
@@ -144,7 +151,7 @@ def exchange_once(path, request, payload=None, profile_output=None, *, integrati
             if result['exit_code']==0 and (not expected or result.get('guest',{}).get('profile_transport',{}).get('complete') is not True
                     or result.get('guest',{}).get('normal_world',{}).get('profiling',{}).get('mode')!=request['profiling']):
                 raise RuntimeError('Requested profiling missing or incomplete')
-        if request.get('integration'):
+        if integration_requested:
             if integration_sink is not None:
                 try:
                     if not integration_sink.finalized:
@@ -154,7 +161,7 @@ def exchange_once(path, request, payload=None, profile_output=None, *, integrati
                 finally:
                     integration_sink.close()
             if result['exit_code'] == 0 and (not integration_receipt or not integration_receipt['complete']
-                    or result.get('integration_receipt', {}).get('complete') is not True):
+                    or (result.get('reexport_complete') is not True if request['operation']=='integration-artifacts' else result.get('integration_receipt', {}).get('complete') is not True)):
                 raise ValueError('Integration export incomplete')
         return result
 

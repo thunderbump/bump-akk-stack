@@ -18,8 +18,9 @@ import stat
 import subprocess
 import sys
 
-SOURCE_FILES=(
-    'validation/worker/sanitizers.py',
+SOURCE_FILES=('validation/worker/integration-v1.4.json', 'validation/worker/integration-v1.3.json', 'validation/worker/integration-v1.2.json',
+    'validation/worker/actor_integration.py', 'validation/worker/integration_artifacts.py', 'validation/worker/integration-v1.json', 'validation/worker/integration-v1.1.json', 'validation/actor-integration-fixture.json',
+        'validation/worker/sanitizers.py',
     'validation/worker/runtime.py','validation/worker/guest.py','validation/worker/build_guest.py',
     'validation/worker/normal_world.py','validation/worker/client.py','validation/worker/identity.py',
     'validation/worker/prepare.py','validation/worker/profiling.py','validation/worker/profile_artifacts.py',

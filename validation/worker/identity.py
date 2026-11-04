@@ -9,7 +9,7 @@ POLICY_ROOT = Path('/etc')
 
 # Bind separate source copies, including conservative transitive local imports.
 # Historical installed inventories below remain independent.
-FRONTEND_FILES = ('validation/worker/actor_integration.py', 'validation/worker/integration_artifacts.py', 'validation/actor-integration-fixture.json', 'validation/worker/sanitizers.py', 'validation/worker/profile_contract.py', 'validation/worker/profiling.py', 'validation/worker/profile_artifacts.py',
+FRONTEND_FILES = ('validation/worker/integration-v1.4.json', 'validation/worker/integration-v1.3.json', 'validation/worker/integration-v1.2.json', 'validation/worker/integration-v1.1.json', 'validation/worker/integration-v1.json', 'validation/worker/actor_integration.py', 'validation/worker/integration_artifacts.py', 'validation/actor-integration-fixture.json', 'validation/worker/sanitizers.py', 'validation/worker/profile_contract.py', 'validation/worker/profiling.py', 'validation/worker/profile_artifacts.py',
                 'validation/worker/profile_inputs.py', 'scripts/validate-worker-candidate', 'validation/worker/identity.py',
                 'validation/worker/prepare.py', 'validation/worker/client.py',
                 'validation/inputs.py', 'validation/profile.json', 'validation/runtime-fixture.json',
@@ -37,6 +37,8 @@ LEGACY_FILES = (
     'validation/worker/snapshot.py', 'validation/worker/quick_guest.py',
     'validation/worker/quick_snapshot.py',
 )
+LEGACY_PROFILING_RUNTIME_SHA256 = '84ec6f1a4d3e729c7600a76379480a45c63f08b74b85ba879bce2095ab6ece23'
+LEGACY_PROFILING_FILES = ('scripts/check-validation-worker', 'scripts/validate-worker-candidate', 'validation/actor.py', 'validation/actor_runtime.py', 'validation/debugger.py', 'validation/inputs.py', 'validation/profile.json', 'validation/runtime-fixture.json', 'validation/worker/build_guest.py', 'validation/worker/client.py', 'validation/worker/format_guest.py', 'validation/worker/guest.py', 'validation/worker/identity.py', 'validation/worker/normal_world.py', 'validation/worker/prepare.py', 'validation/worker/profile_artifacts.py', 'validation/worker/profile_contract.py', 'validation/worker/profile_inputs.py', 'validation/worker/profiling.py', 'validation/worker/quick_guest.py', 'validation/worker/quick_snapshot.py', 'validation/worker/runtime.py', 'validation/worker/snapshot.py')
 PROFILING_FILES = tuple('validation/worker/' + name for name in (
     'profile_contract.py', 'profiling.py', 'profile_artifacts.py', 'profile_inputs.py'))
 
@@ -45,8 +47,16 @@ def installed_files(config, policy):
     """Recognize exact historical runtimes; every new or partial release stays strict."""
     from runtime import IMPLEMENTATION_FILES
     code = Path(config['code_dir'])
+    if (code/'integration-release.json').exists() or (code/'integration-release.json').is_symlink():
+        from integration_artifacts import installed_inventory
+        return installed_inventory(code)
     if config.get('selection') == 'profiling-v1':
         from profile_contract import SOURCE_FILES
+        manifest = json.loads((code/'manifest.json').read_bytes())
+        if (record(code/'validation/worker/runtime.py')['sha256'] == LEGACY_PROFILING_RUNTIME_SHA256
+                and set(manifest.get('files', {})) == set(LEGACY_PROFILING_FILES)
+                and not (code/'validation/worker/actor_integration.py').exists()):
+            return LEGACY_PROFILING_FILES
         return SOURCE_FILES
     if any(
             (code/name).exists() or (code/name).is_symlink() for name in PROFILING_FILES):

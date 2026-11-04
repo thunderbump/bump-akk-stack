@@ -39,6 +39,7 @@ def build_user_data(nonce, profile=None, integration=None):
     failure = dict(version=1, nonce=nonce, scope='worker-build', exit_code=2,
                    stage='guest-launcher', selected_checks=list(selected), completed_checks=[],
                    error='Guest command exited with status %s before normal completion')
+    if integration: failure['integration'] = integration
     # Keep a shell parent alive if Python dies before it can report a result.
     # The shell owns shutdown for both normal completion and abrupt process death.
     # A getty hangup invalidates already-open ttyS0 writers with EIO. Remove
@@ -55,7 +56,7 @@ def build_user_data(nonce, profile=None, integration=None):
                *[(name, Path(__file__).parents[1] / name) for name in
                  ('actor.py', 'actor_runtime.py', 'debugger.py', 'runtime-fixture.json')]]
     if integration is not None:
-        helpers += [(name, Path(__file__).with_name(name)) for name in ('actor_integration.py', 'integration_artifacts.py')]
+        helpers += [(name, Path(__file__).with_name(name)) for name in ('actor_integration.py', 'integration_artifacts.py', 'integration-v1.json', 'integration-v1.1.json', 'integration-v1.2.json', 'integration-v1.3.json', 'integration-v1.4.json')]
         helpers.append(('actor-integration-fixture.json', Path(__file__).parents[1] / 'actor-integration-fixture.json'))
     if profile: helpers.append(('sanitizers.py', Path(__file__).with_name('sanitizers.py')))
     return '#cloud-config\n' + json.dumps({
@@ -65,6 +66,7 @@ def build_user_data(nonce, profile=None, integration=None):
              'content': Path(__file__).with_name('build_guest.py').read_text()},
             {'path': '/opt/eqemu-worker-nonce', 'permissions': '0600', 'content': nonce},
             {'path': '/opt/eqemu-worker-checks.json', 'permissions': '0600', 'content': json.dumps(selected)},
+            *([{'path': '/opt/eqemu-worker-integration', 'permissions': '0600', 'content': integration}] if integration else []),
             *([{'path': '/opt/eqemu-worker-profile', 'permissions': '0600', 'content': profile}] if profile else []),
             *[{'path': '/opt/' + name, 'permissions': '0644', 'content': path.read_text()} for name, path in helpers],
         ],

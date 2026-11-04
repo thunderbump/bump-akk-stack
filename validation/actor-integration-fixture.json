@@ -564,6 +564,260 @@
     "bytes": 1300480,
     "sha256": "cf71b70acf549328552b3c203d2760571cb40b4d816f8aaf0ee447629039c48c"
   },
+  "fixture_selection": {
+    "connection": {
+      "destination_zone": 4,
+      "gate": "Native loaded Resolve/MayEnter, source floor projection, complete dry nav path and destination body+feet admissibility; no teleport/alternateexit/partialroute fallback",
+      "instance": 0,
+      "point_number": 9,
+      "sentinel": "TargetX must resolve from ACTUAL native source exit position, not prewalk hint",
+      "source_xyz": [
+        73,
+        1272,
+        2.5
+      ],
+      "source_zone": 2,
+      "target_xyz": [
+        999999,
+        -220,
+        4
+      ],
+      "version": 0,
+      "zone_points_row": 7
+    },
+    "excluded_runtime_claims": [
+      "raw stale-ready wire replay",
+      "source transfer-publication cut absent actual intent",
+      "nonzero deity modifier",
+      "nonzero scaling/evolving item",
+      "broad access/content matrix and migration extras",
+      "universal no-overlap from one-second status alone"
+    ],
+    "faction_fixture": {
+      "actor": {
+        "class": 1,
+        "deity": 140,
+        "identity_source": "zone/actor_body.cpp:300..320",
+        "race": 1
+      },
+      "friendly": {
+        "class_c1": -25,
+        "deity_d140": 0,
+        "item_bonus": 0,
+        "npc_type": 2021,
+        "original_npc_faction": 982,
+        "primary": 309,
+        "proposed_npc_faction": 1425,
+        "racial_r1": 50,
+        "spell_bonus": 0,
+        "standing_initial": 0
+      },
+      "hostile": {
+        "item_bonus": 0,
+        "npc_type": 2014,
+        "original_npc_faction": 982,
+        "primary": 306,
+        "proposed_npc_faction": 104,
+        "racial_r1": -1000,
+        "spell_bonus": 0,
+        "standing_initial": 0
+      },
+      "live_flip": "After a recorded valid fixture attack, fixed quest phase WipeHateList + SetNPCFactionID(1425) on chosen hostile; actual PlayerHostile reaction including hate correction must become nonhostile before inhibition/no damage expected. No silent continued-threatening bug claim.",
+      "placement_recipe": {
+        "friendly_dx_dy": [
+          8,
+          0
+        ],
+        "gate": "Actual complete dry local route/LOS, neither foreign engagement nor quest/service/pet/spell NPC; emit actual positions/distances and assert friend closer before selecting. Placement fails =>STOP, no position fallback.",
+        "hostile_dx_dy": [
+          24,
+          0
+        ],
+        "mode": "Native spawned fixture NPCs from exact public definitions at projected offsets from stopped actor after levelack",
+        "z": "Native FindBestZ/body offset; no assumedZ"
+      },
+      "standing_case": "Same actual native positive-faction evaluation with recorded standing after actual awards. d140 has no public modifier row, correctly zero; no nonzero deity claim. All actual modifiers/hate/invisibility/pet/merchant context observed; do not duplicate reaction formula."
+    },
+    "hard_caps": {
+      "actor_leases_global_max": 3,
+      "all_live_seconds": 1440,
+      "commands_total_max": 24,
+      "critical_full_record_snapshots_total": 12,
+      "faction_deltas_per_credited_kill": 5,
+      "faction_deltas_total": 20,
+      "fresh_fixture_sets": 3,
+      "inventory_records_global_max": 8,
+      "lease_acquire_plus_release_events_max": 96,
+      "meaning": "Caps bound evidence and scenarios, do not promise liveness. Count failures/denials and all successful saves, fanout peractor, startup/restart saves. Overrun/gap invalidates integrated evidence and stops while existing cleanup still runs; no drop or policy rewrite.",
+      "native_credited_kills_total": 4,
+      "natural_boot_attempts_total": 12,
+      "normal_runtime_seconds": 1800,
+      "outgoing_attack_attempts_total": 256,
+      "owned_clean_acquisitions_max": 48,
+      "setup_cleanup_seconds": 360,
+      "transfer_intents_total": 6,
+      "zone_controller_starts_total": 16
+    },
+    "inventory": {
+      "compatibility_data_checks": {
+        "augment_human_warrior_bits": true,
+        "augment_primary_slot_mask": "2097150",
+        "augment_restrict": 0,
+        "augment_type4_bit": "8",
+        "augment_type_mask": "4091",
+        "bag_children_size_max": 2,
+        "bag_size": 3,
+        "charged_max": 3,
+        "head_human_warrior_bits": true,
+        "native_admission": "REQUIRED: CreateItem, native slot/augment validation, Restore, Snapshot, equipment calculations; SQL compatibility alone does not qualify",
+        "weapon_common": true,
+        "weapon_human_warrior_bits": true,
+        "weapon_primary_slot_mask": "24576",
+        "weapon_socket0_type": 4,
+        "weapon_socket0_visible": 1
+      },
+      "custom_alphabet": "[A-Za-z0-9_^:.-]",
+      "evolve_fields": "Retain every key with actual zero/false values. No nonzero evolution/scaling coverage claim; no fabricated native family.",
+      "max_custom_ascii_bytes_per_record": 64,
+      "native_baseline": "All23 persisted fields AFTER native CreateItem/Restore/Snapshot; do not present sizing placeholders as actual baseline",
+      "native_fields_count": 23,
+      "nonzero_scaling_or_evolving": false,
+      "only_actor1_has_complex_items": true,
+      "other_actors": "Native Restore(empty[]) before baseline; no auto-starting-items outside fixed8record cap",
+      "records": [
+        {
+          "id": 1074,
+          "kind": 0,
+          "parent": -1,
+          "role": "primary weapon",
+          "slot": 13
+        },
+        {
+          "id": 41085,
+          "kind": 2,
+          "parent": 0,
+          "role": "type4 socket0 HP3 augment",
+          "slot": 0
+        },
+        {
+          "id": 2947,
+          "kind": 0,
+          "parent": -1,
+          "role": "head statHP10",
+          "slot": 2
+        },
+        {
+          "id": 17005,
+          "kind": 0,
+          "parent": -1,
+          "role": "general backpack bag8/size3",
+          "slot": 23
+        },
+        {
+          "charges": 3,
+          "id": 1115,
+          "kind": 1,
+          "parent": 3,
+          "role": "charged child, no click consumption",
+          "slot": 0
+        },
+        {
+          "attuned": true,
+          "color": 4279905084,
+          "custom": "cdau^native-fixture-v1^",
+          "id": 11602,
+          "kind": 1,
+          "parent": 3,
+          "role": "size2 attuneable custom child",
+          "slot": 1
+        },
+        {
+          "id": 1001,
+          "kind": 3,
+          "parent": -1,
+          "role": "cursor first",
+          "slot": 0
+        },
+        {
+          "id": 7007,
+          "kind": 3,
+          "parent": -1,
+          "role": "cursor second Rusty Dagger",
+          "slot": 1
+        }
+      ]
+    },
+    "map_repository_commit": "e8efa8ed4f4ea4c434c03c40d2a758388a54f4d6",
+    "not_qualified": [
+      "Native item admission",
+      "loaded zonepoint/dry path",
+      "native same-award gate",
+      "two-zone resource headroom",
+      "all cases finishing in budget",
+      "integrated acceptance",
+      "Remote-hint schema compatibility with ce4: known mismatch, not an assumed migration gate"
+    ],
+    "remote_hint": {
+      "chances": [
+        33,
+        33,
+        34
+      ],
+      "content_flags": null,
+      "content_flags_disabled": null,
+      "expansion": [
+        -1,
+        -1
+      ],
+      "later_enabled": "BLOCKER: public spawn2 has no enabled column but ce4 hint query uses s.enabled=1. Freeze original rows; no fake schema workaround. Root separately routed Server repair against real runtime Spawn2Disabled semantics; reviewed successor and native qualification required.",
+      "levels": [
+        3,
+        4,
+        1
+      ],
+      "npc_candidates": [
+        4015,
+        4021,
+        4079
+      ],
+      "primary_faction": 306,
+      "spawn2": 4347,
+      "spawngroup": 4184,
+      "xyz": [
+        -61,
+        86,
+        1.13
+      ],
+      "zone": 4
+    },
+    "schema": 1,
+    "server_commit": "ce4fbc1f53ef9d3d3adfd0bb0685189f7a14f34d",
+    "server_tree": "10ca98bc8fab60a4a5371c9e47f7e1640f92d564",
+    "sets": [
+      {
+        "actor1_initial_level": 1,
+        "actor1_initial_xp": "0",
+        "flow": "Only hunter1 earns native rat kills -> actual levelack -> progressed hostility/faction kill and liveflip. Preserve clean native snapshot. Suppress unrelated spawns only in private fixture after reviewed exact data overlay, no shared DB.",
+        "id": "A",
+        "live_seconds_max": 480,
+        "starter_spawn_rows": [
+          10863,
+          10865
+        ]
+      },
+      {
+        "flow": "Carry exact clean earned-A actor1 with provenance, native-create fixed8 items then baseline. Clean drain/restart -> actual point9 walk/acquire plus hunter2 stays source. At END, kill source while hunter2 body dirty before orderly drain, restart must refuse. This is NOT proven source transfer-publication cut unless actual intent exists; never reset dirty bytes.",
+        "id": "B",
+        "live_seconds_max": 480
+      },
+      {
+        "flow": "Fresh clean provenance copy of earned actor1, destination initially absent then available; natural bounded retry/acquire/duplicate boot observation. At END kill destination after actual dirty acquisition/body and require restart refusal. Preserve full dirty evidence. No further copies/reset after dirty.",
+        "id": "C",
+        "live_seconds_max": 480
+      }
+    ],
+    "status": "DATA_CONTRACT_PROPOSAL_NOT_RUNTIME_INPUT_OR_EXECUTION"
+  },
   "manifest": {
     "classification": "IMMUTABLE PUBLIC FIXTURE DATA PROPOSAL, NOT ADMITTED RUNTIME OR EXECUTABLE HARNESS",
     "files": [
@@ -731,6 +985,27 @@
     "source_server": "ce4fbc1f53ef9d3d3adfd0bb0685189f7a14f34d"
   },
   "manifest_sha256": "bc266220eba8cf0685463856221ed2a71d035ec1c5607c73e2058d1376df8797",
+  "rust_input": {
+    "bytes": 176957440,
+    "evidence_index_sha256": "97672e0c44f29fb621b76a8f0034026a80c9a17eba41977dc2114e8c1ad63d35",
+    "handoff_sha256": "2367803304bab5e36f390bb24bc7af5e8f2b2da48b5ed12d4f05043a438f1f7d",
+    "lock_bytes": 10932,
+    "lock_path": "rust/actors/Cargo.lock",
+    "lock_sha256": "1e5c00abf14873f23fea9bbbbccb9e5f250b058404dfa8046c6b5a87a7476f53",
+    "manifest_sha256": "654188b91891b3f1bd109dee586be19ace7304dbfff7755f534ca77961fd05ec",
+    "preserved_base_sha256": "7bc2a72f9b8a3ebcea3dfcb879ab2d5bb0a23d5ab4913e85f9acd728a5ce932e",
+    "qualification": "static lock/metadata only; disposable Cargo metadata --offline --locked and coherent checks unrun",
+    "sha256": "d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461",
+    "status": "sealed-data-only-source-pin",
+    "transformer_sha256": "7ffc9141dba56f9ed2e373d13d41315d011fc351cc50670cdd0a62cdcf2ab08c"
+  },
   "schema": 1,
-  "selection": "central-cdau-integration-v1"
+  "selection": "central-cdau-integration-v1",
+  "server_source": {
+    "commit": "1734b9e66f64ed4b431010b8206b0396732ef506",
+    "pull_request": "https://github.com/thunderbump/bump-EQEmu/pull/101",
+    "rust_tree": "3f1d7db9ffe068545ca401cb16076a8c57055193",
+    "status": "reviewed-source-only-unrun",
+    "tree": "843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9"
+  }
 }

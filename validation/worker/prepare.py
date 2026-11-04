@@ -21,9 +21,15 @@ def record(path, limit=PAYLOAD_LIMIT):
     return inputs.file_record(Path(path), limit)
 
 
-def verify_rust(path):
+def verify_rust(path, *, integration=False):
     """Accept the original pin or the one reviewed additive full-build identity."""
     item = record(path, 220 * 1024**2)
+    if integration:
+        from actor_integration import dependency_contract
+        contract = dependency_contract()
+        if item != {key: contract[key] for key in ('bytes', 'sha256')}:
+            raise ValueError('Fixed integration Rust input mismatch')
+        return item
     if item['sha256'] != RUST_SHA and ADDITIONAL_RUST.get(item['sha256']) != item['bytes']:
         raise ValueError('Missing or changed offline Rust input: ' + str(path))
     return item
@@ -82,7 +88,7 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
     approved['native.iso'] = record(native)
     if approved['native.iso']['sha256'] != NATIVE_SHA:
         raise ValueError('Missing or changed offline input: ' + str(native))
-    approved['rust-inputs.tar'] = verify_rust(rust)
+    approved['rust-inputs.tar'] = verify_rust(rust, integration=True) if integration is not None else verify_rust(rust)
     fixture = json.loads((Path(__file__).resolve().parents[1] / 'runtime-fixture.json').read_text())
     if runtime is None:
         raise ValueError('Normal-world validation requires the pinned public runtime ISO')
@@ -99,10 +105,20 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
         if not re.fullmatch('[a-f0-9]{40}', commit):
             raise ValueError('Expected HEAD or a full commit SHA')
         tree = view.git('rev-parse', commit + '^{tree}').decode().strip()
+        if integration is not None:
+            from actor_integration import validate_build_binding
+            validate_build_binding(dict(candidate=commit, tree=tree))
         entries, links = view.inventory(commit, tree)
         if links != profile['sources']['eqemu']['gitlinks']:
             raise ValueError('Candidate requires different native submodule inputs')
         blobs = {entry['path']: entry['blob'] for entry in entries}
+        if integration is not None:
+            from actor_integration import dependency_contract
+            contract = dependency_contract()
+            raw_lock = view.git('show', commit + ':' + contract['lock_path'])
+            import hashlib
+            if len(raw_lock) != contract['lock_bytes'] or hashlib.sha256(raw_lock).hexdigest() != contract['lock_sha256']:
+                raise ValueError('Fixed integration candidate Cargo.lock mismatch')
         if any(blobs.get(name) != blob for name, blob in profile['dependency_blobs'].items()):
             raise ValueError('Candidate requires different native dependency inputs')
         view.clean(commit, entries, links)
@@ -127,7 +143,9 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
         identity = {'version': 1, 'candidate': commit, 'tree': tree,
                     'files': {'eqemu.tar': record(archive), 'websocketpp.tar': record(dep_archive), **approved},
                     'world_control': world_control}
-        if integration is not None: identity['integration'] = integration
+        if integration is not None:
+            identity['integration'] = integration
+            identity['stack_commit'] = frontend_commit()
         if profiling is not None: identity['profiling']=profiling
         if diagnostic_profile is not None: identity['diagnostic_profile'] = diagnostic_profile
         # Repeat after archiving: dirty index/worktree changes must not silently disappear.
@@ -135,12 +153,23 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
         (root / 'identity.json').write_text(json.dumps(identity))
         if Path(output).exists():
             raise ValueError('Payload output already exists')
+        reserved=None
+        if integration is not None:
+            import os
+            reserved=os.open(output,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+            owned=os.fstat(reserved)
         try:
-            subprocess.run(['/usr/bin/genisoimage', '-quiet', '-output', str(output),
+            subprocess.run(['/usr/bin/genisoimage', '-quiet', '-output', str(output) if reserved is None else '/proc/self/fd/'+str(reserved),
                             '-volid', 'EQEMU_INPUT', '-joliet', '-rock', '-graft-points',
                             'identity.json=' + str(root / 'identity.json'),
                             *[name + '=' + str(path) for name, path in files.items()]],
-                           check=True, timeout=120, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+                           check=True, timeout=120, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                           **({} if reserved is None else {'pass_fds':(reserved,)}))
+            if reserved is not None:
+                os.fsync(reserved)
+                current=Path(output).lstat()
+                if (current.st_dev,current.st_ino)!=(owned.st_dev,owned.st_ino):
+                    raise ValueError('Integration payload output replaced')
             payload = record(output)
             # Detect changes to public media while the ISO builder read it.
             if (any(record(path) != identity['files'][name] for name, path in files.items())
@@ -152,5 +181,28 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
             if profiling is not None: request['profiling'] = profiling
             return request
         except BaseException:
-            Path(output).unlink(missing_ok=True)
+            if reserved is None:
+                Path(output).unlink(missing_ok=True)
+            else:
+                try:
+                    current=Path(output).lstat()
+                    if (current.st_dev,current.st_ino)==(owned.st_dev,owned.st_ino): Path(output).unlink()
+                except FileNotFoundError: pass
             raise
+        finally:
+            if reserved is not None: os.close(reserved)
+
+
+def frontend_commit():
+    """Bind the caller checkout or its immutable durable-job source receipt."""
+    root = Path(__file__).resolve().parents[2]
+    receipt = root / 'stack-source.json'
+    if receipt.exists():
+        from integration_artifacts import decode, hex_string
+        with inputs.regular(receipt, 128) as (stream, _):
+            value = decode(stream.read(129))
+        if set(value) != {'source_commit'}:
+            raise ValueError('Invalid frontend source receipt')
+        return hex_string(value['source_commit'], 40)
+    with tempfile.TemporaryDirectory(prefix='eqemu-frontend-identity-') as temporary:
+        return inputs.GitTree(root, Path(temporary)).location('HEAD')

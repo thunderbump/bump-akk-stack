@@ -161,6 +161,12 @@ def start(root, spec, snapshot=False):
             data = (ROOT / name).read_bytes(); target.write_bytes(data)
             target.chmod(0o700 if name.startswith('scripts/') else 0o600)
             records[name] = hashlib.sha256(data).hexdigest()
+        if '--integration' in spec['command']:
+            from prepare import frontend_commit
+            source = json.dumps({'source_commit': frontend_commit()}, separators=(',', ':')).encode()
+            (path/'client/stack-source.json').write_bytes(source)
+            (path/'client/stack-source.json').chmod(0o600)
+            records['stack-source.json'] = hashlib.sha256(source).hexdigest()
         spec = dict(spec, client_files_sha256=records,
                     command=[str(path / 'client/scripts/validate-worker-candidate'), *spec['command'][1:]])
     runner = path / 'runner.py'
