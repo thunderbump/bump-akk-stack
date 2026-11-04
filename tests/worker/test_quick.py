@@ -445,6 +445,12 @@ class QuickCLI(unittest.TestCase):
                     tree.return_value.archive.side_effect=lambda commit,path:path.write_bytes(b'dependency')
                     request=quick_prepare.prepare(repo,value,root,native,rust,output,name)
                     self.assertEqual(request['files']['rust-inputs.tar'],item)
+                    switched=iter([dict(item),dict(snapshot.RUST_PACKAGES['additive-v1' if name=='original' else 'original'])])
+                    def changing_record(path):
+                        return next(switched) if Path(path)==rust else record(path)
+                    with patch.object(quick_prepare,'record',side_effect=changing_record),self.assertRaisesRegex(ValueError,'selection changed'):
+                        quick_prepare.prepare(repo,value,root,native,rust,root/'switched.iso',name)
+
                     other='additive-v1' if name=='original' else 'original'
                     with self.assertRaisesRegex(ValueError,'pinned quick Rust'):
                         quick_prepare.prepare(repo,value,root,native,rust,root/'wrong.iso',other)

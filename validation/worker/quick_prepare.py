@@ -32,7 +32,8 @@ def prepare(repo,value,websocketpp,native,rust,output,rust_package='original'):
     profile=json.loads((Path(__file__).resolve().parents[1]/'profile.json').read_text())
     if value['gitlinks']!=profile['sources']['eqemu']['gitlinks']:
         raise ValueError('Quick snapshot requires unsupported native submodule inputs')
-    if record(rust) != snapshot.RUST_PACKAGES[rust_package]:raise ValueError('Missing/changed pinned quick Rust input')
+    selected_rust = dict(snapshot.RUST_PACKAGES[rust_package])
+    if record(rust) != selected_rust:raise ValueError('Missing/changed pinned quick Rust input')
     for path,wanted in ((native,NATIVE_SHA),):
         if record(path)['sha256']!=wanted:raise ValueError('Missing/changed pinned quick input: '+str(path))
     with tempfile.TemporaryDirectory(prefix='eqemu-quick-payload-') as tmp:
@@ -48,6 +49,7 @@ def prepare(repo,value,websocketpp,native,rust,output,rust_package='original'):
                'native.iso':Path(native),'rust-inputs.tar':Path(rust)}
         ident={key:snapshot.identity(value)[key] for key in ('base','head','recipe_sha256','input_snapshot_sha256')}
         ident['files']={name:record(path) for name,path in files.items()}
+        if ident['files']['rust-inputs.tar'] != selected_rust:raise ValueError('Quick Rust selection changed before packaging')
         (root/'identity.json').write_bytes(snapshot.canonical(ident))
         if output.exists() or output.is_symlink():raise ValueError('Quick payload already exists')
         try:
