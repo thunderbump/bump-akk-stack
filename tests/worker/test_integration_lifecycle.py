@@ -101,4 +101,20 @@ class NativeOwnership(unittest.TestCase):
                 self.assertTrue(owned[0].closed);self.assertEqual(owned[0].index,0)
 
 
+class StagedGuest(unittest.TestCase):
+    def test_completion_schema_imports_only_the_actual_staged_helper_closure(self):
+        import guest
+        value=dict(version=1,scope='worker-build',nonce=RUN,exit_code=2,stage='guest-launcher',
+                   selected_checks=[*guest.BUILD_CHECKS[:-1],'actor-population-integration'],completed_checks=[],integration=a.SELECTION)
+        config=json.loads(guest.build_user_data(RUN,integration=a.SELECTION).split('\n',1)[1])
+        with tempfile.TemporaryDirectory() as root:
+            root=Path(root)
+            for entry in config['write_files']:
+                (root/Path(entry['path']).name).write_text(entry['content'])
+            self.assertFalse((root/'guest.py').exists())
+            code='import sys,json;sys.path.insert(0,sys.argv[1]);import integration_artifacts as a;a.validate_guest(json.loads(sys.argv[2]))'
+            result=subprocess.run([sys.executable,'-I','-B','-c',code,str(root),json.dumps(value)],capture_output=True,timeout=5)
+            self.assertEqual(result.returncode,0,result.stderr.decode())
+
+
 if __name__=='__main__': unittest.main()

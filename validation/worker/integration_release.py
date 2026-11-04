@@ -272,9 +272,10 @@ def sync(path):
 def journal(package_sha,host,*,create=False):
     if create:
         fd=os.open(JOURNAL,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
-        host.metadata(fd,0,0,0o600)
-        header=dict(schema=1,package_sha256=package_sha,prior_socket_active=host.socket_active())
-        with os.fdopen(fd,'wb') as stream: stream.write(canonical(header));stream.flush();os.fsync(stream.fileno())
+        with os.fdopen(fd,'wb') as stream:
+            host.metadata(stream.fileno(),0,0,0o600)
+            header=dict(schema=1,package_sha256=package_sha,prior_socket_active=host.socket_active())
+            stream.write(canonical(header));stream.flush();os.fsync(stream.fileno())
         sync(JOURNAL.parent)
     info=host.info(JOURNAL)
     if info.st_uid!=0 or info.st_gid!=0 or stat.S_IMODE(info.st_mode)!=0o600 or not stat.S_ISREG(info.st_mode): raise ValueError('Publication journal is not protected')
@@ -310,8 +311,11 @@ def current_kind(name,manifest,baseline,host,events):
     if name in CHANGED:
         old=baseline['files'][str(path)]
         if actual==old: return 'old'
-        protected=dict(old,uid=0,gid=0,mode=0o600)
-        if actual==protected: return 'protected'
+        # fchown and fchmod are separate syscalls in both protection and restore.
+        # Only the exact old inode/content with their finite intermediate metadata qualifies.
+        if actual in (dict(old,uid=0,gid=0,mode=old['mode']),
+                      dict(old,uid=0,gid=0,mode=0o600),
+                      dict(old,mode=0o600)): return 'protected'
     raise ValueError('Unknown bytes or metadata at finite publication target: '+name)
 
 
@@ -335,7 +339,7 @@ def verify_state(manifest,baseline,host,events,*,old_only=False,new_only=False,a
         if temporary.exists() or temporary.is_symlink():
             actual=record(temporary,host)
             raw=read(temporary)
-            if (assets is None or actual['uid']!=0 or actual['gid']!=0 or actual['mode']!=0o644
+            if (assets is None or actual['uid']!=0 or actual['gid']!=0 or actual['mode'] not in (0o600,0o644)
                     or raw!=assets['forward/'+name][:len(raw)] or len(raw)>len(assets['forward/'+name])):
                 raise ValueError('Unknown staged publication bytes')
             if old_only or new_only: raise ValueError('Staged publication is unfinished')
@@ -437,8 +441,9 @@ def apply(path,digest,host=None):
             if temporary.exists(): temporary.unlink();sync(temporary.parent)
             fd=os.open(temporary,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
             try:
-                host.metadata(fd,0,0,0o644)
-                with os.fdopen(fd,'wb') as stream: stream.write(assets['forward/'+name]);stream.flush();os.fsync(stream.fileno())
+                with os.fdopen(fd,'wb') as stream:
+                    host.metadata(stream.fileno(),0,0,0o644)
+                    stream.write(assets['forward/'+name]);stream.flush();os.fsync(stream.fileno())
                 if not matches(record(temporary,host),manifest['installed'][name]): raise ValueError('Staged helper identity mismatch')
                 os.replace(temporary,target);sync(target.parent)
                 append('published',name,host.info(target))
@@ -458,6 +463,21 @@ def rollback(path,digest,host=None):
         host.socket(False);host.quiescent()
         # Validate ALL targets first, then protect the same three parents before mutation.
         for directory in DIRECTORIES: protect_directory(directory,baseline['directories'][str(directory)],host)
+        # Directory protection prevents replacement, but old UID1000 file ownership
+        # still permits writes. Freeze those exact inodes before the second inventory.
+        for name in CHANGED:
+            if current_kind(name,manifest,baseline,host,events) in ('old','protected'):
+                target=CODE/name;expected=baseline['files'][str(target)]
+                fd=os.open(target,os.O_RDONLY|os.O_NOFOLLOW)
+                try:
+                    opened=os.fstat(fd)
+                    if (opened.st_ino,opened.st_dev)!=(expected['inode'],expected['device']): raise ValueError('Rollback helper descriptor mismatch')
+                    host.metadata(fd,0,0,0o600)
+                    host.writers({(expected['device'],expected['inode'])})
+                    if record(target,host)!=dict(expected,uid=0,gid=0,mode=0o600): raise ValueError('Rollback helper drift after protection')
+                finally: os.close(fd)
+        _,events=journal(digest,host)
+        kinds=verify_state(manifest,baseline,host,events,assets=assets)
         for name in ASSETS:
             temporary=(CODE/name).with_name(Path(name).name+'.cdau-new')
             if temporary.exists(): temporary.unlink();sync(temporary.parent)

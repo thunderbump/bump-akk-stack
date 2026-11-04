@@ -106,6 +106,50 @@ class Publication(unittest.TestCase):
         r.rollback(Path('/unused'),self.digest,self.host)
         for name,expected in self.baseline['files'].items(): self.assertEqual(r.record(name,self.host),expected)
 
+    def test_rollback_rechecks_after_protection_before_deleting_unknown_new_inode(self):
+        r.apply(Path('/unused'),self.digest,self.host)
+        real=r.protect_directory;changed=[False];path=self.code/r.ADDED[0]
+        def replace(patharg,expected,host):
+            real(patharg,expected,host)
+            if not changed[0]:
+                changed[0]=True;path.unlink();path.write_bytes(b'foreign replacement')
+        with patch.object(r,'protect_directory',side_effect=replace),self.assertRaises(ValueError):
+            r.rollback(Path('/unused'),self.digest,self.host)
+        self.assertEqual(path.read_bytes(),b'foreign replacement');self.assertFalse(self.host.active)
+
+    def test_rollback_recovers_interruption_between_chown_and_chmod(self):
+        for phase in ('forward','rollback'):
+            with self.subTest(phase=phase):
+                # Original inode/bytes, but only the first metadata syscall committed.
+                path=self.code/r.CHANGED[0];expected=self.baseline['files'][str(path)]
+                fd=os.open(path,os.O_RDONLY)
+                try:
+                    self.host.metadata(fd,0 if phase=='forward' else expected['uid'],0 if phase=='forward' else expected['gid'],expected['mode'] if phase=='forward' else 0o600)
+                finally: os.close(fd)
+                if not r.JOURNAL.exists(): r.journal(self.digest,self.host,create=True)
+                r.rollback(Path('/unused'),self.digest,self.host)
+                self.assertEqual(r.record(path,self.host),expected)
+
+    def test_syscall_boundary_failure_during_forward_and_rollback_is_recoverable(self):
+        path=self.code/r.CHANGED[0];original=self.baseline['files'][str(path)];real=self.host.metadata
+        def interrupt(fd,uid,gid,mode):
+            actual=os.fstat(fd)
+            if actual.st_ino==original['inode']:
+                # fchown completed, fchmod did not. Preserve actual mode.
+                self.host.metadata_by_inode[actual.st_dev,actual.st_ino]=(uid,gid,stat.S_IMODE(actual.st_mode))
+                raise OSError('interrupted between fchown and fchmod')
+            real(fd,uid,gid,mode)
+        with patch.object(self.host,'metadata',side_effect=interrupt),self.assertRaises(OSError):
+            r.apply(Path('/unused'),self.digest,self.host)
+        r.rollback(Path('/unused'),self.digest,self.host)
+        self.assertEqual(r.record(path,self.host),original)
+        # A fresh fake journal permits a new independent forward transaction.
+        r.JOURNAL.unlink();r.apply(Path('/unused'),self.digest,self.host)
+        with patch.object(self.host,'metadata',side_effect=interrupt),self.assertRaises(OSError):
+            r.rollback(Path('/unused'),self.digest,self.host)
+        r.rollback(Path('/unused'),self.digest,self.host)
+        self.assertEqual(r.record(path,self.host),original)
+
 
 class Patch(unittest.TestCase):
     def test_selected_overlay_uses_exact_installed_bytes_and_no_fuzz(self):

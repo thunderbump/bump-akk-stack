@@ -232,8 +232,8 @@ def validate_guest(value):
     hex_string(value['nonce'],32)
     if type(value['exit_code']) is not int or value['exit_code'] not in (0,1,2): fail()
     if not isinstance(value['stage'],str) or not re.fullmatch('[a-z0-9-]{1,100}',value['stage']): fail()
-    from guest import BUILD_CHECKS
-    selected=[*BUILD_CHECKS[:-1],'actor-population-integration']
+    selected=['rust-format','rust-dependencies','rust-clippy','rust-tests','rust-doctests',
+              'native-configure','native-build','zone-rust-symbol','native-utilities','actor-population-integration']
     if value['selected_checks']!=selected or not isinstance(value['completed_checks'],list): fail()
     completed=value['completed_checks']
     if completed!=selected[:len(completed)]: fail()
