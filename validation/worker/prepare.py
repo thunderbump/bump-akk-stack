@@ -164,7 +164,7 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
         if Path(output).exists():
             raise ValueError('Payload output already exists')
         reserved=None
-        if integration is not None:
+        if fixed_rust:
             import os
             reserved=os.open(output,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
             owned=os.fstat(reserved)

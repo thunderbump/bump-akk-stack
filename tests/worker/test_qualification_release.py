@@ -43,6 +43,10 @@ class Publication(unittest.TestCase):
         for name in r.CHANGED:
             path=self.code/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(('old-'+name).encode());path.chmod(0o644)
         self.exception=self.code/'validation/unchanged.py';self.exception.write_bytes(b'unchanged mutable exception')
+        for path in (*self.dirs,*[self.code/n for n in r.CHANGED]):
+            fd=os.open(path,os.O_RDONLY)
+            try: self.host.metadata(fd,0,0,stat.S_IMODE(path.stat().st_mode))
+            finally: os.close(fd)
         self.baseline=dict(files={str(self.code/n):r.record(self.code/n,self.host) for n in r.CHANGED},
                            directories={str(p):r.record(p,self.host) for p in self.dirs},retained={})
         self.baseline['files'][str(self.exception)]=r.record(self.exception,self.host)
@@ -52,6 +56,16 @@ class Publication(unittest.TestCase):
         stack.enter_context(patch.object(r,'PRIOR_PRIVATE',{}))
         for name,value in dict(CODE=self.code,DIRECTORIES=self.dirs,LOCK=self.lock,JOURNAL=root/'journal',BACKUP=self.code/'.backup').items(): stack.enter_context(patch.object(r,name,value))
         stack.enter_context(patch.object(r,'package',return_value=(self.manifest,self.baseline,self.assets)))
+
+    def test_prior_admission_private_history_drift_refuses_without_overwrite(self):
+        history=self.code.parent/'prior-journal';history.write_bytes(b'prior frozen history')
+        expected=r.record(history,self.host)
+        with patch.object(r,'PRIOR_PRIVATE',{str(history):expected}):
+            history.write_bytes(b'unknown drift')
+            before=list(self.host.calls)
+            with self.assertRaises(ValueError):r.apply(Path('/unused'),self.digest,self.host)
+            self.assertEqual(history.read_bytes(),b'unknown drift')
+            self.assertEqual(self.host.calls,before+[('quiescent',)])
 
     def test_exact_forward_and_repeated_rollback_restore_original_inodes_before_directories(self):
         original={name:r.record(name,self.host) for name in self.baseline['files']}

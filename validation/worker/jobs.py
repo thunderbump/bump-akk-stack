@@ -161,7 +161,7 @@ def start(root, spec, snapshot=False):
             data = (ROOT / name).read_bytes(); target.write_bytes(data)
             target.chmod(0o700 if name.startswith('scripts/') else 0o600)
             records[name] = hashlib.sha256(data).hexdigest()
-        if '--integration' in spec['command']:
+        if '--integration' in spec['command'] or '--rust-input' in spec['command']:
             from prepare import frontend_commit
             source = json.dumps({'source_commit': frontend_commit()}, separators=(',', ':')).encode()
             (path/'client/stack-source.json').write_bytes(source)

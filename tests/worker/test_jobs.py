@@ -76,6 +76,20 @@ class Jobs(unittest.TestCase):
         for name in FRONTEND_FILES:
             self.assertEqual((path/'client'/name).read_bytes(),(ROOT/name).read_bytes())
 
+    def test_ordinary_explicit_rust_snapshot_freezes_source_receipt_without_git(self):
+        import hashlib
+        value=jobs.start(self.root/'jobs',dict(
+            command=[str(ROOT/'scripts/validate-worker-candidate'),'--help','--rust-input','/exact/d5d8/rust-inputs.tar'],
+            candidate='a'*40,profile='full',adapter=str(self.adapter),thread='explicit-thread',t3_base_dir=str(self.root)),snapshot=True)
+        path=jobs.job_path(self.root/'jobs',value['job_id']);self.paths.append(path)
+        self.assertEqual(self.wait(path)['result']['returncode'],0)
+        raw=(path/'client/stack-source.json').read_bytes()
+        self.assertEqual(jobs.read(path/'job.json')['client_files_sha256']['stack-source.json'],hashlib.sha256(raw).hexdigest())
+        check='import sys;sys.path.insert(0,sys.argv[1]);from prepare import frontend_commit;print(frontend_commit())'
+        result=subprocess.run([sys.executable,'-I','-B','-c',check,str(path/'client/validation/worker')],capture_output=True,text=True,timeout=5)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout.strip(),json.loads(raw)['source_commit'])
+
     def test_success_late_failure_and_launch_failure(self):
         for code in (0, 1, 7):
             path = self.start('import json,sys\nprint(json.dumps(dict(passed=True,cleanup_complete=True)))\n'
