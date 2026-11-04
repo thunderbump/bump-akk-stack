@@ -81,7 +81,11 @@ class JobsCLI(unittest.TestCase):
                     records = spec['client_files_sha256']
                     for name, digest in records.items():
                         data = (path / 'client' / name).read_bytes()
-                        self.assertEqual(data, (ROOT / name).read_bytes())
+                        if name=='stack-source.json':
+                            head=subprocess.check_output(['git','-C',str(ROOT),'rev-parse','HEAD'],text=True).strip()
+                            self.assertEqual(json.loads(data),{'source_commit':head})
+                        else:
+                            self.assertEqual(data, (ROOT / name).read_bytes())
                         self.assertEqual(hashlib.sha256(data).hexdigest(), digest)
                     for name in ('validation/worker/prepare.py', 'validation/worker/identity.py',
                                  'validation/inputs.py'):
