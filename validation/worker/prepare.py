@@ -30,6 +30,9 @@ def verify_rust(path, *, integration=False):
         if item != {key: contract[key] for key in ('bytes', 'sha256')}:
             raise ValueError('Fixed integration Rust input mismatch')
         return item
+    from actor_integration import dependency_contract
+    selected=dependency_contract()
+    if item == {key:selected[key] for key in ('bytes','sha256')}: return item
     if item['sha256'] != RUST_SHA and ADDITIONAL_RUST.get(item['sha256']) != item['bytes']:
         raise ValueError('Missing or changed offline Rust input: ' + str(path))
     return item
@@ -89,6 +92,9 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
     if approved['native.iso']['sha256'] != NATIVE_SHA:
         raise ValueError('Missing or changed offline input: ' + str(native))
     approved['rust-inputs.tar'] = verify_rust(rust, integration=True) if integration is not None else verify_rust(rust)
+    fixed_rust=approved['rust-inputs.tar']['sha256']=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461'
+    if fixed_rust and (world_control or diagnostic_profile or profiling):
+        raise ValueError('Selected Rust input requires ordinary full checks')
     fixture = json.loads((Path(__file__).resolve().parents[1] / 'runtime-fixture.json').read_text())
     if runtime is None:
         raise ValueError('Normal-world validation requires the pinned public runtime ISO')
@@ -105,14 +111,14 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
         if not re.fullmatch('[a-f0-9]{40}', commit):
             raise ValueError('Expected HEAD or a full commit SHA')
         tree = view.git('rev-parse', commit + '^{tree}').decode().strip()
-        if integration is not None:
+        if fixed_rust:
             from actor_integration import validate_build_binding
             validate_build_binding(dict(candidate=commit, tree=tree))
         entries, links = view.inventory(commit, tree)
         if links != profile['sources']['eqemu']['gitlinks']:
             raise ValueError('Candidate requires different native submodule inputs')
         blobs = {entry['path']: entry['blob'] for entry in entries}
-        if integration is not None:
+        if fixed_rust:
             from actor_integration import dependency_contract
             contract = dependency_contract()
             raw_lock = view.git('show', commit + ':' + contract['lock_path'])
@@ -145,6 +151,7 @@ def prepare(repo, commit, websocketpp, native, rust, output, runtime=None, world
                     'world_control': world_control}
         if integration is not None:
             identity['integration'] = integration
+        if fixed_rust:
             identity['stack_commit'] = frontend_commit()
         if profiling is not None: identity['profiling']=profiling
         if diagnostic_profile is not None: identity['diagnostic_profile'] = diagnostic_profile

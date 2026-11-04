@@ -264,7 +264,7 @@ class FixedInputsAndPrivacy(unittest.TestCase):
         with patch.object(i,'read_public',return_value=b'changed lock'),self.assertRaises(ValueError): i.verify_dependencies({'files':{'rust-inputs.tar':selected}},Path('/source'))
         import prepare
         with patch.object(prepare,'record',return_value=selected): self.assertEqual(prepare.verify_rust(Path('/fixture'),integration=True),selected)
-        with patch.object(prepare,'record',return_value=selected),self.assertRaises(ValueError): prepare.verify_rust(Path('/fixture'))
+        with patch.object(prepare,'record',return_value=selected): self.assertEqual(prepare.verify_rust(Path('/fixture')),selected)
         self.assertEqual(prepare.ADDITIONAL_RUST,{'7bc2a72f9b8a3ebcea3dfcb879ab2d5bb0a23d5ab4913e85f9acd728a5ce932e':171284480})
 
     def test_known_secrets_are_refused_after_decoding_escapes(self):

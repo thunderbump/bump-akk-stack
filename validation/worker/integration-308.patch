@@ -1,0 +1,58 @@
+--- a/validation/worker/guest.py
++++ b/validation/worker/guest.py
+@@ -54,9 +54,9 @@
+     helpers = [('normal_world.py', Path(__file__).with_name('normal_world.py')),
+                *[(name, Path(__file__).parents[1] / name) for name in
+                  ('actor.py', 'actor_runtime.py', 'debugger.py', 'runtime-fixture.json')]]
+-    if integration is not None:
+-        helpers += [(name, Path(__file__).with_name(name)) for name in ('actor_integration.py', 'integration_artifacts.py', 'integration-v1.4.json')]
+-        helpers.append(('actor-integration-fixture.json', Path(__file__).parents[1] / 'actor-integration-fixture.json'))
++    # Fixed full-input verifier closure; does not select integration.
++    helpers += [(name, Path(__file__).with_name(name)) for name in ('actor_integration.py', 'integration_artifacts.py', 'integration-v1.4.json')]
++    helpers.append(('actor-integration-fixture.json', Path(__file__).parents[1] / 'actor-integration-fixture.json'))
+     return '#cloud-config\n' + json.dumps({
+         'hostname': 'eqemu-worker-build', 'ssh_pwauth': False, 'disable_root': True,
+         'write_files': [
+--- a/validation/worker/build_guest.py
++++ b/validation/worker/build_guest.py
+@@ -116,7 +116,7 @@
+     identity = json.loads(Path('/media/eqemu-input/identity.json').read_text())
+     selected=Path('/opt/eqemu-worker-integration').read_text() if Path('/opt/eqemu-worker-integration').exists() else None
+     if identity.get('integration')!=selected: raise RuntimeError('Guest integration selection mismatch')
+-    if selected is not None:
++    if selected is not None or identity.get('files',{}).get('rust-inputs.tar',{}).get('sha256')=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461':
+         from actor_integration import validate_input_identity
+         validate_input_identity(identity)
+     for name, expected in identity['files'].items():
+@@ -224,7 +224,7 @@
+ 
+ def build():
+     source, registry = prepare_source()
+-    if INTEGRATION:
++    if INTEGRATION or json.loads(Path('/media/eqemu-input/identity.json').read_text())['files']['rust-inputs.tar']['sha256']=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461':
+         from actor_integration import verify_dependencies
+         verify_dependencies(json.loads(Path('/media/eqemu-input/identity.json').read_text()), source)
+     cargo = prepare_rust()
+--- a/validation/worker/actor_integration.py
++++ b/validation/worker/actor_integration.py
+@@ -1018,8 +1018,11 @@
+ def validate_input_identity(value):
+     fields={'version','candidate','tree','files','world_control','integration','stack_commit'}
+     names={'eqemu.tar','websocketpp.tar','native.iso','rust-inputs.tar','runtime.iso','integration-fixture.tar'}
++    integration='integration' in value
++    if not integration:
++        fields.remove('integration');names.remove('integration-fixture.tar')
+     if (not isinstance(value,dict) or set(value)!=fields or type(value['version']) is not int or value['version']!=1
+-            or value['integration']!=SELECTION or value['world_control'] is not None
++            or (integration and value['integration']!=SELECTION) or value['world_control'] is not None
+             or not isinstance(value['files'],dict) or set(value['files'])!=names): fail()
+     for key in ('candidate','tree','stack_commit'): hex_string(value[key],40)
+     validate_build_binding(value)
+@@ -1029,6 +1032,7 @@
+     expected=dict(native_iso=dict(bytes=469000192,sha256='02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4'),
+                   runtime_iso={k:local_contract('runtime-fixture.json')['iso'][k] for k in ('bytes','sha256')},
+                   integration_fixture_tar=dict(bytes=FIXTURE_BYTES,sha256=FIXTURE_SHA))
++    if not integration: expected.pop('integration_fixture_tar')
+     for key,item in expected.items():
+         name=key.replace('_','.') if key.endswith('_iso') else 'integration-fixture.tar'
+         if value['files'][name]!=item: fail()

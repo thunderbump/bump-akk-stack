@@ -124,7 +124,7 @@ def provision():
     identity = json.loads(Path('/media/eqemu-input/identity.json').read_text())
     selected=Path('/opt/eqemu-worker-integration').read_text() if Path('/opt/eqemu-worker-integration').exists() else None
     if identity.get('integration')!=selected: raise RuntimeError('Guest integration selection mismatch')
-    if selected is not None:
+    if selected is not None or identity.get('files',{}).get('rust-inputs.tar',{}).get('sha256')=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461':
         from actor_integration import validate_input_identity
         validate_input_identity(identity)
     for name, expected in identity['files'].items():
@@ -248,7 +248,7 @@ def build():
     if PROFILE is not None and PROFILING is not None:
         raise RuntimeError('Sanitizers and profiling are mutually exclusive')
     source, registry = prepare_source()
-    if INTEGRATION:
+    if INTEGRATION or json.loads(Path('/media/eqemu-input/identity.json').read_text())['files']['rust-inputs.tar']['sha256']=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461':
         from actor_integration import verify_dependencies
         verify_dependencies(json.loads(Path('/media/eqemu-input/identity.json').read_text()), source)
     cargo = prepare_rust()

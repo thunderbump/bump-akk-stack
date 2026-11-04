@@ -55,9 +55,9 @@ def build_user_data(nonce, profile=None, integration=None):
     helpers = [(name, Path(__file__).with_name(name)) for name in ('profiling.py','profile_artifacts.py','profile_inputs.py','profile_contract.py')] + [('normal_world.py', Path(__file__).with_name('normal_world.py')),
                *[(name, Path(__file__).parents[1] / name) for name in
                  ('actor.py', 'actor_runtime.py', 'debugger.py', 'runtime-fixture.json')]]
-    if integration is not None:
-        helpers += [(name, Path(__file__).with_name(name)) for name in ('actor_integration.py', 'integration_artifacts.py', 'integration-v1.json', 'integration-v1.1.json', 'integration-v1.2.json', 'integration-v1.3.json', 'integration-v1.4.json')]
-        helpers.append(('actor-integration-fixture.json', Path(__file__).parents[1] / 'actor-integration-fixture.json'))
+    # Fixed full-input verifier closure; does not select integration.
+    helpers += [(name, Path(__file__).with_name(name)) for name in ('actor_integration.py', 'integration_artifacts.py', 'integration-v1.json', 'integration-v1.1.json', 'integration-v1.2.json', 'integration-v1.3.json', 'integration-v1.4.json')]
+    helpers.append(('actor-integration-fixture.json', Path(__file__).parents[1] / 'actor-integration-fixture.json'))
     if profile: helpers.append(('sanitizers.py', Path(__file__).with_name('sanitizers.py')))
     return '#cloud-config\n' + json.dumps({
         'hostname': 'eqemu-worker-build', 'ssh_pwauth': False, 'disable_root': True,

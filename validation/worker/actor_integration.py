@@ -1018,8 +1018,11 @@ def validate_build_binding(value):
 def validate_input_identity(value):
     fields={'version','candidate','tree','files','world_control','integration','stack_commit'}
     names={'eqemu.tar','websocketpp.tar','native.iso','rust-inputs.tar','runtime.iso','integration-fixture.tar'}
+    integration='integration' in value
+    if not integration:
+        fields.remove('integration');names.remove('integration-fixture.tar')
     if (not isinstance(value,dict) or set(value)!=fields or type(value['version']) is not int or value['version']!=1
-            or value['integration']!=SELECTION or value['world_control'] is not None
+            or (integration and value['integration']!=SELECTION) or value['world_control'] is not None
             or not isinstance(value['files'],dict) or set(value['files'])!=names): fail()
     for key in ('candidate','tree','stack_commit'): hex_string(value[key],40)
     validate_build_binding(value)
@@ -1029,6 +1032,7 @@ def validate_input_identity(value):
     expected=dict(native_iso=dict(bytes=469000192,sha256='02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4'),
                   runtime_iso={k:local_contract('runtime-fixture.json')['iso'][k] for k in ('bytes','sha256')},
                   integration_fixture_tar=dict(bytes=FIXTURE_BYTES,sha256=FIXTURE_SHA))
+    if not integration: expected.pop('integration_fixture_tar')
     for key,item in expected.items():
         name=key.replace('_','.') if key.endswith('_iso') else 'integration-fixture.tar'
         if value['files'][name]!=item: fail()
