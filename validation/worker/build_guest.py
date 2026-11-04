@@ -34,6 +34,7 @@ SANITIZERS = None
 COMPLETED = []
 PROFILING = None
 INTEGRATION = None
+FIXED_RUST = False
 BUILD_METADATA = {}
 INFRASTRUCTURE = re.compile(
     r'out of memory|cannot allocate memory|no space left|killed signal|command not found|'
@@ -54,7 +55,7 @@ def sha(path):
 
 def command(name, args, *, cwd=None, candidate=False, seconds=900):
     """Bound and stream tool output. Only candidate phases may return candidate failure."""
-    global STAGE
+    global STAGE, FIXED_RUST
     STAGE = name
     print('EQEMU_STAGE ' + name, flush=True)
     end = min(DEADLINE, time.monotonic() + seconds)
@@ -119,12 +120,13 @@ def extract(archive, target):
 
 def provision():
     """Install only the packages already present in the verified public input ISO."""
-    global STAGE
+    global STAGE, FIXED_RUST
     STAGE = 'input-verification'
     identity = json.loads(Path('/media/eqemu-input/identity.json').read_text())
     selected=Path('/opt/eqemu-worker-integration').read_text() if Path('/opt/eqemu-worker-integration').exists() else None
     if identity.get('integration')!=selected: raise RuntimeError('Guest integration selection mismatch')
-    if selected is not None or identity.get('files',{}).get('rust-inputs.tar',{}).get('sha256')=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461':
+    FIXED_RUST=identity.get('files',{}).get('rust-inputs.tar',{}).get('sha256')=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461'
+    if selected is not None or FIXED_RUST:
         from actor_integration import validate_input_identity
         validate_input_identity(identity)
     for name, expected in identity['files'].items():
@@ -248,7 +250,7 @@ def build():
     if PROFILE is not None and PROFILING is not None:
         raise RuntimeError('Sanitizers and profiling are mutually exclusive')
     source, registry = prepare_source()
-    if INTEGRATION or json.loads(Path('/media/eqemu-input/identity.json').read_text())['files']['rust-inputs.tar']['sha256']=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461':
+    if INTEGRATION or FIXED_RUST:
         from actor_integration import verify_dependencies
         verify_dependencies(json.loads(Path('/media/eqemu-input/identity.json').read_text()), source)
     cargo = prepare_rust()

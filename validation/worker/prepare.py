@@ -30,9 +30,12 @@ def verify_rust(path, *, integration=False):
         if item != {key: contract[key] for key in ('bytes', 'sha256')}:
             raise ValueError('Fixed integration Rust input mismatch')
         return item
-    from actor_integration import dependency_contract
-    selected=dependency_contract()
-    if item == {key:selected[key] for key in ('bytes','sha256')}: return item
+    if item['sha256']=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461':
+        from actor_integration import dependency_contract
+        selected=dependency_contract()
+        if item != {key:selected[key] for key in ('bytes','sha256')}:
+            raise ValueError('Selected ordinary Rust input size mismatch')
+        return item
     if item['sha256'] != RUST_SHA and ADDITIONAL_RUST.get(item['sha256']) != item['bytes']:
         raise ValueError('Missing or changed offline Rust input: ' + str(path))
     return item

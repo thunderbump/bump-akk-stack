@@ -175,7 +175,7 @@ def prepare(source,output):
     def copy(name,raw):
         path=output/name;path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
         with path.open('xb') as stream: stream.write(raw);stream.flush();os.fsync(stream.fileno())
-        path.chmod(0o700 if name.startswith(('frontend/scripts/','formatter/scripts/')) else 0o600);assets[name]=dict(bytes=len(raw),sha256=sha(raw))
+        path.chmod(0o700 if name.startswith(('frontend/scripts/','formatter/scripts/','formatter-baseline/scripts/')) else 0o600);assets[name]=dict(bytes=len(raw),sha256=sha(raw))
     for name,raw in forward.items(): copy('forward/'+name,raw)
     for name,raw in old.items(): copy('rollback/'+name,raw)
     for name in FRONTEND_FILES:
@@ -191,6 +191,8 @@ def prepare(source,output):
     copy('formatter/validation/profile.json',read(legacy/'validation/profile.json'))
     for name,digest in FORMATTER_EXPECTED.items():
         if assets['formatter/'+name]['sha256']!=digest: raise ValueError('Historical formatter source drift')
+    for name in INSTALLED_FILES: copy('formatter-baseline/'+name,read(CODE/name))
+    for name in FORMATTER_EXPECTED: copy('formatter-baseline/'+name,read(legacy/name))
     copy('baseline.json',baseline_raw);copy('installed.patch',patch);copy('operator.py',source_bytes('validation/worker/qualification_release.py'))
     fixture=json.loads(source_bytes('validation/actor-integration-fixture.json'))
     runtime_fixture=json.loads(source_bytes('validation/runtime-fixture.json'))
@@ -219,18 +221,18 @@ def package(path,digest):
             or set(value['installed'])!=set(ASSETS) or set(value['directories'])!={str(p) for p in DIRECTORIES}
             or value['backup']!=str(BACKUP) or value['journal']!=str(JOURNAL) or value['shared_lock']!=str(LOCK)):
         raise ValueError('Unknown finite package shape')
-    expected_assets={'forward/'+name for name in ASSETS}|{'rollback/'+name for name in CHANGED}|{'frontend/'+name for name in FRONTEND_FILES}|{'frontend/stack-source.json','baseline.json','installed.patch','operator.py'}|{'formatter/'+name for name in INSTALLED_FILES}|{'formatter/'+name for name in (*FORMATTER_EXTRA,'validation/worker/prepare.py','validation/inputs.py','validation/profile.json')}
+    expected_assets={'formatter-baseline/'+name for name in (*INSTALLED_FILES,*FORMATTER_EXPECTED)}|{'forward/'+name for name in ASSETS}|{'rollback/'+name for name in CHANGED}|{'frontend/'+name for name in FRONTEND_FILES}|{'frontend/stack-source.json','baseline.json','installed.patch','operator.py'}|{'formatter/'+name for name in INSTALLED_FILES}|{'formatter/'+name for name in (*FORMATTER_EXTRA,'validation/worker/prepare.py','validation/inputs.py','validation/profile.json')}
     if set(value['assets'])!=expected_assets: raise ValueError('Unknown or missing finite package asset')
     if not isinstance(value['source_commit'],str) or not re.fullmatch('[a-f0-9]{40}',value['source_commit']): raise ValueError('Invalid package source pin')
     frozen={}
     for name,expected in value['assets'].items():
-        if not isinstance(name,str) or name.startswith('/') or '..' in name.split('/') or not name.startswith(('forward/','rollback/','frontend/','formatter/','baseline.json','installed.patch','operator.py')): raise ValueError('Unknown package asset path')
+        if not isinstance(name,str) or name.startswith('/') or '..' in name.split('/') or not name.startswith(('forward/','rollback/','frontend/','formatter/','formatter-baseline/','baseline.json','installed.patch','operator.py')): raise ValueError('Unknown package asset path')
         data=read(path/name)
         if expected!={'bytes':len(data),'sha256':sha(data)}: raise ValueError('Package asset identity mismatch')
         frozen[name]=data
         if sum(len(v) for v in frozen.values())>LIMIT: raise ValueError('Aggregate finite package budget')
     for name,digest in FORMATTER_EXPECTED.items():
-        if sha(frozen['formatter/'+name])!=digest: raise ValueError('Historical formatter asset drift')
+        if sha(frozen['formatter-baseline/'+name])!=digest or sha(frozen['formatter/'+name])!=digest: raise ValueError('Historical formatter asset drift')
     if sha(frozen['baseline.json'])!=BASELINE_SHA: raise ValueError('Changed baseline asset')
     for name,expected in value['installed'].items():
         if expected!=content_record(frozen['forward/'+name]): raise ValueError('Changed forward target metadata')
@@ -251,6 +253,9 @@ def package(path,digest):
     expected_files.pop('integration-release.json',None)
     expected_release=dict(schema=1,selection=SELECTION,source_commit=value['source_commit'],base_runtime_sha256=baseline['files'][str(CODE/'validation/worker/runtime.py')]['sha256'],files=expected_files)
     for name in INSTALLED_FILES:
+        original=baseline['files'][str(CODE/name)]
+        raw=frozen['formatter-baseline/'+name]
+        if len(raw)!=original['bytes'] or sha(raw)!=original['sha256']: raise ValueError('Baseline formatter closure mismatch')
         expected=value['installed'][name] if name in CHANGED else baseline['files'][str(CODE/name)]
         raw=frozen['formatter/'+name]
         if len(raw)!=expected['bytes'] or sha(raw)!=expected['sha256']: raise ValueError('Formatter installed closure mismatch')
