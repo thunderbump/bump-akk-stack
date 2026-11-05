@@ -997,7 +997,7 @@ def run(build, identity):
         failure=failure or (stage,cause)
         result['exit_code']=2
         result['summary']['outcome']=2
-        result['summary']['failure_cause']=11
+        if not result['summary']['failure_cause']: result['summary']['failure_cause']=11
     finally:
         try:
             result['database_cleanup']=runtime.cleanup()

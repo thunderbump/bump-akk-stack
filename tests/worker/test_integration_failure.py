@@ -20,7 +20,8 @@ from test_actor_integration import artifact, CANDIDATE, TREE, RUN
 
 class GuestFailure(unittest.TestCase):
     def exercise(self, method=None, error=None, *, cleanup=True, artifact_error=None,
-                 controller_pass=False, controller_output=None, private_artifact=False):
+                 controller_pass=False, controller_output=None, private_artifact=False,
+                 controller_failure=11, native_cleanup='not-run', final_error=None):
         with tempfile.TemporaryDirectory() as temporary, ExitStack() as patches:
             root = Path(temporary)
             server = root/'server'
@@ -33,8 +34,8 @@ class GuestFailure(unittest.TestCase):
             result = dict(scope=artifacts.SELECTION, exit_code=2,
                           binaries={name: 'f'*64 for name in ('world', 'zone', 'shared_memory')},
                           fixture_sha256=artifacts.FIXTURE_SHA, process_outcomes=[],
-                          native_cleanup='not-run', database_cleanup='not-run',
-                          summary=dict(integration.initial_summary(), outcome=2, failure_cause=11))
+                          native_cleanup=native_cleanup, database_cleanup='not-run',
+                          summary=dict(integration.initial_summary(), outcome=2, failure_cause=controller_failure))
             if controller_pass:
                 result.update(exit_code=0,native_cleanup=True)
                 result['summary'].update(outcome=1,failure_cause=0,case_outcomes=[1]*3,check_results=[1]*12)
@@ -51,7 +52,9 @@ class GuestFailure(unittest.TestCase):
                     if name == 'actor-population-integration' and controller_output is not None:
                         return controller_output
                     return 'CDAU_RESULT '+artifacts.encoded(result).decode() if name == 'actor-population-integration' else ''
-                def verify_inputs(self): self.invoke('verify_inputs')
+                def verify_inputs(self):
+                    self.invoke('verify_inputs')
+                    if final_error and 'actor-population-integration' in calls: raise final_error
                 def install_packages(self): self.invoke('install_packages')
                 def initialize_database(self): self.invoke('initialize_database')
                 def import_database(self): self.invoke('import_database')
@@ -148,6 +151,12 @@ class GuestFailure(unittest.TestCase):
         failure,_=self.exercise(controller_pass=True,private_artifact=True)
         self.assertEqual(str(failure),'integration-nonpass:artifact-validate:value')
         self.assertIsInstance(failure.__cause__,ValueError)
+
+    def test_controller_failure_code_and_native_cleanup_survive_final_verification_error(self):
+        failure,_=self.exercise(controller_failure=8,native_cleanup=False,final_error=OSError('PRIVATE-CREDENTIAL'))
+        self.assertEqual(str(failure),'integration-nonpass:controller-result:nonpass')
+        self.assertEqual(failure.result['summary']['failure_cause'],8)
+        self.assertIs(failure.result['native_cleanup'],False)
 
 
 if __name__ == '__main__': unittest.main()
