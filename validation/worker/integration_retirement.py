@@ -172,7 +172,9 @@ def reject_references(identities,processes=None):
 
     Access mode is insufficient: read-only directory FDs permit openat, and a
     read-only file FD may be reopened through procfs. Reject every such reference.
-    Only disappearing processes/descriptors are ignored; inspection denial refuses.
+    Process birth/departure/reuse and uncertain inspection refuse. A descriptor
+    disappearing during inspection is tolerated only within the stable process
+    and task sets; active worker-principal tasks always refuse.
     """
     selected=None if processes is None else list(processes)
     snapshot=process_snapshot(selected)
