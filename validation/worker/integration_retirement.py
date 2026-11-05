@@ -152,6 +152,37 @@ def inspect(state,archive,expected):
     return 'original' if at_source else 'retired'
 
 
+def reject_references(identities,processes=None):
+    """Any foreign FD or cwd/root reference can reopen owner-writable history.
+
+    Access mode is insufficient: read-only directory FDs permit openat, and a
+    read-only file FD may be reopened through procfs. Reject every such reference.
+    Only disappearing processes/descriptors are ignored; inspection denial refuses.
+    """
+    processes=Path('/proc').glob('[0-9]*') if processes is None else processes
+    for process in processes:
+        if process.name==str(os.getpid()): continue
+        try:
+            for entry in [process/'cwd',process/'root',*(process/'fd').iterdir()]:
+                try:
+                    info=entry.stat()
+                    if (info.st_dev,info.st_ino) in identities: raise ValueError('retained-reference')
+                except (FileNotFoundError,ProcessLookupError): pass
+            # Shared writable mappings outlive their original file descriptor.
+            with (process/'maps').open() as stream:
+                count=0
+                for line in stream:
+                    count+=1
+                    if count>65536 or len(line)>8192: raise ValueError('process-map-bound')
+                    fields=line.split(maxsplit=5)
+                    if len(fields)<5: raise ValueError('process-map-shape')
+                    major,minor=fields[3].split(':')
+                    identity=(os.makedev(int(major,16),int(minor,16)),int(fields[4]))
+                    if identity in identities and 'w' in fields[1] and fields[1].endswith('s'):
+                        raise ValueError('retained-mapping')
+        except (FileNotFoundError,ProcessLookupError): pass
+
+
 def transaction(op,host,expected):
     """No automatic recovery: only explicit rollback handles recognized interruption.
 
@@ -314,7 +345,9 @@ class Host:
         return dict(stamp(before),sha256=sha(raw))
 
     def socket(self,value): self.ops.socket(value)
-    def writers(self,identities): self.ops.writers(identities)
+    def writers(self,identities):
+        self.ops.writers(identities)
+        reject_references(identities)
 
 
 def validate_package(path,digest):

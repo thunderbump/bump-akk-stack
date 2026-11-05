@@ -171,3 +171,22 @@ class ResultGuard(unittest.TestCase):
             finally:
                 if host.result_fd is not None:os.close(host.result_fd)
                 os.close(state)
+
+
+class RetainedReferences(unittest.TestCase):
+    def test_subprocess_readonly_directory_fd_is_rejected_before_openat_mutation(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            directory=Path(tmp);info=directory.stat()
+            code="import os,sys;fd=os.open(sys.argv[1],os.O_RDONLY|os.O_DIRECTORY);print('held',flush=True);sys.stdin.read(1)"
+            child=subprocess.Popen([sys.executable,'-B','-c',code,str(directory)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True)
+            try:
+                self.assertEqual(child.stdout.readline().strip(),'held')
+                with self.assertRaisesRegex(ValueError,'retained-reference'):
+                    r.reject_references({(info.st_dev,info.st_ino)},[Path('/proc')/str(child.pid)])
+                self.assertEqual(list(directory.iterdir()),[])
+            finally:
+                child.communicate(input='x',timeout=5)
+                self.assertEqual(child.returncode,0)
+    def test_unrelated_reference_does_not_refuse(self):
+        r.reject_references({(0,0)},[Path('/proc')/str(os.getpid())])
