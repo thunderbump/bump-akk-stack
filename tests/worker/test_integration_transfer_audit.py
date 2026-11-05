@@ -48,7 +48,8 @@ class ReadOnlyAudit(unittest.TestCase):
 
     def snapshot(self):
         result={}
-        for path in [self.state,self.target,self.state/'worker.lock',*sorted(self.target.iterdir())]:
+        # The observer must not change directory atime while taking its own snapshots.
+        for path in [self.state,self.target,self.state/'worker.lock',*[self.target/name for name in audit.LIMITS]]:
             data=None
             if path.is_file():
                 fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NOATIME)
