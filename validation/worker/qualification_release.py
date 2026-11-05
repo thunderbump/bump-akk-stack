@@ -27,7 +27,7 @@ PRIOR_BACKUP=CODE/'.central-cdau-integration-backup-v1'
 OPERATOR=Path('/usr/local/libexec/eqemu-cdau-qualification-operator-v2.py')
 BASELINE_SHA='85f4393423c520b5f92db11eb24899db0ceaa42e4a1b622d652bcf59932c3e15'
 SELECTION='central-cdau-integration-v1'
-CHANGED=('validation/worker/guest.py','validation/worker/build_guest.py','validation/worker/actor_integration.py','integration-release.json')
+CHANGED=('validation/worker/guest.py','validation/worker/build_guest.py','validation/worker/actor_integration.py','validation/actor-integration-fixture.json','integration-release.json')
 PATCHED=CHANGED[:-1]
 ADDED=()
 ASSETS=CHANGED
@@ -138,7 +138,16 @@ def patch_files(old,patch):
     return result
 
 
+def unused_successor_paths():
+    # These v2 names may be reused only while no operator or transaction exists.
+    for path in (OPERATOR,JOURNAL,BACKUP):
+        try: path.lstat()
+        except FileNotFoundError: continue
+        raise ValueError('Successor operator or audit path already used: '+str(path))
+
+
 def prepare(source,output):
+    unused_successor_paths()
     source=Path(source);output=Path(output)
     status=subprocess.run(['/usr/bin/git','-C',str(source),'-c','core.fsmonitor=false','-c','core.hooksPath=/dev/null','status','--porcelain','--untracked-files=all'],check=True,stdout=subprocess.PIPE).stdout
     if status: raise ValueError('Preparation requires a clean committed Stack checkout')
@@ -156,6 +165,8 @@ def prepare(source,output):
         if not matches(content_record(raw),{k:baseline['files'][str(CODE/name)][k] for k in ('bytes','sha256')}): raise ValueError('Changed original helper during preparation')
     patch=source_bytes('validation/worker/integration-308.patch')
     forward=patch_files(old,patch)
+    if forward['validation/actor-integration-fixture.json']!=source_bytes('validation/actor-integration-fixture.json'):
+        raise ValueError('Frontend and guest fixture binding differ')
     # No installed additions; exact successor patch plus refreshed release manifest.
     # Derive the complete narrow installed inventory without importing its code.
     sys.path.insert(0,str(source/'validation/worker'))
@@ -260,6 +271,8 @@ def package(path,digest):
         raw=frozen['formatter/'+name]
         if len(raw)!=expected['bytes'] or sha(raw)!=expected['sha256']: raise ValueError('Formatter installed closure mismatch')
     if release!=expected_release or type(release['schema']) is not int: raise ValueError('Installed/frontend source identity mismatch')
+    if frozen['forward/validation/actor-integration-fixture.json']!=frozen['frontend/validation/actor-integration-fixture.json']:
+        raise ValueError('Frontend and guest fixture binding differ')
     fixture=json.loads(frozen['frontend/validation/actor-integration-fixture.json'])
     runtime_fixture=json.loads(frozen['frontend/validation/runtime-fixture.json'])
     expected_inputs=dict(native=dict(bytes=469000192,sha256='02e94c23126772a5ca81ac7974661c3010cbdbba8da7647b8ac6cedac6c3cca4'),runtime={k:runtime_fixture['iso'][k] for k in ('bytes','sha256')},rust=fixture['rust_input'],fixture=dict(fixture['fixture'],manifest_sha256=fixture['manifest_sha256']))

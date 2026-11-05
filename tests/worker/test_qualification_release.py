@@ -57,6 +57,28 @@ class Publication(unittest.TestCase):
         for name,value in dict(CODE=self.code,DIRECTORIES=self.dirs,LOCK=self.lock,JOURNAL=root/'journal',BACKUP=self.code/'.backup').items(): stack.enter_context(patch.object(r,name,value))
         stack.enter_context(patch.object(r,'package',return_value=(self.manifest,self.baseline,self.assets)))
 
+    def test_fifth_fixture_asset_partial_publication_restores_actual_308_bytes_and_inode(self):
+        name='validation/actor-integration-fixture.json'
+        self.assertEqual(len(r.CHANGED),5);self.assertIn(name,r.CHANGED);self.assertEqual(r.ADDED,())
+        original=self.baseline['files'][str(self.code/name)];real=r.append
+        def stop(event,target,info=None):
+            value=real(event,target,info)
+            if event=='published' and target==name:raise OSError('interrupted after fifth-source fixture publication')
+            return value
+        with patch.object(r,'append',side_effect=stop),self.assertRaises(OSError):r.apply(Path('/unused'),self.digest,self.host)
+        r.rollback(Path('/unused'),self.digest,self.host);r.rollback(Path('/unused'),self.digest,self.host)
+        self.assertEqual(r.record(self.code/name,self.host),original)
+
+    def test_versioned_successor_paths_must_be_unapplied(self):
+        with patch.object(r,'OPERATOR',self.code.parent/'operator'):
+            r.unused_successor_paths()
+            r.OPERATOR.write_bytes(b'existing historical operator')
+            with self.assertRaises(ValueError):r.unused_successor_paths()
+            r.OPERATOR.unlink();r.JOURNAL.write_bytes(b'existing transaction')
+            with self.assertRaises(ValueError):r.unused_successor_paths()
+            r.JOURNAL.unlink();r.BACKUP.mkdir()
+            with self.assertRaises(ValueError):r.unused_successor_paths()
+
     def test_prior_admission_private_history_drift_refuses_without_overwrite(self):
         history=self.code.parent/'prior-journal';history.write_bytes(b'prior frozen history')
         expected=r.record(history,self.host)
