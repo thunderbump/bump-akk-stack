@@ -74,6 +74,12 @@ def exchange_once(path, request, payload=None, profile_output=None, *, integrati
                 try:
                     integration_sink.accept(frame)
                     if integration_sink.ended:
+                        # An incomplete prefix is retained, never parsed as a whole artifact or ACKed.
+                        # Keep reading the final worker report so its cleanup facts survive.
+                        if not integration_sink.valid or not integration_sink.total:
+                            integration_receipt = integration_sink.finish()
+                            data = bytearray(rest)
+                            continue
                         from actor_integration import validate_artifact
                         artifact=validate_artifact((integration_sink.directory/__import__('integration_artifacts').NAME).read_bytes())
                         if (artifact['manifest']['server_commit']!=integration_sink.fixed['candidate']
