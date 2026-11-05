@@ -15,6 +15,7 @@ import json
 import os
 from pathlib import Path
 import stat
+import types
 
 STATE = Path('/var/lib/eqemu-validator')
 ARCHIVE = Path('/var/lib/eqemu-validator-transfer-archive-02fee-v1')
@@ -169,7 +170,12 @@ def transaction(op,host,expected):
             else: intent=None
             current=inspect(state,archive,expected)
             host.verify();check_state();check_archive()
-            if op=='verify': return dict(state=current,vm_started=False,uncertain=True,ack=False)
+            if op=='verify':
+                if intent is not None:
+                    required='retired.json' if current=='retired' else 'rollback.json'
+                    if absent(archive,required) or (current=='retired' and not absent(archive,'rollback.json')):
+                        raise ValueError('interrupted-disposition')
+                return dict(state=current,vm_started=False,uncertain=True,ack=False)
             if op=='apply' and intent is not None: raise ValueError('used-transaction')
             if op=='rollback' and (intent is None or current!='retired' or not absent(archive,'rollback.json')): raise ValueError('rollback-state')
             host.socket(False);host.verify();check_state();check_archive()
@@ -197,13 +203,22 @@ def transaction(op,host,expected):
 
 class Host:
     def __init__(self,package):
-        import importlib.util
         self.package=Path(package)
-        def module(name,path):
-            spec=importlib.util.spec_from_file_location(name,path);value=importlib.util.module_from_spec(spec);spec.loader.exec_module(value);return value
-        self.release=module('finite_v6',self.package/'v6/operator.py')
-        self.audit=module('finite_audit',self.package/'audit.py')
-        self.data=json.loads(read(self.package/'binding.json'))
+        def module(name,path,want):
+            # Execute only the exact frozen bytes just verified in memory. Package
+            # paths are user-owned and must never be imported after a hash check.
+            raw=read(path)
+            if sha(raw)!=want: raise ValueError('helper-hash')
+            value=types.ModuleType(name);value.__file__=str(path)
+            exec(compile(raw,str(path),'exec'),value.__dict__)
+            return value
+        self.release=module('finite_v6',self.package/'v6/operator.py',
+                            '9e7b899fdd3ec11ba20626e68bae0c15f8775c01b16e1f93454772fa0813f296')
+        self.audit=module('finite_audit',self.package/'audit.py',
+                          '5979299ebd41706e6e7f5affc33c7eabc30dfe0931c363c10aa788b159f68ba6')
+        raw=read(self.package/'binding.json')
+        if sha(raw)!=DATA_SHA: raise ValueError('binding')
+        self.data=json.loads(raw)
         self.ops=self.release.Host();self.history=None
 
     @contextlib.contextmanager
@@ -256,6 +271,19 @@ def validate_package(path,digest):
         if name.startswith('/') or '..' in name.split('/'): raise ValueError('asset')
         data=read(path/name)
         if expected!=dict(bytes=len(data),sha256=sha(data)): raise ValueError('asset-hash')
+    expected={'operator.py','binding.json','audit.py','v6/manifest.json'}
+    v6=json.loads(read(path/'v6/manifest.json',65536))
+    expected.update('v6/'+name for name in v6['assets'])
+    if set(manifest['assets'])!=expected: raise ValueError('asset-inventory')
+    seen=set();count=0
+    for parent,dirs,files in os.walk(path,followlinks=False):
+        count+=len(dirs)+len(files)
+        if count>256: raise ValueError('members')
+        for name in dirs+files:
+            f=Path(parent)/name
+            if f.is_symlink(): raise ValueError('symlink')
+        seen.update(str((Path(parent)/name).relative_to(path)) for name in files)
+    if seen!=expected|{'manifest.json'}: raise ValueError('unknown-members')
     if sha(read(path/'binding.json'))!=DATA_SHA: raise ValueError('binding')
     if sha(read(path/'v6/manifest.json'))!=V6_SHA: raise ValueError('v6')
     if sha(read(path/'audit.py'))!='5979299ebd41706e6e7f5affc33c7eabc30dfe0931c363c10aa788b159f68ba6': raise ValueError('audit')

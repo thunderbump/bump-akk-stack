@@ -99,9 +99,20 @@ class Retirement(unittest.TestCase):
         self.host.fail_at=4
         with self.assertRaises(ValueError):self.runop('apply')
         self.assertTrue(self.host.stopped);self.assertFalse(self.target.exists());self.assertTrue((self.archive/r.RETIRED).exists())
-        self.host.fail_at=None;self.assertEqual(self.runop('rollback')['state'],'original')
+        self.host.fail_at=None
+        with self.assertRaisesRegex(ValueError,'interrupted-disposition'):self.runop('verify')
+        self.assertEqual(self.runop('rollback')['state'],'original')
+        self.assertEqual(self.runop('verify')['state'],'original')
         self.assertFalse(self.host.stopped)
     def test_drift_in_installed_guard_leaves_original_untouched(self):
         self.host.fail_at=1
         with self.assertRaises(ValueError):self.runop('apply')
         self.assertTrue(self.target.exists());self.assertFalse(self.archive.exists());self.assertFalse(self.host.stopped)
+
+
+class FrozenHelperLoading(unittest.TestCase):
+    def test_replaced_package_helper_is_never_executed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp);(p/'v6').mkdir()
+            (p/'v6/operator.py').write_text("raise AssertionError('UNTRUSTED EXECUTED')")
+            with self.assertRaisesRegex(ValueError,'helper-hash'):r.Host(p)
