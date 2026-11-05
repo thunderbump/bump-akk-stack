@@ -63,6 +63,17 @@ def decode(raw):
     except (ValueError,UnicodeError): raise Refused('binding') from None
 
 
+def members(fd):
+    """At most the three expected names and the first unexpected entry are inspected."""
+    os.lseek(fd,0,os.SEEK_SET)
+    found=set()
+    with os.scandir(fd) as entries:
+        for entry in entries:
+            if entry.name not in LIMITS or entry.name in found: raise Refused('members')
+            found.add(entry.name)
+    if found!=set(LIMITS): raise Refused('members')
+
+
 class Host:
     def root(self):
         if os.geteuid()!=0 or os.getegid()!=0: raise Refused('root')
@@ -136,7 +147,7 @@ def audit(host=None):
         target=directory('last-integration',state);target_info=os.fstat(target)
         if not state_metadata(target_info): raise Refused('state')
         chain.append((state,'last-integration',target,fingerprint(target_info),True))
-        if set(os.listdir(target))!=set(LIMITS): raise Refused('members')
+        members(target)
         raw={};records={}
         for name,limit in LIMITS.items():raw[name],records[name]=read_file(target,name,limit)
         if not same(decode(raw['pending.json']),BINDING) or not same(decode(raw['receipt.json']),RECEIPT) or raw[NAME]!=b'':
@@ -147,7 +158,7 @@ def audit(host=None):
             if (fingerprint(os.stat(name,dir_fd=parent,follow_symlinks=False))!=before
                     or fingerprint(os.fstat(fd))!=before or os.pread(fd,limit+1,0)!=data
                     or fingerprint(os.fstat(fd))!=before): raise Refused('changed')
-        if set(os.listdir(target))!=set(LIMITS): raise Refused('members')
+        members(target)
         if (fingerprint(os.fstat(lock))!=lock_before
                 or fingerprint(os.stat('worker.lock',dir_fd=state,follow_symlinks=False))!=lock_before): raise Refused('changed')
         check_chain()
