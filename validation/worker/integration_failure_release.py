@@ -470,6 +470,12 @@ def current_kind(name,manifest,baseline,host,events):
 def verify_state(manifest,baseline,host,events,*,old_only=False,new_only=False,assets=None,history=None):
     if history is None: raise ValueError('Derived history observation required')
     history.check()
+    if BACKUP.exists() or BACKUP.is_symlink():
+        # No backup can belong to an untouched transaction. Resumption requires
+        # the exact protected directory type/metadata before any new writes.
+        info=host.info(BACKUP)
+        if not events or not stat.S_ISDIR(info.st_mode) or (info.st_uid,info.st_gid,stat.S_IMODE(info.st_mode))!=(0,0,0o700):
+            raise ValueError('Unrecognized v6 rollback directory')
     # Prior admission is immutable history, not the successor transaction journal.
     for prior in PRIOR_BACKUPS:
         expected_paths={Path(name) for name in PRIOR_PRIVATE if prior in Path(name).parents}

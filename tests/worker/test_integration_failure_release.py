@@ -6,6 +6,8 @@ from pathlib import Path
 import stat
 import sys
 import tempfile
+import subprocess
+import runpy
 import types
 import unittest
 from unittest.mock import patch
@@ -86,6 +88,30 @@ class Publication(unittest.TestCase):
             with self.assertRaises(ValueError):r.unused_successor_paths()
             r.JOURNAL.unlink();r.BACKUP.mkdir()
             with self.assertRaises(ValueError):r.unused_successor_paths()
+
+    def test_unknown_backup_root_refuses_before_journal_socket_or_metadata_writes(self):
+        r.BACKUP.mkdir(mode=0o777);r.BACKUP.chmod(0o777)
+        info=r.BACKUP.stat();self.host.metadata_by_inode[info.st_dev,info.st_ino]=(1000,1000,0o777)
+        for uid,gid,mode in [(1000,1000,0o777),(0,0,0o700)]:
+            fd=os.open(r.BACKUP,os.O_RDONLY)
+            try:self.host.metadata(fd,uid,gid,mode)
+            finally:os.close(fd)
+            before=r.record(r.BACKUP,self.host);calls=list(self.host.calls)
+            with self.assertRaises(ValueError):r.verify(Path('/unused'),self.digest,self.host)
+            with self.assertRaises(ValueError):r.apply(Path('/unused'),self.digest,self.host)
+            self.assertEqual(r.record(r.BACKUP,self.host),before);self.assertFalse(r.JOURNAL.exists())
+            self.assertEqual(self.host.calls,calls+[('quiescent',),('quiescent',)])
+
+    def test_unprotected_backup_root_during_resumption_is_not_repaired(self):
+        r.apply(Path('/unused'),self.digest,self.host)
+        fd=os.open(r.BACKUP,os.O_RDONLY)
+        try:self.host.metadata(fd,0,0,0o777)
+        finally:os.close(fd)
+        before=r.record(r.BACKUP,self.host);calls=list(self.host.calls)
+        with self.assertRaises(ValueError):r.verify(Path('/unused'),self.digest,self.host)
+        with self.assertRaises(ValueError):r.rollback(Path('/unused'),self.digest,self.host)
+        self.assertEqual(r.record(r.BACKUP,self.host),before)
+        self.assertEqual(self.host.calls,calls+[('quiescent',),('quiescent',)])
 
     def test_prior_admission_private_history_drift_refuses_without_overwrite(self):
         history=self.code.parent/'prior-journal';history.write_bytes(b'prior frozen history')
@@ -309,3 +335,12 @@ class DerivedJournal(Publication):
         header['derived_private'][str(self.prior)]['uid']=False
         r.JOURNAL.write_bytes(r.canonical(header)+b''.join(lines[1:]))
         with self.assertRaises(ValueError):r.verify(Path('/unused'),self.digest,self.host)
+
+
+class PreparationEntry(unittest.TestCase):
+    def test_script_propagates_handled_prepare_refusal_and_success_status(self):
+        script=Path(__file__).resolve().parents[2]/'scripts/prepare-integration-failure'
+        for code in (0,2):
+            with self.subTest(code=code),patch.dict(sys.modules,{'integration_failure_release':types.SimpleNamespace(main=lambda:code)}),patch.object(sys,'path',list(sys.path)):
+                with self.assertRaises(SystemExit) as raised:runpy.run_path(str(script),run_name='__main__')
+                self.assertEqual(raised.exception.code,code)
