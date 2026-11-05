@@ -12,7 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'validation/worker'))
 import actor_integration as a
 import guest
 import integration_artifacts as wire
-import integration_diagnostic_release as release
+import integration_repair_release as release
 
 class OrdinaryInput(unittest.TestCase):
     def identity(self):
@@ -40,10 +40,10 @@ class OrdinaryInput(unittest.TestCase):
 
     def test_repin_changes_only_commit_tree_and_retains_rust_tree(self):
         root=Path(__file__).resolve().parents[2]
-        oldraw=subprocess.check_output(['git','-C',str(root),'show','cf11c73f7abf6c7b41d4a6d523f5371c502d384e:validation/actor-integration-fixture.json'])
+        oldraw=subprocess.check_output(['git','-C',str(root),'show','cb5f5f35c001016ae3bbb6ab561b06953a02a9a3:validation/actor-integration-fixture.json'])
         newraw=(root/'validation/actor-integration-fixture.json').read_bytes()
         before=json.loads(oldraw);after=json.loads(newraw)
-        expected={'commit': 'c9288ddf8573031aacc57d0c107c97a5e8243432', 'tree': 'ec15350ab250f2533b295a6eacaf1bb2ed904491'}
+        expected={'commit': 'e35d4513c44e5eacac796a36fd68cd30acb7706a', 'tree': 'f288d612781a4ceb9d8595f4d36d797c863080b1'}
         rewritten=oldraw
         for key,value in expected.items():
             self.assertEqual(after['server_source'][key],value)
@@ -61,7 +61,7 @@ class OrdinaryInput(unittest.TestCase):
         integrated=copy.deepcopy(ordinary);integrated['integration']=wire.SELECTION
         integrated['files']['integration-fixture.tar']=dict(bytes=a.FIXTURE_BYTES,sha256=wire.FIXTURE_SHA)
         a.validate_input_identity(integrated)
-        for commit,tree in [('7d19508967b0f924ff02441a3065dbfd7ab846cc','1d89d42026354b879c4d9246b52f97ee4fe0a675'),('7d19508967b0f924ff02441a3065dbfd7ab846cc',ordinary['tree']),(ordinary['candidate'],'1d89d42026354b879c4d9246b52f97ee4fe0a675'),('928d82e3fca80a0be28049330c0f93226b4a3db4','6165225b56edb97173420c465aea93bb8fa610ad'),('928d82e3fca80a0be28049330c0f93226b4a3db4',ordinary['tree']),(ordinary['candidate'],'6165225b56edb97173420c465aea93bb8fa610ad'),('1734b9e66f64ed4b431010b8206b0396732ef506','843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('1734b9e66f64ed4b431010b8206b0396732ef506',ordinary['tree']),(ordinary['candidate'],'843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('0'*40,ordinary['tree'])]:
+        for commit,tree in [('c9288ddf8573031aacc57d0c107c97a5e8243432','ec15350ab250f2533b295a6eacaf1bb2ed904491'),('c9288ddf8573031aacc57d0c107c97a5e8243432',ordinary['tree']),(ordinary['candidate'],'ec15350ab250f2533b295a6eacaf1bb2ed904491'),('7d19508967b0f924ff02441a3065dbfd7ab846cc','1d89d42026354b879c4d9246b52f97ee4fe0a675'),('7d19508967b0f924ff02441a3065dbfd7ab846cc',ordinary['tree']),(ordinary['candidate'],'1d89d42026354b879c4d9246b52f97ee4fe0a675'),('928d82e3fca80a0be28049330c0f93226b4a3db4','6165225b56edb97173420c465aea93bb8fa610ad'),('928d82e3fca80a0be28049330c0f93226b4a3db4',ordinary['tree']),(ordinary['candidate'],'6165225b56edb97173420c465aea93bb8fa610ad'),('1734b9e66f64ed4b431010b8206b0396732ef506','843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('1734b9e66f64ed4b431010b8206b0396732ef506',ordinary['tree']),(ordinary['candidate'],'843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('0'*40,ordinary['tree'])]:
             for value in (ordinary,integrated):
                 bad=copy.deepcopy(value);bad.update(candidate=commit,tree=tree)
                 with self.assertRaises(ValueError):a.validate_build_binding(bad)
@@ -77,14 +77,14 @@ class OrdinaryInput(unittest.TestCase):
         self.assertIn('/opt/actor-integration-fixture.json',files)
         self.assertEqual(guest.BUILD_CHECKS[-1],'normal-world')
 
-    def test_successor_patch_matches_current_cf11_only_and_does_not_promote_master(self):
+    def test_successor_patch_matches_current_cb5_only_and_does_not_promote_master(self):
         root=Path(__file__).resolve().parents[2]
         before={name:release.read(release.CODE/name) for name in release.PATCHED}
-        result=release.patch_files(before,(root/'validation/worker/integration-cf11.patch').read_bytes())
+        result=release.patch_files(before,(root/'validation/worker/integration-cb5.patch').read_bytes())
         self.assertEqual(set(result),set(release.PATCHED))
         self.assertEqual(set(result),{'validation/actor-integration-fixture.json'})
         self.assertEqual(result['validation/actor-integration-fixture.json'],(root/'validation/actor-integration-fixture.json').read_bytes())
         changed=dict(before);changed[release.PATCHED[0]]=b'changed bytes'
-        with self.assertRaises(ValueError):release.patch_files(changed,(root/'validation/worker/integration-cf11.patch').read_bytes())
+        with self.assertRaises(ValueError):release.patch_files(changed,(root/'validation/worker/integration-cb5.patch').read_bytes())
 
 if __name__=='__main__':unittest.main()
