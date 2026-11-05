@@ -1,0 +1,138 @@
+--- a/validation/worker/actor_integration.py
++++ b/validation/worker/actor_integration.py
+@@ -908,6 +908,25 @@
+                 boot_attempts=sum(e[3]==12 and e[6][0]==1 and e[6][3]==100 for e in events))
+ 
+ 
++FAILURE_PHASES = ('runtime-directory','mount-runtime','runtime-inputs','runtime-packages',
++                  'database-initialize','database-import','server-configure','fixture-quests',
++                  'fixture-config','fixture-plan','fixture-ownership','shared-memory','shared-files',
++                  'controller','controller-result','final-inputs','binary-identity',
++                  'database-cleanup','artifact-read','artifact-validate')
++
++
++def failure_text(phase, cause):
++    """Only fixed source vocabulary enters the existing bounded guest error string."""
++    if phase not in FAILURE_PHASES: fail()
++    kind = 'nonpass' if cause is None else 'other'
++    for error_type, name in ((TimeoutError,'timeout'),(OSError,'os'),(ValueError,'value'),
++                             (TypeError,'type'),(RuntimeError,'runtime')):
++        if isinstance(cause,error_type):
++            kind=name
++            break
++    return 'integration-nonpass:'+phase+':'+kind
++
++
+ def run(build, identity):
+     """Enter only the disposable guest's existing full build/fixture lifecycle."""
+     import os
+@@ -930,49 +949,75 @@
+     binaries={name:build.sha(build.WORK/'build/bin'/name) for name in ('world','zone','shared_memory')}
+     result=dict(scope=SELECTION,exit_code=2,binaries=binaries,fixture_sha256=FIXTURE_SHA,process_outcomes=[],
+                 native_cleanup='not-run',database_cleanup='not-run',summary=initial_summary())
+-    artifact=b'';error=True;server=None;account=pwd.getpwnam('nobody')
++    artifact=b'';error=True;server=None;account=pwd.getpwnam('nobody');failure=None
++    stage='runtime-directory'
+     try:
+         MEDIA.mkdir()
++        stage='mount-runtime'
+         runtime.command('integration-mount-runtime',['mount','-o','loop,ro,nosuid,nodev,noexec','/media/eqemu-input/runtime.iso',str(MEDIA)])
+-        runtime.verify_inputs();runtime.install_packages();runtime.initialize_database();runtime.import_database()
+-        server=runtime.configure();install_quests(server)
++        stage='runtime-inputs';runtime.verify_inputs()
++        stage='runtime-packages';runtime.install_packages()
++        stage='database-initialize';runtime.initialize_database()
++        stage='database-import';runtime.import_database()
++        stage='server-configure';server=runtime.configure()
++        stage='fixture-quests';install_quests(server)
++        stage='fixture-config'
+         config=decode((server/'eqemu_config.json').read_bytes())
+         config['server']['world']['loginserver']=dict(host='127.0.0.1',port='5998',account='',password='')
+         (server/'eqemu_config.json').write_bytes(encoded(config))
++        stage='fixture-plan'
+         run_id=Path('/opt/eqemu-worker-nonce').read_text().strip()
+         plan=dict(run=run_id,server_commit=identity['candidate'],server_tree=identity['tree'],stack_commit=identity['stack_commit'],binaries=binaries)
+         (server/'integration-plan.json').write_bytes(encoded(plan));(server/'integration-plan.json').chmod(0o600)
++        stage='fixture-ownership'
+         for path in (server,*server.rglob('*')):
+             if not path.is_symlink(): os.chown(path,account.pw_uid,account.pw_gid)
+         prefix=['/usr/bin/setpriv','--reuid='+str(account.pw_uid),'--regid='+str(account.pw_gid),'--clear-groups','--no-new-privs']
++        stage='shared-memory'
+         runtime.command('integration-shared-memory',[*prefix,str(build.WORK/'build/bin/shared_memory')],cwd=server,timeout=180)
++        stage='shared-files'
+         for name in ('items','spells'):
+             path=server/'shared'/name
+             if not path.is_file() or path.is_symlink() or not 0<path.stat().st_size<=768*1024**2: fail()
++        stage='controller'
+         output=runtime.command('actor-population-integration',[*prefix,'/usr/bin/python3','/opt/actor_integration.py',str(build.WORK/'build/bin'),str(server)],cwd=server,timeout=max(1,runtime.deadline-time.monotonic()-30))
++        stage='controller-result'
+         lines=[line[len('CDAU_RESULT '):] for line in output.splitlines() if line.startswith('CDAU_RESULT ')]
+         if len(lines)!=1: fail()
+         observed=decode(lines[0]);validate_result(observed,database_required=False)
+         if observed['binaries']!=binaries or observed['fixture_sha256']!=FIXTURE_SHA: fail()
+         result=observed
+         error=False
++        if result['exit_code']: failure=(stage,None)
++        stage='final-inputs'
+         runtime.verify_inputs()
++        stage='binary-identity'
+         if any(build.sha(build.WORK/'build/bin'/name)!=digest for name,digest in binaries.items()): fail()
+-    except Exception:
++    except Exception as cause:
++        failure=failure or (stage,cause)
+         result['exit_code']=2
+         result['summary']['outcome']=2
+-        result['summary']['failure_cause']=11
++        if not result['summary']['failure_cause']: result['summary']['failure_cause']=11
+     finally:
+-        try: result['database_cleanup']=runtime.cleanup()
+-        except Exception: result['database_cleanup']=False
++        try:
++            result['database_cleanup']=runtime.cleanup()
++            if result['database_cleanup'] is not True: failure=failure or ('database-cleanup',None)
++        except Exception as cause:
++            result['database_cleanup']=False
++            failure=failure or ('database-cleanup',cause)
+         for sig,handler in prior.items(): signal.signal(sig,handler)
+         if server is not None:
++            stage='artifact-read'
+             try:
+                 artifact=read_public(server/(SELECTION+'.json'),CAP,owner=account.pw_uid)
++                stage='artifact-validate'
+                 public_artifact(artifact,runtime.secrets)
+-            except Exception: artifact=b''
++            except Exception as cause:
++                artifact=b''
++                failure=failure or (stage,cause)
+         if error or result['database_cleanup'] is not True or not artifact:
+             result['exit_code']=2;result['summary']['outcome']=2
++            if not result['summary']['failure_cause']: result['summary']['failure_cause']=11
+         for frame in frames(artifact,identity['candidate'],Path('/opt/eqemu-worker-nonce').read_text().strip(),
+                             complete=bool(artifact) and decode(artifact)['complete'],
+                             gaps=not bool(artifact) or bool(decode(artifact)['gaps']),
+@@ -980,7 +1025,9 @@
+             sys_stdout_write(wire(frame))
+     validate_result(result)
+     if result['exit_code']:
+-        failure=RuntimeError('integration-nonpass');failure.result=result;raise failure
++        phase,cause=failure or ('controller-result',None)
++        error=RuntimeError(failure_text(phase,cause));error.result=result
++        raise error from cause
+     return result
+ 
+ 
+--- a/validation/worker/client.py
++++ b/validation/worker/client.py
+@@ -70,6 +70,12 @@
+                 try:
+                     integration_sink.accept(frame)
+                     if integration_sink.ended:
++                        # An incomplete prefix is retained, never parsed as a whole artifact or ACKed.
++                        # Keep reading the final worker report so its cleanup facts survive.
++                        if not integration_sink.valid or not integration_sink.total:
++                            integration_receipt = integration_sink.finish()
++                            data = bytearray(rest)
++                            continue
+                         from actor_integration import validate_artifact
+                         artifact=validate_artifact((integration_sink.directory/__import__('integration_artifacts').NAME).read_bytes())
+                         if (artifact['manifest']['server_commit']!=integration_sink.fixed['candidate']

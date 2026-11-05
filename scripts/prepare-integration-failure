@@ -1,0 +1,8 @@
+#!/usr/bin/python3 -I
+"""Prepare only the finite admitted-2821 failure-evidence successor; starts no worker."""
+import sys
+from pathlib import Path
+sys.dont_write_bytecode=True
+sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'validation/worker'))
+from integration_failure_release import main
+if __name__=='__main__': main()
