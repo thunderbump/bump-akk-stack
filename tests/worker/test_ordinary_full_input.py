@@ -77,9 +77,11 @@ class OrdinaryInput(unittest.TestCase):
         self.assertIn('/opt/actor-integration-fixture.json',files)
         self.assertEqual(guest.BUILD_CHECKS[-1],'normal-world')
 
-    def test_successor_patch_matches_current_cb5_only_and_does_not_promote_master(self):
+    def test_frozen_successor_patch_matches_cb5_only_and_does_not_promote_master(self):
         root=Path(__file__).resolve().parents[2]
-        before={name:release.read(release.CODE/name) for name in release.PATCHED}
+        # This used v5 patch has a historical cb5 baseline, independent of today's installation.
+        before={name:subprocess.check_output(['git','-C',str(root),'show',
+                    'cb5f5f35c001016ae3bbb6ab561b06953a02a9a3:'+name]) for name in release.PATCHED}
         result=release.patch_files(before,(root/'validation/worker/integration-cb5.patch').read_bytes())
         self.assertEqual(set(result),set(release.PATCHED))
         self.assertEqual(set(result),{'validation/actor-integration-fixture.json'})
