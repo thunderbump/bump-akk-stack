@@ -21,7 +21,16 @@ class FakeHost:
         self.calls+=1
         if self.calls==self.fail_at: raise ValueError('injected')
     def socket(self,value): self.stopped=not value
-    def writers(self,identities): pass
+    def writers(self,identities):
+        if getattr(self,'writer',False): raise ValueError('preopened-writer')
+    def state_metadata(self,fd): return self.parent
+    def protect(self,fd):
+        self.parent=dict(self.original_parent,uid=0,gid=0)
+        if getattr(self,'half_protection',False): raise ValueError('half-protection')
+    def restore(self,fd,old):self.parent=dict(old)
+    def result(self,state):
+        if getattr(self,'no_result',False):raise ValueError('result-unavailable')
+        return dict(device=1,inode=10,sha256='fixed',mtime_ns=getattr(self,'workload',0))
 
 
 class Retirement(unittest.TestCase):
@@ -51,6 +60,8 @@ class Retirement(unittest.TestCase):
             finally:os.close(child)
         self.enterContext(patch.object(r,'load_event',side_effect=load))
         self.host=FakeHost()
+        self.host.original_parent=r.metadata(self.state.stat());self.host.original_parent.pop('bytes')
+        self.host.parent=dict(self.host.original_parent)
     def runop(self,op):return r.transaction(op,self.host,self.expected)
     def test_apply_verify_rollback_preserves_original_inodes_bytes_and_no_ack(self):
         self.assertEqual(self.runop('verify')['state'],'original')
@@ -100,7 +111,7 @@ class Retirement(unittest.TestCase):
         with self.assertRaises(ValueError):self.runop('apply')
         self.assertTrue(self.host.stopped);self.assertFalse(self.target.exists());self.assertTrue((self.archive/r.RETIRED).exists())
         self.host.fail_at=None
-        with self.assertRaisesRegex(ValueError,'interrupted-disposition'):self.runop('verify')
+        with self.assertRaisesRegex(ValueError,'interrupted'):self.runop('verify')
         self.assertEqual(self.runop('rollback')['state'],'original')
         self.assertEqual(self.runop('verify')['state'],'original')
         self.assertFalse(self.host.stopped)
@@ -109,6 +120,26 @@ class Retirement(unittest.TestCase):
         with self.assertRaises(ValueError):self.runop('apply')
         self.assertTrue(self.target.exists());self.assertFalse(self.archive.exists());self.assertFalse(self.host.stopped)
 
+    def test_completed_ordinary_workload_or_missing_result_refuses_rollback(self):
+        self.runop('apply')
+        self.host.workload=1
+        with self.assertRaisesRegex(ValueError,'workload'):self.runop('rollback')
+        self.host.workload=0;self.host.no_result=True
+        with self.assertRaisesRegex(ValueError,'unavailable'):self.runop('rollback')
+        self.assertFalse(self.target.exists());self.assertTrue((self.archive/r.RETIRED).exists())
+    def test_half_protection_keeps_socket_stopped_and_explicit_rollback_restores_parent(self):
+        self.host.half_protection=True
+        with self.assertRaisesRegex(ValueError,'half-protection'):self.runop('apply')
+        self.assertTrue(self.host.stopped);self.assertEqual(self.host.parent['uid'],0)
+        with self.assertRaisesRegex(ValueError,'interrupted'):self.runop('verify')
+        self.host.half_protection=False;self.runop('rollback')
+        self.assertEqual(self.host.parent,self.host.original_parent);self.assertFalse(self.host.stopped)
+    def test_preopened_writer_refuses_and_preserves_original(self):
+        self.host.writer=True
+        with self.assertRaisesRegex(ValueError,'writer'):self.runop('apply')
+        self.assertTrue(self.target.exists());self.assertFalse(self.archive.exists())
+        self.assertTrue(self.host.stopped)
+
 
 class FrozenHelperLoading(unittest.TestCase):
     def test_replaced_package_helper_is_never_executed(self):
@@ -116,3 +147,27 @@ class FrozenHelperLoading(unittest.TestCase):
             p=Path(tmp);(p/'v6').mkdir()
             (p/'v6/operator.py').write_text("raise AssertionError('UNTRUSTED EXECUTED')")
             with self.assertRaisesRegex(ValueError,'helper-hash'):r.Host(p)
+
+
+class ResultGuard(unittest.TestCase):
+    def test_actual_bounded_result_reads_bind_inode_timestamps_hash_without_raw_export(self):
+        import types
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp);f=path/'last-result.json';f.write_bytes(b'PRIVATE-RESULT-BYTES');f.chmod(0o600)
+            state=os.open(path,os.O_RDONLY|os.O_DIRECTORY)
+            host=object.__new__(r.Host);host.result_fd=None
+            real_fstat=os.fstat;real_stat=os.stat
+            def fixed(info):
+                fields={k:getattr(info,k) for k in dir(info) if k.startswith('st_')}
+                return types.SimpleNamespace(**dict(fields,st_uid=995,st_gid=980))
+            try:
+                with patch.object(os,'fstat',side_effect=lambda fd:fixed(real_fstat(fd))),patch.object(os,'stat',side_effect=lambda *a,**kw:fixed(real_stat(*a,**kw))):
+                    first=host.result(state)
+                    self.assertNotIn('PRIVATE-RESULT',str(first));self.assertIn('mtime_ns',first);self.assertIn('ctime_ns',first)
+                    f.write_bytes(b'CHANGED-WORKLOAD')
+                    self.assertNotEqual(first,host.result(state))
+                    f.unlink();f.write_bytes(b'CHANGED-WORKLOAD');f.chmod(0o600)
+                    with self.assertRaisesRegex(ValueError,'result-(changed|shape)'):host.result(state)
+            finally:
+                if host.result_fd is not None:os.close(host.result_fd)
+                os.close(state)

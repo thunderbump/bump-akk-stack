@@ -21,7 +21,7 @@ STATE = Path('/var/lib/eqemu-validator')
 ARCHIVE = Path('/var/lib/eqemu-validator-transfer-archive-02fee-v1')
 SLOT = 'last-integration'
 RETIRED = 'original-461d7aad57cb41e8ade9e7e1afcc1ab3'
-DATA_SHA = '0e0e71d7b21d5133f29eaccd52e599190fb889d631a540378bb1a49528fe196d'
+DATA_SHA = '23e16700150128111327d4a4b9324570812c6028bd9f026ed16dd22762934500'
 V6_SHA = '4fe1738ea201bd1b898b426ec4be480f11155a8153fb5407a22aed30673bd8fc'
 FLAGS = os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK | os.O_NOATIME
 
@@ -63,14 +63,17 @@ def directory(path,private=False):
             parent=fd;fd=os.open(name,FLAGS|os.O_DIRECTORY,dir_fd=parent);fds.append(fd)
             info=os.fstat(fd)
             if private and i==len(path.parts)-2:
-                if (info.st_uid,info.st_gid,stat.S_IMODE(info.st_mode))!=(995,980,0o700): raise ValueError('state')
+                if (info.st_uid,info.st_gid,stat.S_IMODE(info.st_mode)) not in ((995,980,0o700),(0,0,0o700)): raise ValueError('state')
             elif not protected(info): raise ValueError('parent')
             links.append((parent,name,fd,metadata(info)))
         def check():
             for parent,name,held,expected in links:
                 actual=metadata(os.fstat(held));named=metadata(os.stat(name,dir_fd=parent,follow_symlinks=False))
-                for k in ('device','inode','uid','gid','mode'):
+                keys=('device','inode','mode') if private and held==fd else ('device','inode','uid','gid','mode')
+                for k in keys:
                     if actual[k]!=expected[k] or named[k]!=expected[k]: raise ValueError('parent-changed')
+                if private and held==fd and (actual['uid'],actual['gid']) not in ((995,980),(0,0)):
+                    raise ValueError('state-owner')
         yield fd,check
         check()
     finally:
@@ -150,53 +153,77 @@ def inspect(state,archive,expected):
 
 
 def transaction(op,host,expected):
-    """host.guard holds the ordinary lock and verifies installed/publication history.
+    """No automatic recovery: only explicit rollback handles recognized interruption.
 
-    Exceptions after socket stop deliberately leave it stopped. A protected intent
-    records the previous socket state before retirement; no recovery is automatic.
+    Parent metadata restores last, after complete tree/result/history verification.
+    DAC restoration ends namespace protection against future unrelated UID995 code.
     """
     with host.guard(), directory(STATE,private=True) as (state,check_state):
         with contextlib.ExitStack() as stack:
-            archive=None;check_archive=lambda:None
+            archive=None;check_archive=lambda:None;intent=None;names=set()
+            old=host.original_parent
+            current_parent=host.state_metadata(state)
+            if current_parent not in (old,dict(old,uid=0,gid=0)):
+                raise ValueError('state-parent')
             if ARCHIVE.exists() or ARCHIVE.is_symlink():
                 archive,check_archive=stack.enter_context(directory(ARCHIVE))
                 if stat.S_IMODE(os.fstat(archive).st_mode)!=0o700: raise ValueError('archive-mode')
-                names=set(os.listdir(archive))
-                if not names<=set((RETIRED,'intent.json','retired.json','rollback.json')) or 'intent.json' not in names: raise ValueError('archive-members')
+                with os.scandir(archive) as entries:
+                    for entry in entries:
+                        if entry.name not in (RETIRED,'intent.json','retired.json','rollback.json') or entry.name in names: raise ValueError('archive-members')
+                        names.add(entry.name)
+                if 'intent.json' not in names: raise ValueError('archive-members')
                 intent=load_event(archive,'intent.json')
-                if set(intent)!={'schema','run','original','prior_socket_active','history'} or intent['schema']!=1 or intent['run']!=RETIRED or intent['original']!=expected or type(intent['prior_socket_active']) is not bool or intent['history']!=host.history: raise ValueError('intent-binding')
+                if (set(intent)!={'schema','run','original','prior_socket_active','history','parent','result'}
+                        or intent['schema']!=1 or intent['run']!=RETIRED or intent['original']!=expected
+                        or type(intent['prior_socket_active']) is not bool or intent['history']!=host.history
+                        or intent['parent']!=old or intent['result']!=host.result(state)):
+                    raise ValueError('intent-binding-or-workload')
                 for name in ('retired.json','rollback.json'):
                     if name in names and load_event(archive,name)!={'schema':1,'run':RETIRED,'state':'retired' if name=='retired.json' else 'original','uncertain':True,'ack':False}: raise ValueError('receipt-binding')
-            else: intent=None
+            elif current_parent!=old: raise ValueError('unrecorded-protection')
             current=inspect(state,archive,expected)
             host.verify();check_state();check_archive()
             if op=='verify':
+                if current_parent!=old: raise ValueError('interrupted-parent')
                 if intent is not None:
                     required='retired.json' if current=='retired' else 'rollback.json'
                     if absent(archive,required) or (current=='retired' and not absent(archive,'rollback.json')):
                         raise ValueError('interrupted-disposition')
                 return dict(state=current,vm_started=False,uncertain=True,ack=False)
             if op=='apply' and intent is not None: raise ValueError('used-transaction')
-            if op=='rollback' and (intent is None or current!='retired' or not absent(archive,'rollback.json')): raise ValueError('rollback-state')
-            host.socket(False);host.verify();check_state();check_archive()
-            host.writers({(expected['directory']['device'],expected['directory']['inode']),*((v['device'],v['inode']) for v in expected['files'].values())})
+            if op=='rollback' and (intent is None or not absent(archive,'rollback.json')): raise ValueError('rollback-state')
+            result=host.result(state)
+            identities={(expected['directory']['device'],expected['directory']['inode']),
+                        (old['device'],old['inode']),(result['device'],result['inode']),
+                        *((v['device'],v['inode']) for v in expected['files'].values())}
+            host.socket(False);host.verify();check_state();check_archive();host.writers(identities)
             if op=='apply':
-                # Parent is outside worker-writable ancestry and held across creation.
                 with directory(ARCHIVE.parent) as (parent,check_parent):
                     if os.fstat(parent).st_dev!=os.fstat(state).st_dev: raise ValueError('filesystem')
                     os.mkdir(ARCHIVE.name,0o700,dir_fd=parent);os.fsync(parent)
                     archive,check_archive=stack.enter_context(directory(ARCHIVE))
                     if os.fstat(archive).st_dev!=expected['directory']['device']: raise ValueError('filesystem')
-                    intent=dict(schema=1,run=RETIRED,original=expected,prior_socket_active=host.prior_socket,history=host.history)
+                    intent=dict(schema=1,run=RETIRED,original=expected,prior_socket_active=host.prior_socket,
+                                history=host.history,parent=old,result=result)
                     event(archive,'intent.json',intent);check_parent()
-            host.verify();check_state();check_archive()
-            if inspect(state,archive,expected)!=current: raise ValueError('state-changed')
+            # Intent is durable BEFORE either fchown/fchmod syscall. Recheck after
+            # revoking directory mutation from UID995 and rejecting held writers.
+            host.protect(state);check_state();check_archive();host.writers(identities)
+            if host.state_metadata(state)!=dict(old,uid=0,gid=0): raise ValueError('protection')
+            host.verify()
+            if host.result(state)!=intent['result'] or inspect(state,archive,expected)!=current: raise ValueError('state-changed')
             if op=='apply': rename(state,SLOT,archive,RETIRED)
-            else: rename(archive,RETIRED,state,SLOT)
+            elif current=='retired': rename(archive,RETIRED,state,SLOT)
             tree(archive if op=='apply' else state,RETIRED if op=='apply' else SLOT,expected)
             if not absent(state if op=='apply' else archive,SLOT if op=='apply' else RETIRED): raise ValueError('namespace')
             host.verify();check_state();check_archive()
+            if host.result(state)!=intent['result']: raise ValueError('intervening-workload')
             event(archive,'retired.json' if op=='apply' else 'rollback.json',dict(schema=1,run=RETIRED,state='retired' if op=='apply' else 'original',uncertain=True,ack=False))
+            # No unconditional finally: any unknown outcome keeps protection/socket.
+            host.restore(state,old)
+            if host.state_metadata(state)!=old: raise ValueError('parent-restore')
+            check_state();check_archive()
             if intent['prior_socket_active']: host.socket(True)
             return dict(state='retired' if op=='apply' else 'original',vm_started=False,uncertain=True,ack=False)
 
@@ -219,6 +246,8 @@ class Host:
         raw=read(self.package/'binding.json')
         if sha(raw)!=DATA_SHA: raise ValueError('binding')
         self.data=json.loads(raw)
+        self.original_parent=self.data['public_state_parent_lstat']
+        self.result_fd=None
         self.ops=self.release.Host();self.history=None
 
     @contextlib.contextmanager
@@ -246,7 +275,9 @@ class Host:
                         self.verify();check()
                         if info!=os.fstat(lock) or info!=os.stat('worker.lock',dir_fd=state,follow_symlinks=False): raise ValueError('lock-changed')
                     finally: os.close(self.journal_fd)
-            finally: os.close(lock)
+            finally:
+                if self.result_fd is not None: os.close(self.result_fd);self.result_fd=None
+                os.close(lock)
 
     def verify(self):
         self.ops.quiescent();self.private.check()
@@ -257,6 +288,30 @@ class Host:
         _,events=self.release.journal(V6_SHA,self.ops,history=self.private)
         if not events or events[-1]['event']!='applied': raise ValueError('v6-not-applied')
         self.release.verify_state(self.manifest,self.baseline,self.ops,events,new_only=True,assets=self.assets,history=self.private)
+
+    def state_metadata(self,fd):
+        value=metadata(os.fstat(fd));value.pop('bytes');return value
+
+    def protect(self,fd):
+        os.fchown(fd,0,0);os.fchmod(fd,0o700);os.fsync(fd)
+
+    def restore(self,fd,old):
+        os.fchmod(fd,old['mode']);os.fchown(fd,old['uid'],old['gid']);os.fsync(fd)
+
+    def result(self,state):
+        if self.result_fd is None: self.result_fd=os.open('last-result.json',FLAGS,dir_fd=state)
+        fd=self.result_fd;before=os.fstat(fd)
+        if (not stat.S_ISREG(before.st_mode) or before.st_nlink!=1 or not 0<before.st_size<=65536
+                or (before.st_uid,before.st_gid,stat.S_IMODE(before.st_mode))!=(995,980,0o600)):
+            raise ValueError('result-shape')
+        def stamp(i):
+            return dict(metadata(i),mtime_ns=i.st_mtime_ns,ctime_ns=i.st_ctime_ns,nlink=i.st_nlink)
+        raw=os.pread(fd,65537,0)
+        if (len(raw)!=before.st_size or stamp(before)!=stamp(os.fstat(fd))
+                or stamp(before)!=stamp(os.stat('last-result.json',dir_fd=state,follow_symlinks=False))
+                or raw!=os.pread(fd,65537,0) or stamp(before)!=stamp(os.fstat(fd))):
+            raise ValueError('result-changed')
+        return dict(stamp(before),sha256=sha(raw))
 
     def socket(self,value): self.ops.socket(value)
     def writers(self,identities): self.ops.writers(identities)

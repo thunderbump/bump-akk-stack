@@ -1076,6 +1076,13 @@
     "stack": "a8f8a29c5225cdbc593880eb21e5e127a72b14ac",
     "vm_started": false
   },
+  "public_state_parent_lstat": {
+    "device": 66306,
+    "gid": 980,
+    "inode": 44828110,
+    "mode": 448,
+    "uid": 995
+  },
   "reported_private": {
     "audit": {
       "ack_sent": false,
