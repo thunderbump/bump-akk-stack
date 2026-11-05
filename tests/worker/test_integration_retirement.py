@@ -20,7 +20,10 @@ class FakeHost:
     def verify(self):
         self.calls+=1
         if self.calls==self.fail_at: raise ValueError('injected')
-    def socket(self,value): self.stopped=not value
+    def socket_active(self): return not self.stopped
+    def socket(self,value):
+        if value and getattr(self,'start_failure',False):raise ValueError('socket-start')
+        self.stopped=not value
     def writers(self,identities):
         if getattr(self,'writer',False): raise ValueError('preopened-writer')
     def state_metadata(self,fd): return self.parent
@@ -140,6 +143,12 @@ class Retirement(unittest.TestCase):
         self.assertTrue(self.target.exists());self.assertFalse(self.archive.exists())
         self.assertTrue(self.host.stopped)
 
+    def test_socket_start_failure_cannot_verify_success(self):
+        self.host.start_failure=True
+        with self.assertRaisesRegex(ValueError,'socket-start'):self.runop('apply')
+        self.assertEqual(self.host.parent,self.host.original_parent);self.assertTrue(self.host.stopped)
+        with self.assertRaisesRegex(ValueError,'interrupted-socket'):self.runop('verify')
+
 
 class FrozenHelperLoading(unittest.TestCase):
     def test_replaced_package_helper_is_never_executed(self):
@@ -190,3 +199,67 @@ class RetainedReferences(unittest.TestCase):
                 self.assertEqual(child.returncode,0)
     def test_unrelated_reference_does_not_refuse(self):
         r.reject_references({(0,0)},[Path('/proc')/str(os.getpid())])
+
+
+class RetainedMappings(unittest.TestCase):
+    def test_shared_readonly_mapping_with_closed_fd_is_rejected(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp)/'original';path.write_bytes(b'original bytes');info=path.stat()
+            code="""import ctypes,os,sys
+lib=ctypes.CDLL(None,use_errno=True)
+lib.mmap.restype=ctypes.c_void_p
+lib.mmap.argtypes=[ctypes.c_void_p,ctypes.c_size_t,ctypes.c_int,ctypes.c_int,ctypes.c_int,ctypes.c_long]
+fd=os.open(sys.argv[1],os.O_RDWR)
+p=lib.mmap(None,4096,1,1,fd,0)
+os.close(fd)
+if p==ctypes.c_void_p(-1).value: raise SystemExit(2)
+print('mapped',flush=True)
+sys.stdin.read(1)
+lib.munmap.argtypes=[ctypes.c_void_p,ctypes.c_size_t]
+lib.munmap(p,4096)
+"""
+            child=subprocess.Popen([sys.executable,'-B','-c',code,str(path)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True)
+            try:
+                self.assertEqual(child.stdout.readline().strip(),'mapped')
+                with self.assertRaisesRegex(ValueError,'retained-mapping'):
+                    r.reject_references({(info.st_dev,info.st_ino)},[Path('/proc')/str(child.pid)])
+                self.assertEqual(path.read_bytes(),b'original bytes')
+            finally:
+                child.communicate(input='x',timeout=5);self.assertEqual(child.returncode,0)
+
+
+class ThreadReferences(unittest.TestCase):
+    def test_unshared_thread_directory_fd_is_rejected(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            directory=Path(tmp);info=directory.stat()
+            code="""import ctypes,os,sys,threading
+ready=threading.Event();finish=threading.Event();failed=[]
+def hold():
+ lib=ctypes.CDLL(None,use_errno=True)
+ # CLOSE_RANGE_UNSHARE clones only this thread's descriptor table.
+ if lib.close_range(ctypes.c_uint(1000000),ctypes.c_uint(0xffffffff),ctypes.c_uint(2)):
+  failed.append(ctypes.get_errno());ready.set();return
+ fd=os.open(sys.argv[1],os.O_RDONLY|os.O_DIRECTORY)
+ ready.set();finish.wait();os.close(fd)
+t=threading.Thread(target=hold);t.start();ready.wait()
+print('failed' if failed else 'thread-held',flush=True)
+sys.stdin.read(1);finish.set();t.join()
+"""
+            child=subprocess.Popen([sys.executable,'-B','-c',code,str(directory)],stdin=subprocess.PIPE,stdout=subprocess.PIPE,text=True)
+            try:
+                self.assertEqual(child.stdout.readline().strip(),'thread-held')
+                with self.assertRaisesRegex(ValueError,'retained-reference'):
+                    r.reject_references({(info.st_dev,info.st_ino)},[Path('/proc')/str(child.pid)])
+            finally:
+                child.communicate(input='x',timeout=5);self.assertEqual(child.returncode,0)
+
+
+class WorkerPrincipal(unittest.TestCase):
+    def test_active_worker_uid_task_refuses_even_without_visible_target_fd(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            process=Path(tmp)/'99999999';task=process/'task/99999999';task.mkdir(parents=True)
+            (task/'status').write_text('Uid:\t995\t995\t995\t995\n')
+            with self.assertRaisesRegex(ValueError,'worker-principal-active'):
+                r.reject_references({(1,2)},[process])

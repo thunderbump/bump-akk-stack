@@ -163,24 +163,42 @@ def reject_references(identities,processes=None):
     for process in processes:
         if process.name==str(os.getpid()): continue
         try:
-            for entry in [process/'cwd',process/'root',*(process/'fd').iterdir()]:
+            tasks=process/'task'
+            before={entry.name for entry in tasks.iterdir()}
+            if not before or len(before)>65536: raise ValueError('task-bound')
+            for tid in before:
+                task=tasks/tid
                 try:
-                    info=entry.stat()
-                    if (info.st_dev,info.st_ino) in identities: raise ValueError('retained-reference')
-                except (FileNotFoundError,ProcessLookupError): pass
-            # Shared writable mappings outlive their original file descriptor.
-            with (process/'maps').open() as stream:
-                count=0
-                for line in stream:
-                    count+=1
-                    if count>65536 or len(line)>8192: raise ValueError('process-map-bound')
-                    fields=line.split(maxsplit=5)
-                    if len(fields)<5: raise ValueError('process-map-shape')
-                    major,minor=fields[3].split(':')
-                    identity=(os.makedev(int(major,16),int(minor,16)),int(fields[4]))
-                    if identity in identities and 'w' in fields[1] and fields[1].endswith('s'):
-                        raise ValueError('retained-mapping')
-        except (FileNotFoundError,ProcessLookupError): pass
+                    # A live worker-principal task could retain less visible kernel
+                    # references or move FDs during inspection. Refuse its presence,
+                    # rather than claim procfs snapshots revoke capabilities.
+                    with (task/'status').open() as stream: status=stream.read(16385)
+                    if len(status)>16384: raise ValueError('task-status-bound')
+                    uid_lines=[line.split()[1:] for line in status.splitlines() if line.startswith('Uid:')]
+                    if len(uid_lines)!=1 or len(uid_lines[0])!=4: raise ValueError('task-status-shape')
+                    if 995 in [int(value) for value in uid_lines[0]]: raise ValueError('worker-principal-active')
+                    for entry in [task/'cwd',task/'root',*(task/'fd').iterdir()]:
+                        try:
+                            info=entry.stat()
+                            if (info.st_dev,info.st_ino) in identities: raise ValueError('retained-reference')
+                        except (FileNotFoundError,ProcessLookupError):
+                            if entry.name in ('cwd','root') and task.exists(): raise ValueError('task-inspection')
+                    # Reject mappings irrespective of current permissions.
+                    with (task/'maps').open() as stream:
+                        count=0
+                        for line in stream:
+                            count+=1
+                            if count>65536 or len(line)>8192: raise ValueError('process-map-bound')
+                            fields=line.split(maxsplit=5)
+                            if len(fields)<5: raise ValueError('process-map-shape')
+                            major,minor=fields[3].split(':')
+                            identity=(os.makedev(int(major,16),int(minor,16)),int(fields[4]))
+                            if identity in identities: raise ValueError('retained-mapping')
+                except (FileNotFoundError,ProcessLookupError):
+                    if task.exists(): raise ValueError('task-inspection')
+            if {entry.name for entry in tasks.iterdir()}!=before: raise ValueError('task-changed')
+        except (FileNotFoundError,ProcessLookupError):
+            if process.exists(): raise ValueError('process-inspection')
 
 
 def transaction(op,host,expected):
@@ -217,6 +235,8 @@ def transaction(op,host,expected):
             host.verify();check_state();check_archive()
             if op=='verify':
                 if current_parent!=old: raise ValueError('interrupted-parent')
+                if intent is not None and host.socket_active()!=intent['prior_socket_active']:
+                    raise ValueError('interrupted-socket')
                 if intent is not None:
                     required='retired.json' if current=='retired' else 'rollback.json'
                     if absent(archive,required) or (current=='retired' and not absent(archive,'rollback.json')):
@@ -344,6 +364,7 @@ class Host:
             raise ValueError('result-changed')
         return dict(stamp(before),sha256=sha(raw))
 
+    def socket_active(self): return self.ops.socket_active()
     def socket(self,value): self.ops.socket(value)
     def writers(self,identities):
         self.ops.writers(identities)
