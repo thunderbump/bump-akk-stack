@@ -12,7 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'validation/worker'))
 import actor_integration as a
 import guest
 import integration_artifacts as wire
-import qualification_release as release
+import integration_repin_release as release
 
 class OrdinaryInput(unittest.TestCase):
     def identity(self):
@@ -40,10 +40,10 @@ class OrdinaryInput(unittest.TestCase):
 
     def test_repin_changes_only_three_exact_source_fields(self):
         root=Path(__file__).resolve().parents[2]
-        oldraw=subprocess.check_output(['git','-C',str(root),'show','d42160f3769266bbbb25463057beb16f0455e11f:validation/actor-integration-fixture.json'])
+        oldraw=subprocess.check_output(['git','-C',str(root),'show','ca85658ee3f95729da7cdeb760f0e2f80250dbaa:validation/actor-integration-fixture.json'])
         newraw=(root/'validation/actor-integration-fixture.json').read_bytes()
         before=json.loads(oldraw);after=json.loads(newraw)
-        expected={'commit':'928d82e3fca80a0be28049330c0f93226b4a3db4','tree':'6165225b56edb97173420c465aea93bb8fa610ad','rust_tree':'4e5e8bd2846fed9efd7f21bf66b8d6ae5fce0eed'}
+        expected={'commit': '7d19508967b0f924ff02441a3065dbfd7ab846cc', 'tree': '1d89d42026354b879c4d9246b52f97ee4fe0a675', 'rust_tree': 'ec41c9b0ed5d95c546fe3faf971020fac6210f1b'}
         rewritten=oldraw
         for key,value in expected.items():
             self.assertEqual(after['server_source'][key],value)
@@ -59,7 +59,7 @@ class OrdinaryInput(unittest.TestCase):
         integrated=copy.deepcopy(ordinary);integrated['integration']=wire.SELECTION
         integrated['files']['integration-fixture.tar']=dict(bytes=a.FIXTURE_BYTES,sha256=wire.FIXTURE_SHA)
         a.validate_input_identity(integrated)
-        for commit,tree in [('1734b9e66f64ed4b431010b8206b0396732ef506','843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('1734b9e66f64ed4b431010b8206b0396732ef506',ordinary['tree']),(ordinary['candidate'],'843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('0'*40,ordinary['tree'])]:
+        for commit,tree in [('928d82e3fca80a0be28049330c0f93226b4a3db4','6165225b56edb97173420c465aea93bb8fa610ad'),('928d82e3fca80a0be28049330c0f93226b4a3db4',ordinary['tree']),(ordinary['candidate'],'6165225b56edb97173420c465aea93bb8fa610ad'),('1734b9e66f64ed4b431010b8206b0396732ef506','843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('1734b9e66f64ed4b431010b8206b0396732ef506',ordinary['tree']),(ordinary['candidate'],'843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('0'*40,ordinary['tree'])]:
             for value in (ordinary,integrated):
                 bad=copy.deepcopy(value);bad.update(candidate=commit,tree=tree)
                 with self.assertRaises(ValueError):a.validate_build_binding(bad)
@@ -75,13 +75,14 @@ class OrdinaryInput(unittest.TestCase):
         self.assertIn('/opt/actor-integration-fixture.json',files)
         self.assertEqual(guest.BUILD_CHECKS[-1],'normal-world')
 
-    def test_successor_patch_matches_actual_308_only_and_does_not_promote_master(self):
+    def test_successor_patch_matches_current_ca85658_only_and_does_not_promote_master(self):
         root=Path(__file__).resolve().parents[2]
         before={name:release.read(release.CODE/name) for name in release.PATCHED}
-        result=release.patch_files(before,(root/'validation/worker/integration-308.patch').read_bytes())
+        result=release.patch_files(before,(root/'validation/worker/integration-ca85658.patch').read_bytes())
         self.assertEqual(set(result),set(release.PATCHED))
-        self.assertNotIn(b'from profiling',result['validation/worker/build_guest.py'])
+        self.assertEqual(set(result),{'validation/actor-integration-fixture.json'})
+        self.assertEqual(result['validation/actor-integration-fixture.json'],(root/'validation/actor-integration-fixture.json').read_bytes())
         changed=dict(before);changed[release.PATCHED[0]]=b'changed bytes'
-        with self.assertRaises(ValueError):release.patch_files(changed,(root/'validation/worker/integration-308.patch').read_bytes())
+        with self.assertRaises(ValueError):release.patch_files(changed,(root/'validation/worker/integration-ca85658.patch').read_bytes())
 
 if __name__=='__main__':unittest.main()
