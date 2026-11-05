@@ -1,4 +1,6 @@
 """Finite root READ-ONLY audit of the original 02fee retained transfer, never recovery."""
+import sys
+sys.dont_write_bytecode = True
 import fcntl
 import hashlib
 import json
@@ -6,7 +8,6 @@ import os
 from pathlib import Path
 import stat
 import subprocess
-import sys
 
 STATE = Path('/var/lib/eqemu-validator')
 WORKER_UID, WORKER_GID = 995, 980

@@ -4,6 +4,8 @@ Preparation only copies source/data. Root operations require a separately copied
 externally hash-verified operator and explicit package hash, outside NoNewPrivs.
 This module never launches a worker, guest, native executable, Cargo or database.
 """
+import sys
+sys.dont_write_bytecode=True
 import argparse
 import contextlib
 import fcntl
@@ -14,7 +16,6 @@ from pathlib import Path
 import re
 import stat
 import subprocess
-import sys
 import tempfile
 
 sys.dont_write_bytecode=True
