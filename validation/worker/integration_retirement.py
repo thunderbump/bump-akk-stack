@@ -152,6 +152,21 @@ def inspect(state,archive,expected):
     return 'original' if at_source else 'retired'
 
 
+def process_identity(process):
+    with (process/'stat').open() as stream: raw=stream.read(8193)
+    if len(raw)>8192 or ')' not in raw: raise ValueError('process-stat')
+    fields=raw.rsplit(')',1)[1].split()
+    if len(fields)<20 or not fields[19].isdigit(): raise ValueError('process-stat')
+    return fields[19]
+
+
+def process_snapshot(processes=None):
+    entries=list(Path('/proc').glob('[0-9]*')) if processes is None else list(processes)
+    if len(entries)>65536: raise ValueError('process-bound')
+    # A vanished process during identity capture is uncertainty, not permission.
+    return {entry:process_identity(entry) for entry in entries}
+
+
 def reject_references(identities,processes=None):
     """Any foreign FD or cwd/root reference can reopen owner-writable history.
 
@@ -159,8 +174,10 @@ def reject_references(identities,processes=None):
     read-only file FD may be reopened through procfs. Reject every such reference.
     Only disappearing processes/descriptors are ignored; inspection denial refuses.
     """
-    processes=Path('/proc').glob('[0-9]*') if processes is None else processes
-    for process in processes:
+    selected=None if processes is None else list(processes)
+    snapshot=process_snapshot(selected)
+    for process,start in snapshot.items():
+        if process_identity(process)!=start: raise ValueError('process-changed')
         if process.name==str(os.getpid()): continue
         try:
             tasks=process/'task'
@@ -198,7 +215,9 @@ def reject_references(identities,processes=None):
                     if task.exists(): raise ValueError('task-inspection')
             if {entry.name for entry in tasks.iterdir()}!=before: raise ValueError('task-changed')
         except (FileNotFoundError,ProcessLookupError):
-            if process.exists(): raise ValueError('process-inspection')
+            raise ValueError('process-inspection') from None
+        if process_identity(process)!=start: raise ValueError('process-changed')
+    if process_snapshot(selected)!=snapshot: raise ValueError('process-set-changed')
 
 
 def transaction(op,host,expected):

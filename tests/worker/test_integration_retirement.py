@@ -261,5 +261,54 @@ class WorkerPrincipal(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             process=Path(tmp)/'99999999';task=process/'task/99999999';task.mkdir(parents=True)
             (task/'status').write_text('Uid:\t995\t995\t995\t995\n')
+            (process/'stat').write_text('99999999 (fixture) '+' '.join(['S']+['0']*18+['1'])+'\n')
             with self.assertRaisesRegex(ValueError,'worker-principal-active'):
                 r.reject_references({(1,2)},[process])
+
+
+class ForkRace(unittest.TestCase):
+    def test_fork_parent_exit_after_snapshot_is_not_ignored(self):
+        import subprocess,ctypes,time
+        lib=ctypes.CDLL(None,use_errno=True);prior=ctypes.c_int()
+        self.assertEqual(lib.prctl(37,ctypes.byref(prior),0,0,0),0)
+        self.assertEqual(lib.prctl(36,1,0,0,0),0)
+        with tempfile.TemporaryDirectory() as tmp:
+            path=Path(tmp);release=path/'release';pidfile=path/'child'
+            code="""import os,sys,time
+from pathlib import Path
+fd=os.open(sys.argv[1],os.O_RDONLY|os.O_DIRECTORY)
+sys.stdin.read(1)
+pid=os.fork()
+if pid: os._exit(0)
+Path(sys.argv[2]).write_text(str(os.getpid()))
+while not Path(sys.argv[3]).exists():time.sleep(.01)
+os.close(fd);os._exit(0)
+"""
+            parent=subprocess.Popen([sys.executable,'-B','-c',code,str(path),str(pidfile),str(release)],stdin=subprocess.PIPE,stdout=subprocess.DEVNULL)
+            real_snapshot=r.process_snapshot;calls=[]
+            def snapshot(selected=None):
+                captured=real_snapshot(selected)
+                if not calls:
+                    calls.append(True);parent.stdin.write(b'x');parent.stdin.flush();parent.stdin.close();parent.wait(timeout=5)
+                return captured
+            try:
+                with patch.object(r,'process_snapshot',side_effect=snapshot):
+                    with self.assertRaises((ValueError,FileNotFoundError,ProcessLookupError)):
+                        r.reject_references({(path.stat().st_dev,path.stat().st_ino)},[Path('/proc')/str(parent.pid)])
+            finally:
+                release.touch()
+                if parent.poll() is None:parent.kill();parent.wait(timeout=5)
+                deadline=time.monotonic()+5
+                while not pidfile.exists() and time.monotonic()<deadline:time.sleep(.01)
+                if pidfile.exists():
+                    child=int(pidfile.read_text())
+                    while time.monotonic()<deadline:
+                        done,status=os.waitpid(child,os.WNOHANG)
+                        if done:break
+                        time.sleep(.01)
+                    self.assertEqual(done,child);self.assertEqual(status,0)
+                self.assertEqual(lib.prctl(36,prior.value,0,0,0),0)
+    def test_process_birth_or_start_identity_change_refuses(self):
+        process=Path('/proc')/str(os.getpid())
+        with patch.object(r,'process_snapshot',side_effect=[{process:'old'},{process:'new'}]),patch.object(r,'process_identity',return_value='old'):
+            with self.assertRaisesRegex(ValueError,'process-set-changed'):r.reject_references(set())
