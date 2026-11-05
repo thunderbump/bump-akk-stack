@@ -12,7 +12,7 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'validation/worker'))
 import actor_integration as a
 import guest
 import integration_artifacts as wire
-import integration_repin_release as release
+import integration_diagnostic_release as release
 
 class OrdinaryInput(unittest.TestCase):
     def identity(self):
@@ -38,18 +38,20 @@ class OrdinaryInput(unittest.TestCase):
         with self.assertRaises(ValueError):a.validate_input_identity(bad)
         with patch.object(a,'read_public',return_value=b'wrong lock'),self.assertRaises(ValueError):a.verify_dependencies(value,Path('/fixture'))
 
-    def test_repin_changes_only_three_exact_source_fields(self):
+    def test_repin_changes_only_commit_tree_and_retains_rust_tree(self):
         root=Path(__file__).resolve().parents[2]
-        oldraw=subprocess.check_output(['git','-C',str(root),'show','ca85658ee3f95729da7cdeb760f0e2f80250dbaa:validation/actor-integration-fixture.json'])
+        oldraw=subprocess.check_output(['git','-C',str(root),'show','cf11c73f7abf6c7b41d4a6d523f5371c502d384e:validation/actor-integration-fixture.json'])
         newraw=(root/'validation/actor-integration-fixture.json').read_bytes()
         before=json.loads(oldraw);after=json.loads(newraw)
-        expected={'commit': '7d19508967b0f924ff02441a3065dbfd7ab846cc', 'tree': '1d89d42026354b879c4d9246b52f97ee4fe0a675', 'rust_tree': 'ec41c9b0ed5d95c546fe3faf971020fac6210f1b'}
+        expected={'commit': 'c9288ddf8573031aacc57d0c107c97a5e8243432', 'tree': 'ec15350ab250f2533b295a6eacaf1bb2ed904491'}
         rewritten=oldraw
         for key,value in expected.items():
             self.assertEqual(after['server_source'][key],value)
             old=before['server_source'][key].encode();self.assertEqual(rewritten.count(old),1)
             rewritten=rewritten.replace(old,value.encode())
         self.assertEqual(newraw,rewritten)
+        self.assertEqual(after['server_source']['rust_tree'],before['server_source']['rust_tree'])
+        self.assertEqual(after['server_source']['rust_tree'],'ec41c9b0ed5d95c546fe3faf971020fac6210f1b')
         before['server_source'].update(expected);self.assertEqual(after,before)
         self.assertEqual(after['rust_input']['lock_sha256'],'1e5c00abf14873f23fea9bbbbccb9e5f250b058404dfa8046c6b5a87a7476f53')
         self.assertEqual(hashlib.sha256((root/'validation/worker/integration-v1.4.json').read_bytes()).hexdigest(),'c604e154baf96908e2d6707714875924a198793438ec219565f05dc4e6cf6eb0')
@@ -59,7 +61,7 @@ class OrdinaryInput(unittest.TestCase):
         integrated=copy.deepcopy(ordinary);integrated['integration']=wire.SELECTION
         integrated['files']['integration-fixture.tar']=dict(bytes=a.FIXTURE_BYTES,sha256=wire.FIXTURE_SHA)
         a.validate_input_identity(integrated)
-        for commit,tree in [('928d82e3fca80a0be28049330c0f93226b4a3db4','6165225b56edb97173420c465aea93bb8fa610ad'),('928d82e3fca80a0be28049330c0f93226b4a3db4',ordinary['tree']),(ordinary['candidate'],'6165225b56edb97173420c465aea93bb8fa610ad'),('1734b9e66f64ed4b431010b8206b0396732ef506','843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('1734b9e66f64ed4b431010b8206b0396732ef506',ordinary['tree']),(ordinary['candidate'],'843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('0'*40,ordinary['tree'])]:
+        for commit,tree in [('7d19508967b0f924ff02441a3065dbfd7ab846cc','1d89d42026354b879c4d9246b52f97ee4fe0a675'),('7d19508967b0f924ff02441a3065dbfd7ab846cc',ordinary['tree']),(ordinary['candidate'],'1d89d42026354b879c4d9246b52f97ee4fe0a675'),('928d82e3fca80a0be28049330c0f93226b4a3db4','6165225b56edb97173420c465aea93bb8fa610ad'),('928d82e3fca80a0be28049330c0f93226b4a3db4',ordinary['tree']),(ordinary['candidate'],'6165225b56edb97173420c465aea93bb8fa610ad'),('1734b9e66f64ed4b431010b8206b0396732ef506','843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('1734b9e66f64ed4b431010b8206b0396732ef506',ordinary['tree']),(ordinary['candidate'],'843e92b5f3acc66f1e0a71bfc3fab0e4f6b6a0e9'),('0'*40,ordinary['tree'])]:
             for value in (ordinary,integrated):
                 bad=copy.deepcopy(value);bad.update(candidate=commit,tree=tree)
                 with self.assertRaises(ValueError):a.validate_build_binding(bad)
@@ -75,14 +77,14 @@ class OrdinaryInput(unittest.TestCase):
         self.assertIn('/opt/actor-integration-fixture.json',files)
         self.assertEqual(guest.BUILD_CHECKS[-1],'normal-world')
 
-    def test_successor_patch_matches_current_ca85658_only_and_does_not_promote_master(self):
+    def test_successor_patch_matches_current_cf11_only_and_does_not_promote_master(self):
         root=Path(__file__).resolve().parents[2]
         before={name:release.read(release.CODE/name) for name in release.PATCHED}
-        result=release.patch_files(before,(root/'validation/worker/integration-ca85658.patch').read_bytes())
+        result=release.patch_files(before,(root/'validation/worker/integration-cf11.patch').read_bytes())
         self.assertEqual(set(result),set(release.PATCHED))
         self.assertEqual(set(result),{'validation/actor-integration-fixture.json'})
         self.assertEqual(result['validation/actor-integration-fixture.json'],(root/'validation/actor-integration-fixture.json').read_bytes())
         changed=dict(before);changed[release.PATCHED[0]]=b'changed bytes'
-        with self.assertRaises(ValueError):release.patch_files(changed,(root/'validation/worker/integration-ca85658.patch').read_bytes())
+        with self.assertRaises(ValueError):release.patch_files(changed,(root/'validation/worker/integration-cf11.patch').read_bytes())
 
 if __name__=='__main__':unittest.main()
