@@ -62,6 +62,14 @@ def stage(package, expected_manifest):
         if (not stat.S_ISREG(info.st_mode) or info.st_uid != TRUSTED_UID
                 or stat.S_IMODE(info.st_mode) != 0o600 or regular(destination,1024*1024) != payload):
             raise ValueError('unknown existing operator')
+        # A retry must re-establish durable custody, including after a prior
+        # file/link effect followed by a failed directory synchronization.
+        fd = os.open(destination, os.O_RDONLY|os.O_NOFOLLOW)
+        try: os.fsync(fd)
+        finally: os.close(fd)
+        fd = os.open(ROOT, os.O_RDONLY|os.O_DIRECTORY)
+        try: os.fsync(fd)
+        finally: os.close(fd)
         return destination
     fd, name = tempfile.mkstemp(prefix='.rootops-operator-', dir=ROOT)
     try:

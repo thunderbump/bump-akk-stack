@@ -169,6 +169,9 @@ class CompatibilityTests(unittest.TestCase):
             destination=bootstrap.stage(output,info['manifest_sha256'])
             self.assertEqual(destination.read_bytes(),(SOURCE/'package.py').read_bytes())
             self.assertEqual(bootstrap.stage(output,info['manifest_sha256']),destination)
+            with patch.object(bootstrap.os,'fsync',side_effect=OSError('fixture durability failure')):
+                with self.assertRaises(OSError):bootstrap.stage(output,info['manifest_sha256'])
+            self.assertEqual(destination.read_bytes(),(SOURCE/'package.py').read_bytes())
             destination.unlink();destination.symlink_to(self.root/'outside')
             with self.assertRaises(ValueError):bootstrap.stage(output,info['manifest_sha256'])
             destination.unlink()
