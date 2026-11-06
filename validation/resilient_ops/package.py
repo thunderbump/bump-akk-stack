@@ -314,7 +314,10 @@ class Operator:
             fsync_directory(path.parent)
 
     def initialize(self):
-        for path in (self.code / 'releases', self.state / 'package-events', self.units):
+        # These same fixed state namespaces are consumed by service/adoption,
+        # so install must persist them before publishing unit/current references.
+        state_dirs = ('package-events', 'plans', 'requests', 'operations', 'locks')
+        for path in (self.code / 'releases', *(self.state / name for name in state_dirs), self.units):
             self.mkdir(path)
         lock = self.state / 'package.lock'
         fd = os.open(lock, os.O_CREAT | os.O_NOFOLLOW | os.O_RDWR, 0o600)

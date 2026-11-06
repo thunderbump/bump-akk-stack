@@ -372,10 +372,10 @@ class NamespaceDurabilityTests(unittest.TestCase):
     stage = PackageTests.stage
 
     def required_paths(self, enroll=False):
-        leaves=[self.operator.code/'releases',self.operator.state/'package-events',self.operator.units]
+        leaves=[self.operator.code/'releases',self.operator.units]
+        leaves += [self.operator.state/name for name in ('package-events','plans','requests','operations','locks')]
         if enroll:
             leaves += [self.operator.config,self.operator.base/'var/lib/eqemu-resilient-targets/fixture']
-            leaves += [self.operator.state/name for name in ('plans','requests','operations','locks')]
         paths=set()
         for leaf in leaves:
             path=leaf
@@ -453,7 +453,7 @@ class NamespaceDurabilityTests(unittest.TestCase):
         self.assert_barriers(events,required,{self.operator.units/name for name in package.UNITS}|{self.operator.code/'current'})
 
     def test_install_namespace_sync_faults_remain_nonpass_and_retry_barriers(self):
-        for name,relative in (('code','usr/lib'),('state','var/lib'),('units','etc/systemd')):
+        for name,relative in (('code','usr/lib'),('state','var/lib'),('operations','var/lib/eqemu-resilient-ops/operations'),('units','etc/systemd')):
             with self.subTest(namespace=name):
                 self.operator=package.Operator(self.host/name,os.getuid())
                 stage,expected=self.stage(name)
