@@ -54,6 +54,6 @@ def main():
     digest=hashlib.sha256(raw).hexdigest();installer=manifest['install.py']['sha256']
     bootstrap="import os,hashlib;from pathlib import Path;p=Path("+repr(str(output/'install.py'))+");f=os.open(p,os.O_RDONLY|os.O_NOFOLLOW|os.O_NOATIME);i=os.fstat(f);b=os.pread(f,131073,0);assert len(b)==i.st_size and i==os.fstat(f) and i==p.lstat() and hashlib.sha256(b).hexdigest()=="+repr(installer)+";os.close(f);exec(compile(b,str(p),'exec'),{'__name__':'__main__','__file__':str(p)})"
     command=['/usr/bin/python3','-I','-S','-c',bootstrap,'--package',str(output),'--sha256',digest]
-    print(json.dumps(dict(package=str(output),package_sha256=digest,installer_sha256=installer,install_argv=command+['install'],install_shell=shlex.join(command+['install']),resume_install_argv=command+['resume-install'],uninstall_argv=command+['uninstall'],worker_started=False),indent=2))
+    print(json.dumps(dict(package=str(output),package_sha256=digest,installer_sha256=installer,install_argv=command+['install'],normal_terminal_install_argv=['sudo','--',*command,'install'],install_shell=shlex.join(['sudo','--',*command,'install']),resume_install_argv=command+['resume-install'],uninstall_argv=command+['uninstall'],worker_started=False),indent=2))
 
 if __name__=='__main__':main()

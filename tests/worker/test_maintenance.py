@@ -113,6 +113,18 @@ class Transaction(unittest.TestCase):
         self.publish();(self.state/'.head.json.new').write_bytes(b'unknown');(self.state/'.head.json.new').chmod(0o600)
         with self.assertRaises(m.Refusal):self.rollback()
         self.assertEqual((self.state/'.head.json.new').read_bytes(),b'unknown')
+    def test_corrupt_retained_rollback_receipt_refuses_before_any_control(self):
+        self.host.active=True;self.publish();self.host.controls.clear()
+        tx=self.state/self.request['id']
+        with temp_directory(self.state) as (fd,_):m.write_new(fd,'pending.json',m.canonical({'id':self.request['id']}))
+        receipt=tx/'rollback.json';receipt.write_bytes(b'{}');receipt.chmod(0o600)
+        after={name:m.read(self.code/name)[1] for name in m.PAIR}
+        with self.assertRaisesRegex(m.Refusal,'receipt-drift'):self.rollback()
+        self.assertEqual(self.host.controls,[])
+        self.assertEqual({name:m.read(self.code/name)[1] for name in m.PAIR},after)
+        receipt.write_bytes(m.canonical(dict(state='rolled-back',transaction=self.request['id'])));receipt.chmod(0o644)
+        with self.assertRaisesRegex(m.Refusal,'receipt-drift'):self.rollback()
+        self.assertEqual(self.host.controls,[])
     def test_cross_mount_and_max_request_do_not_create_unreadable_intent(self):
         self.request['proof']={'opaque':'x'*190000}
         with patch.object(m,'mount_identity',side_effect=[1,2,1,1]):

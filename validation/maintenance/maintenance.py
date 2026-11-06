@@ -364,7 +364,9 @@ class Store:
     def record_once(self, tx, name, value):
         path = tx / (name + '.json')
         if present(path):
-            require(self.load(path) == value, 'receipt-drift')
+            raw,item=read(path)
+            require((item['uid'],item['gid'],item['mode']) == (self.owner,self.owner,0o600)
+                    and raw == canonical(value), 'receipt-drift')
         else:
             self.event(tx, name, value)
 
@@ -426,6 +428,10 @@ class Store:
         require((pending and pending['id'] == identifier) or (not pending and head['transaction'] == identifier), 'not-current-transaction')
         completed = present(tx / 'rollback.json')
         require(not completed or pending is not None, 'already-rolled-back')
+        if completed:
+            self.record_once(tx, 'rollback', dict(state='rolled-back', transaction=identifier))
+        if present(tx / 'result.json'):
+            self.record_once(tx, 'result', dict(state='published', transaction=identifier, source=header['request']['source']))
         current = {}
         for name in self.config['records']:
             current[name] = read(self.code / name)[1]
