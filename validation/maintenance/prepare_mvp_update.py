@@ -38,7 +38,6 @@ def prepare(output):
     manifest = dict(source_commit=commit, files={name:dict(destination=str(paths[name]),
                     before_sha256=digest(before[name]), after_sha256=digest(after[name])) for name in paths},
                     client_sha256=digest((source/'client.py').read_bytes()))
-    (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
     q = shlex.quote
     lines = ['# REVIEW ONLY. Run manually in a normal root terminal outside NoNewPrivs.',
              '# No script from this package is executed as root. Stop on every error.',
@@ -50,8 +49,10 @@ def prepare(output):
                   f"printf '%s  %s\\n' {digest(before[name])} {path} | sha256sum -c -",
                   f'install -o root -g root -m 600 {q(str(output/name))} {STAGE/name}',
                   f"printf '%s  %s\\n' {digest(after[name])} {STAGE/name} | sha256sum -c -"]
-    lines += ['/usr/bin/systemctl stop eqemu-validator-maintenance.socket',
-              'test -z "$(/usr/bin/systemctl list-units --type=service --state=activating,active,deactivating --no-legend --no-pager \'eqemu-validator-maintenance@*.service\')"']
+    active_guard = [
+        'maintenance_active=$(/usr/bin/systemctl list-units --type=service --state=activating,active,deactivating --no-legend --no-pager \'eqemu-validator-maintenance@*.service\')',
+        'test -z "$maintenance_active"']
+    lines += ['/usr/bin/systemctl stop eqemu-validator-maintenance.socket', *active_guard]
     for name, path in paths.items():
         lines += [f'cp -p --no-dereference {path} {BACKUP/name}',
                   f"printf '%s  %s\\n' {digest(before[name])} {BACKUP/name} | sha256sum -c -"]
@@ -62,12 +63,15 @@ def prepare(output):
     (output/'UPDATE-REVIEW-ONLY.sh').write_text('\n'.join(lines)+'\n')
     restore = ['# Explicit restore after reviewing any partial update. No automatic rollback.', 'set -eu',
                '/usr/bin/systemctl stop eqemu-validator-maintenance.socket',
-               lines[lines.index('/usr/bin/systemctl stop eqemu-validator-maintenance.socket')+1]]
+               *active_guard]
     for name, path in paths.items():
         restore += [f"printf '%s  %s\\n' {digest(before[name])} {BACKUP/name} | sha256sum -c -",
                     f'install -o root -g root -m 644 {BACKUP/name} {path}']
     restore += ['/usr/bin/systemctl daemon-reload', '/usr/bin/systemctl start eqemu-validator-maintenance.socket']
     (output/'RESTORE-REVIEW-ONLY.sh').write_text('\n'.join(restore)+'\n')
+    manifest['scripts_sha256'] = {name: digest((output/name).read_bytes()) for name in
+                                  ('UPDATE-REVIEW-ONLY.sh', 'RESTORE-REVIEW-ONLY.sh')}
+    (output/'manifest.json').write_text(json.dumps(manifest, indent=2)+'\n')
     print(json.dumps(manifest, indent=2))
 
 

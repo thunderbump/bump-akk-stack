@@ -1,5 +1,6 @@
 """Fixed operations through real client/service sockets, with harmless host controls."""
 import json
+import errno
 import os
 from pathlib import Path
 import socket
@@ -143,6 +144,78 @@ class FixedOperations(unittest.TestCase):
                 result = self.call('retire-failed-integration', expected_run=self.run)
                 self.assertFalse(result['ok']); self.assertTrue(self.slot.exists())
 
+    def test_exdev_dispatch_uses_fixed_real_mv_and_preserves_complete_bytes(self):
+        artifact = b'original failure evidence\x00\xff' * 100
+        (self.slot/m.ARTIFACT).write_bytes(artifact)
+        self.receipt.update(bytes=len(artifact), sha256=m.sha(artifact))
+        self.write('receipt.json', self.receipt)
+        before = {p.name:p.read_bytes() for p in self.slot.iterdir()}
+        target = self.state/'retired-integrations'/self.run
+        self.host.active = True
+        real_run = subprocess.run
+        with patch.object(m.os, 'rename', side_effect=OSError(errno.EXDEV, 'injected bind-mount boundary')) as rename, patch.object(m.subprocess, 'run', wraps=real_run) as move:
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.assertTrue(result['ok'], result)
+        rename.assert_called_once_with(self.slot, target)
+        self.assertEqual(move.call_args.args[0], ['/usr/bin/mv', '--no-clobber', '--no-target-directory', '--', str(self.slot), str(target)])
+        self.assertEqual(move.call_args.kwargs, dict(check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15))
+        self.assertFalse(self.slot.exists()); self.assertFalse(self.host.active)
+        self.assertEqual({p.name:p.read_bytes() for p in target.iterdir()}, before)
+        self.assertFalse(self.call('retire-failed-integration', expected_run=self.run)['ok'])
+        self.assertEqual({p.name:p.read_bytes() for p in target.iterdir()}, before)
+
+    def test_exdev_move_failure_timeout_and_false_success_never_claim_retirement(self):
+        before = {p.name:p.read_bytes() for p in self.slot.iterdir()}
+        for failure in (subprocess.TimeoutExpired(['fixture'], 15), subprocess.CalledProcessError(1, ['fixture']), None):
+            self.host.active = True
+            with patch.object(m.os, 'rename', side_effect=OSError(errno.EXDEV, 'boundary')), patch.object(m.subprocess, 'run', side_effect=failure):
+                result = self.call('retire-failed-integration', expected_run=self.run)
+            self.assertFalse(result['ok'])
+            self.assertFalse(self.host.active)
+            self.assertEqual({p.name:p.read_bytes() for p in self.slot.iterdir()}, before)
+
+    def test_exdev_real_mv_no_clobber_when_destination_appears(self):
+        target = self.state/'retired-integrations'/self.run
+        before = {p.name:p.read_bytes() for p in self.slot.iterdir()}
+        real_run = subprocess.run
+        def appeared(*args, **kwargs):
+            target.mkdir(); (target/'keep').write_bytes(b'untouched evidence')
+            return real_run(*args, **kwargs)
+        with patch.object(m.os, 'rename', side_effect=OSError(errno.EXDEV, 'boundary')), patch.object(m.subprocess, 'run', side_effect=appeared):
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.assertFalse(result['ok'])
+        self.assertEqual({p.name:p.read_bytes() for p in self.slot.iterdir()}, before)
+        self.assertEqual({p.name:p.read_bytes() for p in target.iterdir()}, {'keep':b'untouched evidence'})
+        self.assertFalse(self.host.active)
+
+    def test_exdev_bad_copy_is_uncertain_and_repeat_refuses(self):
+        target = self.state/'retired-integrations'/self.run
+        real_rename = os.rename
+        def bad_copy(*args, **kwargs):
+            real_rename(self.slot, target)
+            (target/m.ARTIFACT).write_bytes(b'bad copy')
+        with patch.object(m.os, 'rename', side_effect=OSError(errno.EXDEV, 'boundary')), patch.object(m.subprocess, 'run', side_effect=bad_copy):
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.assertFalse(result['ok']); self.assertEqual(result['reason'], 'retirement-copy-unconfirmed')
+        self.assertFalse(self.call('retire-failed-integration', expected_run=self.run)['ok'])
+        self.assertFalse(self.host.active)
+        self.assertEqual((target/'receipt.json').read_bytes(), m.canonical(self.receipt))
+
+    def test_exdev_timeout_after_move_reports_uncertain_with_original_archive(self):
+        target = self.state/'retired-integrations'/self.run
+        before = {p.name:p.read_bytes() for p in self.slot.iterdir()}
+        real_rename = os.rename
+        def moved_then_timeout(*args, **kwargs):
+            real_rename(self.slot, target)
+            raise subprocess.TimeoutExpired(args[0], 15)
+        with patch.object(m.os, 'rename', side_effect=OSError(errno.EXDEV, 'boundary')), patch.object(m.subprocess, 'run', side_effect=moved_then_timeout):
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.assertFalse(result['ok']); self.assertEqual(result['reason'], 'command-failed-or-uncertain')
+        self.assertFalse(self.slot.exists()); self.assertFalse(self.host.active)
+        self.assertEqual({p.name:p.read_bytes() for p in target.iterdir()}, before)
+        self.assertFalse(self.call('retire-failed-integration', expected_run=self.run)['ok'])
+        self.assertEqual({p.name:p.read_bytes() for p in target.iterdir()}, before)
+
     def test_post_rename_failure_reports_uncertain_and_never_repeats(self):
         with patch.object(m.os, 'fsync', side_effect=OSError('injected')):
             result = self.call('retire-failed-integration', expected_run=self.run)
@@ -172,6 +245,27 @@ class UpdatePackage(unittest.TestCase):
             self.assertEqual((installed/'maintenance.py').read_bytes(), b'old core')
             self.assertEqual(unit.read_bytes(), b'old unit')
             self.assertEqual(len(manifest['files']), 3)
+            guards = []
             for name in ('UPDATE-REVIEW-ONLY.sh', 'RESTORE-REVIEW-ONLY.sh'):
                 subprocess.run(['/bin/sh', '-n', str(package/name)], check=True, timeout=5)
                 self.assertNotIn('start eqemu-validator.socket', (package/name).read_text())
+                lines = (package/name).read_text().splitlines()
+                index = next(i for i, line in enumerate(lines) if 'list-units' in line)
+                guard = lines[index:index+2]
+                guards.append(guard)
+                self.assertEqual(guard[1], 'test -z "$maintenance_active"')
+                self.assertEqual(manifest['scripts_sha256'][name], m.sha((package/name).read_bytes()))
+                enumeration = root/'enumerate'
+                enumeration.write_text('#!/bin/sh\nprintf "%s" "$FIXTURE_OUTPUT"\nexit "$FIXTURE_EXIT"\n')
+                enumeration.chmod(0o700)
+                # Execute only the two generated guard lines, substituting the
+                # enumeration executable. No root preflight/service action runs.
+                seam = '\n'.join(guard).replace('/usr/bin/systemctl', str(enumeration))
+                for code, output, allowed in ((7, '', False), (0, 'active-instance', False), (0, '', True)):
+                    with self.subTest(recipe=name, exit=code, active=bool(output)):
+                        result = subprocess.run(['/bin/sh', '-c', 'set -eu\n'+seam+'\nprintf reached-marker'],
+                            env=dict(os.environ, FIXTURE_EXIT=str(code), FIXTURE_OUTPUT=output),
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=5)
+                        self.assertEqual(result.returncode == 0, allowed)
+                        self.assertEqual(result.stdout, b'reached-marker' if allowed else b'')
+            self.assertEqual(guards[0], guards[1])

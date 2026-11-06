@@ -1,6 +1,7 @@
 """Fixed maintenance capabilities. Root never imports worker or candidate code."""
 import base64
 import contextlib
+import errno
 import fcntl
 import hashlib
 import json
@@ -431,12 +432,25 @@ class Store:
                 require(stat.S_IMODE(os.fstat(fd).st_mode) == 0o700, 'archive-mode')
                 target = archive / run
                 require(not present(target), 'archive-exists')
-                require(info.st_dev == os.fstat(fd).st_dev, 'retirement-cross-filesystem')
                 self.host.socket(False)
                 self.host.quiescent()
                 require(info == source.lstat(), 'retention-changed')
                 # Both parents are protected and all writers share worker.lock.
-                os.rename(source, target)
+                try:
+                    os.rename(source, target)
+                except OSError as error:
+                    if error.errno != errno.EXDEV:
+                        raise
+                    # systemd's two writable bind mounts can share st_dev yet
+                    # reject rename. GNU mv handles this fixed cross-mount copy.
+                    subprocess.run(['/usr/bin/mv', '--no-clobber', '--no-target-directory',
+                                    '--', str(source), str(target)], check=True,
+                                   stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=15)
+                require(not present(source), 'retirement-move-unconfirmed')
+                require(stat.S_ISDIR(target.lstat().st_mode)
+                        and {p.name for p in target.iterdir()} == set(names), 'retirement-copy-unconfirmed')
+                for name, limit in names.items():
+                    require(read(target / name, limit)[0] == raw[name], 'retirement-copy-unconfirmed')
                 os.fsync(fd)
                 parent = os.open(source.parent, FLAGS | os.O_DIRECTORY)
                 try:

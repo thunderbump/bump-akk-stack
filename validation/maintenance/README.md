@@ -55,7 +55,7 @@ connection can then activate a worker. Keep the existing HOLD until separately
 authorized.
 
 `retire-failed-integration --expected-run HEX32` validates the fixed ordinary
-`/var/lib/eqemu-validator/last-integration` receipt and moves the whole directory
+`/var/lib/eqemu-validator/last-integration` receipt and transfers the whole directory
 to `.maintenance-v1/retired-integrations/HEX32`. VM cleanup must be exactly true.
 Native and database cleanup retain their separate original values, including
 `not-run` and `unknown`. A failed execution or an explicitly incomplete failed
@@ -63,15 +63,18 @@ transfer is required. The operation uses the common worker lock, refuses active
 owned work, stops ordinary ingress, and leaves it stopped. It preserves all
 artifact/pending/receipt bytes, writes no ACK, and creates no replacement slot.
 Only a separately requested integration job creates the next slot. Root and file
-symlinks, malformed metadata, wrong run, existing archive, and cross-filesystem
-moves refuse. No diagnostic sockets or worker code change.
+symlinks, malformed metadata, wrong run, and existing archive refuse. Cross-mount rename refusal falls back to the fixed
+`/usr/bin/mv --no-clobber --no-target-directory -- SOURCE DESTINATION` with a
+15-second deadline and discarded output. Both paths verify source absence and
+the complete original bytes of exactly the three regular files before success.
+Inodes may change across mounts; original evidence bytes do not. No diagnostic sockets or worker code change.
 
 Both operations share the existing lock with publication. Requests have no
 automatic retry or rollback. A command failure or timeout returns
 `command-failed-or-uncertain`; disconnects and I/O failures can leave effects
 uncertain. Consult status, which reports actual socket state, slot presence and
 up to 16 archived run names with a truncation flag. Explicit repeated retirement
-refuses without another move or overwriting an archive. This is ordinary rename
+refuses without another move or overwriting an archive. This is ordinary rename or standard move
 and directory synchronization, not power-loss recovery or exactly-once delivery.
 
 Prepare an update for an EXISTING installation from clean committed source:
@@ -81,14 +84,16 @@ python3 -I -B validation/maintenance/prepare_mvp_update.py --output /absolute/fr
 ```
 
 Preparation reads only the public installed baseline, broker source and template.
-It writes `manifest.json` with exact before/after SHA256 values, the three fixed
+It writes `manifest.json` with exact before/after SHA256 values and client/recipe hashes, the three fixed
 replacement files, an unprivileged client copy, and `UPDATE-REVIEW-ONLY.sh` /
 `RESTORE-REVIEW-ONLY.sh`. Review those exact human root commands. Do not execute
 preparation or package Python as root. The recipe stages checked bytes under a
 fresh protected `/root/eqemu-maintenance-mvp-update`, stops only the maintenance
 socket, refuses active maintenance requests, backs up the three files under a
 fresh `/root/eqemu-maintenance-mvp-backup`, installs checked files, reloads systemd,
-and starts only the maintenance socket. It never starts ordinary ingress.
+and starts only the maintenance socket. Both recipes use a standalone
+enumeration assignment followed by a separate emptiness test, so an enumeration
+error or active request refuses before file replacement. It never starts ordinary ingress.
 Do not run it automatically; a partial update requires human inspection and the
 explicit restore recipe. Existing backup/staging directories intentionally refuse
 reuse. The original install manifest remains historical; use the backup recipe
