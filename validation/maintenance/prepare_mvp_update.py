@@ -1,4 +1,4 @@
-"""Prepare a fixed three-file existing-broker update as data. Never execute it."""
+"""Prepare a fixed core/baseline existing-broker update as data. Never execute it."""
 import argparse
 import hashlib
 import json
@@ -8,8 +8,12 @@ import subprocess
 
 ROOT = Path('/usr/local/lib/eqemu-validator-maintenance-v1')
 UNIT = Path('/etc/systemd/system/eqemu-validator-maintenance@.service')
-STAGE = Path('/root/eqemu-maintenance-mvp-update')
-BACKUP = Path('/root/eqemu-maintenance-mvp-backup')
+STAGE = Path('/root/eqemu-maintenance-mvp-atime-update-v4')
+BACKUP = Path('/root/eqemu-maintenance-mvp-atime-backup-v4')
+EXPECTED_BEFORE = {
+    'maintenance.py': 'be08bef85b2681b52ecf9b21885b0de526bd0bf7eab174ccbea5d84cfb1a2b40',
+    'baseline.json': '100edaa4484356be96eb5571f88930451a30dd62aedce8aa5e31c739c93474fa'}
+EXPECTED_UNIT = 'e209cf3efae5e763385ae888b15b9abb887c95d80e8ba2cc9b5e2cc11669ddb5'
 
 
 def digest(raw):
@@ -21,15 +25,15 @@ def prepare(output):
     assert not subprocess.check_output(['/usr/bin/git', '-C', str(repo), 'status', '--porcelain=v1'])
     commit = subprocess.check_output(['/usr/bin/git', '-C', str(repo), 'rev-parse', 'HEAD']).decode().strip()
     source = repo / 'validation/maintenance'
-    paths = {'maintenance.py': ROOT/'maintenance.py', 'baseline.json': ROOT/'baseline.json',
-             'eqemu-validator-maintenance@.service': UNIT}
+    paths = {'maintenance.py': ROOT/'maintenance.py', 'baseline.json': ROOT/'baseline.json'}
     before = {name: path.read_bytes() for name, path in paths.items()}
+    assert all(digest(raw) == EXPECTED_BEFORE[name] for name, raw in before.items()), 'installed-before-drift'
+    assert digest(UNIT.read_bytes()) == EXPECTED_UNIT, 'retained-unit-drift'
     baseline = json.loads(before['baseline.json'])
     after = dict(before)
     after['maintenance.py'] = (source/'maintenance.py').read_bytes()
     baseline['code_sha256']['maintenance.py'] = digest(after['maintenance.py'])
     after['baseline.json'] = (json.dumps(baseline, sort_keys=True, separators=(',', ':'))+'\n').encode()
-    after[UNIT.name] = (source/UNIT.name).read_bytes()
     output.mkdir(mode=0o700)
     for name, raw in after.items():
         (output/name).write_bytes(raw)
@@ -37,13 +41,16 @@ def prepare(output):
     (output/'client.py').write_bytes((source/'client.py').read_bytes())
     manifest = dict(source_commit=commit, files={name:dict(destination=str(paths[name]),
                     before_sha256=digest(before[name]), after_sha256=digest(after[name])) for name in paths},
-                    client_sha256=digest((source/'client.py').read_bytes()))
+                    client_sha256=digest((source/'client.py').read_bytes()),
+                    retained_unit=dict(destination=str(UNIT), sha256=EXPECTED_UNIT))
     q = shlex.quote
+    unit_guard = [f'test -f {UNIT} && test ! -L {UNIT}',
+                  f"printf '%s  %s\\n' {EXPECTED_UNIT} {UNIT} | sha256sum -c -"]
     lines = ['# REVIEW ONLY. Run manually in a normal root terminal outside NoNewPrivs.',
              '# No script from this package is executed as root. Stop on every error.',
              'set -eu', 'test "$(id -u)" = 0',
              "grep -q '^NoNewPrivs:[[:space:]]*0$' /proc/self/status",
-             f'mkdir -m 700 {STAGE}', f'mkdir -m 700 {BACKUP}']
+             *unit_guard, f'mkdir -m 700 {STAGE}', f'mkdir -m 700 {BACKUP}']
     for name, path in paths.items():
         lines += [f'test -f {path} && test ! -L {path}',
                   f"printf '%s  %s\\n' {digest(before[name])} {path} | sha256sum -c -",
@@ -61,7 +68,7 @@ def prepare(output):
                   f"printf '%s  %s\\n' {digest(after[name])} {path} | sha256sum -c -"]
     lines += ['/usr/bin/systemctl daemon-reload', '/usr/bin/systemctl start eqemu-validator-maintenance.socket']
     (output/'UPDATE-REVIEW-ONLY.sh').write_text('\n'.join(lines)+'\n')
-    restore = ['# Explicit restore after reviewing any partial update. No automatic rollback.', 'set -eu',
+    restore = ['# Explicit restore after reviewing any partial update. No automatic rollback.', 'set -eu', *unit_guard,
                '/usr/bin/systemctl stop eqemu-validator-maintenance.socket',
                *active_guard]
     for name, path in paths.items():

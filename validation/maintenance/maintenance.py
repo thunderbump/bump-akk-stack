@@ -70,6 +70,12 @@ def metadata(info):
                 gid=info.st_gid, mode=stat.S_IMODE(info.st_mode))
 
 
+def directory_state(info):
+    """Identity, permissions and mutation fields; listing can change only atime."""
+    return (info.st_dev, info.st_ino, info.st_uid, info.st_gid, info.st_mode,
+            info.st_nlink, info.st_size, info.st_mtime_ns, info.st_ctime_ns)
+
+
 def read(path, limit=131072):
     fd = os.open(path, FLAGS)
     try:
@@ -434,7 +440,9 @@ class Store:
                 require(not present(target), 'archive-exists')
                 self.host.socket(False)
                 self.host.quiescent()
-                require(info == source.lstat(), 'retention-changed')
+                require(directory_state(info) == directory_state(source.lstat()), 'retention-changed')
+                for name, limit in names.items():
+                    require(read(source / name, limit)[0] == raw[name], 'retention-changed')
                 # Both parents are protected and all writers share worker.lock.
                 try:
                     os.rename(source, target)

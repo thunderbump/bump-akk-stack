@@ -6,6 +6,7 @@ from pathlib import Path
 import socket
 import subprocess
 import threading
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -23,8 +24,10 @@ class FixedOperations(unittest.TestCase):
         def logical_stat(path, *a, **kw):
             info = original_stat(path, *a, **kw)
             if path in (self.root, self.slot):
-                values = list(info); values[4:6] = [995, 980]
-                return os.stat_result(values)
+                # Preserve actual timestamp precision, including nanoseconds.
+                fields = {key:getattr(info, key) for key in dir(info) if key.startswith('st_')}
+                fields.update(st_uid=995, st_gid=980)
+                return SimpleNamespace(**fields)
             return info
         self.enterContext(patch.object(Path, 'lstat', logical_stat))
         original_read = m.read
@@ -69,6 +72,85 @@ class FixedOperations(unittest.TestCase):
             thread.join(5)
             self.assertFalse(thread.is_alive())
             self.assertEqual(errors, [])
+
+    def test_stale_atime_listing_retirement_preserves_original_bytes(self):
+        artifact = b'failed fixture evidence\x00\xff' * 64
+        (self.slot/m.ARTIFACT).write_bytes(artifact)
+        self.receipt.update(bytes=len(artifact), sha256=m.sha(artifact))
+        self.write('receipt.json', self.receipt)
+        original = {p.name:p.read_bytes() for p in self.slot.iterdir()}
+        os.utime(self.slot, ns=(1_000_000_000, 2_000_000_000))
+        before = os.stat(self.slot, follow_symlinks=False)
+        observed = []
+        control = self.host.socket
+        def after_listing(active):
+            observed.append(os.stat(self.slot, follow_symlinks=False))
+            control(active)
+        with patch.object(self.host, 'socket', side_effect=after_listing):
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.assertEqual(len(observed), 1)
+        fields = ('st_mode', 'st_ino', 'st_dev', 'st_nlink', 'st_uid', 'st_gid',
+                  'st_size', 'st_atime', 'st_mtime', 'st_ctime',
+                  'st_atime_ns', 'st_mtime_ns', 'st_ctime_ns')
+        old = {key:getattr(before, key) for key in fields}
+        new = {key:getattr(observed[0], key) for key in fields}
+        changed = [key for key in fields if old[key] != new[key]]
+        print('STALE-ATIME-FIXTURE '+json.dumps(dict(before=old, after=new, changed_fields=changed,
+              result=result, source_present=self.slot.exists()), sort_keys=True), flush=True)
+        self.assertEqual(changed, ['st_atime', 'st_atime_ns'])
+        self.assertIsNotNone(self.slot.lstat().st_mtime_ns if self.slot.exists() else before.st_mtime_ns)
+        if self.slot.exists():
+            self.assertEqual({p.name:p.read_bytes() for p in self.slot.iterdir()}, original)
+        self.assertTrue(result['ok'], result)
+        target = self.state/'retired-integrations'/self.run
+        self.assertFalse(self.slot.exists()); self.assertFalse(self.host.active)
+        self.assertEqual({p.name:p.read_bytes() for p in target.iterdir()}, original)
+        self.assertEqual(result['result']['execution'], self.receipt['execution'])
+
+    def test_directory_replacement_refuses(self):
+        old = self.root/'original-slot'
+        def replace(active):
+            self.slot.rename(old); self.slot.mkdir(mode=0o700)
+            for entry in old.iterdir():
+                (self.slot/entry.name).write_bytes(entry.read_bytes())
+                (self.slot/entry.name).chmod(0o600)
+        with patch.object(self.host, 'socket', side_effect=replace):
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.assertFalse(result['ok']); self.assertEqual(result['reason'], 'retention-changed')
+        self.assertTrue(old.exists()); self.assertTrue(self.slot.exists())
+        self.assertFalse((self.state/'retired-integrations'/self.run).exists())
+
+    def test_directory_ownership_change_refuses(self):
+        original_stat = Path.lstat
+        changed = False
+        def ownership(path, *a, **kw):
+            info = original_stat(path, *a, **kw)
+            if path == self.slot and changed:
+                return SimpleNamespace(**dict(vars(info), st_uid=996))
+            return info
+        def change(active):
+            nonlocal changed
+            changed = True
+        with patch.object(Path, 'lstat', ownership), patch.object(self.host, 'socket', side_effect=change):
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.assertFalse(result['ok']); self.assertEqual(result['reason'], 'retention-changed')
+        self.assertTrue(self.slot.exists()); self.assertFalse((self.state/'retired-integrations'/self.run).exists())
+
+    def test_directory_mode_change_refuses(self):
+        with patch.object(self.host, 'socket', side_effect=lambda active:self.slot.chmod(0o500)):
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.slot.chmod(0o700)
+        self.assertFalse(result['ok']); self.assertEqual(result['reason'], 'retention-changed')
+        self.assertTrue(self.slot.exists()); self.assertFalse((self.state/'retired-integrations'/self.run).exists())
+
+    def test_file_content_change_refuses_without_transfer(self):
+        receipt = (self.slot/'receipt.json').read_bytes()
+        with patch.object(self.host, 'socket', side_effect=lambda active:(self.slot/m.ARTIFACT).write_bytes(b'changed evidence')):
+            result = self.call('retire-failed-integration', expected_run=self.run)
+        self.assertFalse(result['ok'])
+        self.assertTrue(self.slot.exists()); self.assertFalse((self.state/'retired-integrations'/self.run).exists())
+        self.assertEqual((self.slot/m.ARTIFACT).read_bytes(), b'changed evidence')
+        self.assertEqual((self.slot/'receipt.json').read_bytes(), receipt)
 
     def test_retire_preserves_every_byte_and_explicit_repeat_refuses(self):
         before = {p.name:p.read_bytes() for p in self.slot.iterdir()}
@@ -244,7 +326,7 @@ class UpdatePackage(unittest.TestCase):
             baseline = dict(code_sha256={'maintenance.py':m.sha(b'old core'), 'service.py':'unchanged'}, marker='preserve config')
             (installed/'baseline.json').write_bytes(m.canonical(baseline))
             unit = root/'eqemu-validator-maintenance@.service'; unit.write_bytes(b'old unit')
-            with patch.object(preparer, 'ROOT', installed), patch.object(preparer, 'UNIT', unit), patch.object(preparer.subprocess, 'check_output', side_effect=[b'', b'f'*40+b'\n']):
+            with patch.object(preparer, 'ROOT', installed), patch.object(preparer, 'UNIT', unit), patch.object(preparer, 'EXPECTED_BEFORE', {name:m.sha((installed/name).read_bytes()) for name in ('maintenance.py','baseline.json')}), patch.object(preparer, 'EXPECTED_UNIT', m.sha(unit.read_bytes())), patch.object(preparer.subprocess, 'check_output', side_effect=[b'', b'f'*40+b'\n']):
                 with patch('builtins.print'): preparer.prepare(root/'package')
             package = root/'package'; manifest = json.loads((package/'manifest.json').read_bytes())
             after = json.loads((package/'baseline.json').read_bytes())
@@ -253,7 +335,11 @@ class UpdatePackage(unittest.TestCase):
             self.assertEqual(after['code_sha256']['maintenance.py'], m.sha((package/'maintenance.py').read_bytes()))
             self.assertEqual((installed/'maintenance.py').read_bytes(), b'old core')
             self.assertEqual(unit.read_bytes(), b'old unit')
-            self.assertEqual(len(manifest['files']), 3)
+            self.assertEqual(len(manifest['files']), 2)
+            self.assertEqual(manifest['retained_unit'], dict(destination=str(unit), sha256=m.sha(b'old unit')))
+            self.assertFalse((package/unit.name).exists())
+            self.assertNotIn('/root/eqemu-maintenance-mvp-update\n', (package/'UPDATE-REVIEW-ONLY.sh').read_text())
+            self.assertIn('/root/eqemu-maintenance-mvp-atime-update-v4', (package/'UPDATE-REVIEW-ONLY.sh').read_text())
             guards = []
             for name in ('UPDATE-REVIEW-ONLY.sh', 'RESTORE-REVIEW-ONLY.sh'):
                 subprocess.run(['/bin/sh', '-n', str(package/name)], check=True, timeout=5)
@@ -278,3 +364,14 @@ class UpdatePackage(unittest.TestCase):
                         self.assertEqual(result.returncode == 0, allowed)
                         self.assertEqual(result.stdout, b'reached-marker' if allowed else b'')
             self.assertEqual(guards[0], guards[1])
+            expected = {name:m.sha((installed/name).read_bytes()) for name in ('maintenance.py','baseline.json')}
+            for changed in ('maintenance.py', 'baseline.json', 'unit'):
+                path = unit if changed == 'unit' else installed/changed
+                saved = path.read_bytes(); path.write_bytes(b'unexpected drift')
+                try:
+                    with patch.object(preparer, 'ROOT', installed), patch.object(preparer, 'UNIT', unit), patch.object(preparer, 'EXPECTED_BEFORE', expected), patch.object(preparer, 'EXPECTED_UNIT', m.sha(b'old unit')), patch.object(preparer.subprocess, 'check_output', side_effect=[b'', b'f'*40+b'\n']):
+                        with self.assertRaisesRegex(AssertionError, 'drift'):
+                            preparer.prepare(root/'refused-package')
+                    self.assertFalse((root/'refused-package').exists())
+                finally:
+                    path.write_bytes(saved)

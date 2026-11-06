@@ -83,14 +83,16 @@ Prepare an update for an EXISTING installation from clean committed source:
 python3 -I -B validation/maintenance/prepare_mvp_update.py --output /absolute/fresh-update
 ```
 
-Preparation reads only the public installed baseline, broker source and template.
-It writes `manifest.json` with exact before/after SHA256 values and client/recipe hashes, the three fixed
-replacement files, an unprivileged client copy, and `UPDATE-REVIEW-ONLY.sh` /
+Preparation reads only public installed broker files and the retained service template.
+It requires the fixed installed 1c13 core/baseline hashes and the unchanged template
+hash; unexpected bytes refuse before creating a package. It writes `manifest.json`
+with exact before/after hashes for only core and baseline, retained unit hash,
+client/recipe hashes, those two replacement files, a client copy, and `UPDATE-REVIEW-ONLY.sh` /
 `RESTORE-REVIEW-ONLY.sh`. Review those exact human root commands. Do not execute
 preparation or package Python as root. The recipe stages checked bytes under a
-fresh protected `/root/eqemu-maintenance-mvp-update`, stops only the maintenance
-socket, refuses active maintenance requests, backs up the three files under a
-fresh `/root/eqemu-maintenance-mvp-backup`, installs checked files, reloads systemd,
+fresh protected `/root/eqemu-maintenance-mvp-atime-update-v4`, stops only the maintenance
+socket, refuses active maintenance requests, backs up only core and baseline under a
+fresh `/root/eqemu-maintenance-mvp-atime-backup-v4`, installs checked files, reloads systemd,
 and starts only the maintenance socket. Both recipes use a standalone
 enumeration assignment followed by a separate emptiness test, so an enumeration
 error or active request refuses before file replacement. It never starts ordinary ingress.
@@ -103,6 +105,13 @@ The only service-policy change adds `/var/lib/eqemu-validator` to the existing
 `ReadWritePaths`, required for the fixed rename. Existing identities, resource
 limits, worker policy, profiles, code/input selection, and private state layout
 remain intact. Normal broker API requests cannot change broker code or policy.
-The newly prepared source is uninstalled and unqualified on the real host.
+Brian reported installing the prior 1c13 production update and successful ordinary
+socket stop/start/stop. A retained-slot retirement then refused `retention-changed`.
+A stale-atime source fixture reproduced that refusal: listing changes access time.
+The new comparison retains device/inode, ownership, mode, link count, size and
+mtime/ctime nanoseconds while ignoring access time, and rechecks all three original
+file bytes before transfer. Replacement/ownership/mode/content changes still
+refuse. The live cause remains unproved because private before/after fields were
+not supplied. This new correction is uninstalled and unqualified on the real host.
 Source-only authorization excludes root commands, Docker redeployment, worker
 runs, and probes of protected runtime state.
