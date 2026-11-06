@@ -522,12 +522,15 @@ class Engine:
             def retire():
                 if workspace.exists():
                     if quarantine.exists():
+                        if 'host_contract' in target and self.linked_fresh_workspace(plan, previous, workspace, target):
+                            return
                         raise Rejected('ambiguous workspace ownership')
                     os.rename(workspace, quarantine)
                     sync_dir(workspace.parent)
                     sync_dir(quarantine.parent)
             self.step(op, path, 'retire', retire)
             fresh = workspace if 'host_contract' in target else root/'workspaces'/str(previous.get('workspace_generation', 0)+1)
+            op['fresh_workspace'] = {'generation': previous.get('workspace_generation', 0)+1}
             self.step(op, path, 'allocate', lambda: self.allocate(fresh, target))
             self.step(op, path, 'publish', lambda: atomic(root/'current.json', {**previous, 'generation': previous['generation']+1, 'workspace_generation': previous.get('workspace_generation', 0)+1}, 0o644))
             # Preserve original records. Resolution is a separate durable link, never a rewritten failure.
@@ -566,3 +569,23 @@ class Engine:
         if 'host_contract' in target:
             self.manager.publish_binding(target, root/'releases'/selected['release'])
         atomic(root/'current.json', selected, 0o644)
+
+    def linked_fresh_workspace(self, plan, previous, workspace, target):
+        """Explicit recovery may finish only a prior recorded empty allocation.
+
+        The fixed host path is reused. Its separate allocation intent distinguishes
+        a new empty workspace from the quarantined failed generation.
+        """
+        linked = plan['recovery_of']
+        for _ in range(MAX_RECORDS):
+            prior = self.status({'operation_id': linked})
+            intended = prior.get('fresh_workspace', {}).get('generation')
+            if intended == previous.get('workspace_generation', 0)+1:
+                info = workspace.lstat()
+                return (stat.S_ISDIR(info.st_mode) and info.st_uid in (self.uid, target['service_uid'])
+                        and stat.S_IMODE(info.st_mode) == 0o700 and not any(workspace.iterdir()))
+            prior_plan = read(self.store/'plans'/(prior['plan_id']+'.json'))
+            if prior_plan['action'] != 'recover':
+                return False
+            linked = prior_plan['recovery_of']
+        raise Rejected('administrative requirement: allocation recovery link bound exceeded')

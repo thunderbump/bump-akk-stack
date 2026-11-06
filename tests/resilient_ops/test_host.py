@@ -283,3 +283,46 @@ class HostTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class HostRecoveryIntegrationTests(unittest.TestCase):
+    setUp = HostTests.setUp
+    run_systemctl = HostTests.run_systemctl
+    def interrupted_allocation(self, boundary):
+        import base64
+        import contextlib
+        import sys
+        core=sys.modules['engine']
+        class Interrupted(BaseException): pass
+        target=dict(self.target,root=str(h.WORKSPACE_ROOT),actions=['recover'],resources=['validator-ordinary-state','validator-integration-evidence'],files=['central-cdau-integration-v1.json','pending.json','receipt.json'],max_bytes=4096,max_files=20)
+        code=dict(self.target,max_bytes=4096,max_files=20)
+        peer=(os.getuid(),os.getgid())
+        policy={'peers':[dict(uid=peer[0],gid=peer[1],methods=['prepare','execute','status'],targets=['workspace','code'],actions=['publish','revert','recover'])],'targets':{'workspace':target,'code':code}}
+        store=self.base/'store';store.mkdir()
+        h.WORKSPACE.mkdir(mode=0o700)
+        (h.WORKSPACE/'failure').write_text('old failed evidence')
+        with patch.dict(sys.modules,{'host':h}),patch.object(core,'protected',lambda path,uid:None),patch.object(core.os,'chown',lambda *args:None):
+            engine=core.Engine(policy,store,self.manager,trusted_uid=os.getuid())
+            original=dict(operation_id='original',plan_id='legacy',target='workspace',resources=target['resources'],state='failed',step='retained',recovery_required=True)
+            core.atomic(store/'operations/original.json',original)
+            def prepare(rid, linked):
+                return engine.handle(dict(method='prepare',request_id=rid,target='workspace',action='recover',generation=0,recovery_of=linked),peer)['plan_id']
+            def execute(pid,oid):
+                return engine.handle(dict(method='execute',plan_id=pid,operation_id=oid),peer)
+            plan=prepare('first','original')
+            engine.fault=lambda point: (_ for _ in ()).throw(Interrupted()) if point==boundary else None
+            with self.assertRaises(Interrupted): execute(plan,'interrupted')
+            engine.fault=lambda _:None
+            self.assertEqual(engine.handle(dict(method='status',operation_id='interrupted'),peer)['state'],'uncertain')
+            result=execute(prepare('linked','interrupted'),'recovered')
+            self.assertEqual(result['state'],'succeeded',result)
+            self.assertEqual(core.read(store/'operations/original.json'),original)
+            self.assertEqual((h.WORKSPACE_ROOT/'evidence/0/workspace/failure').read_text(),'old failed evidence')
+            self.assertTrue(h.WORKSPACE.is_dir())
+            # A separately approved code publication still works after state recovery.
+            published=engine.handle(dict(method='prepare',request_id='code',target='code',action='publish',generation=0,artifact={name:base64.b64encode(b'fixture').decode() for name in h.FILES}),peer)['plan_id']
+            h.BINDING.symlink_to(h.CODE_ROOT/'releases'/published)
+            core.atomic(h.CODE_ROOT/'current.json',dict(generation=0,workspace_generation=0,release=published),0o644)
+            self.assertEqual(execute(published,'next-code')['state'],'succeeded')
+
+    def test_fixed_workspace_allocation_effect_crash(self): self.interrupted_allocation('allocate-effect')
+    def test_fixed_workspace_allocation_observed_crash(self): self.interrupted_allocation('allocate-observed')
