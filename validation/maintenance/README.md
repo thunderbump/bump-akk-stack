@@ -17,9 +17,9 @@ only protected broker code and stdlib, never installed worker or candidate code.
 normal root terminal, after the package/installer hashes have been checked.
 
 Capabilities: health, status, diagnose, fixture-data read, source-binding publish,
-and explicit bounded binding rollback. No archive, delete, retention clear,
-maintenance retry, arbitrary program, file path or Python capability exists.
-The unresolved 02fee state and its guards are outside this feature.
+and explicit bounded binding rollback. The proposed MVP additions below are
+source only; the installed broker still has no retirement capability. No arbitrary
+program, file path or Python capability exists. Existing HOLDs remain in place.
 
 Prepare from clean committed source:
 
@@ -43,3 +43,75 @@ Temporary transaction tests simulate privileged metadata. These host tests alone
 do not qualify actual root/systemd, mount namespaces, privileged transactions,
 worker execution, or candidate results. The installed read-only checks above are
 separate evidence.
+
+## Fixed unattended MVP, central-016p
+
+The proposed source adds `socket-start` and `socket-stop`, accepting no unit or
+options. They call only `/usr/bin/systemctl start|stop eqemu-validator.socket`
+with a 15-second deadline and discarded command output, then confirm its state.
+They never start accepted worker service instances. Status includes
+`ordinary_socket_active`. An explicit start authorizes ingress; a later client
+connection can then activate a worker. Keep the existing HOLD until separately
+authorized.
+
+`retire-failed-integration --expected-run HEX32` validates the fixed ordinary
+`/var/lib/eqemu-validator/last-integration` receipt and transfers the whole directory
+to `.maintenance-v1/retired-integrations/HEX32`. VM cleanup must be exactly true.
+Native and database cleanup retain their separate original values, including
+`not-run` and `unknown`. A failed execution or an explicitly incomplete failed
+transfer is required. The operation uses the common worker lock, refuses active
+owned work, stops ordinary ingress, and leaves it stopped. It preserves all
+artifact/pending/receipt bytes, writes no ACK, and creates no replacement slot.
+Only a separately requested integration job creates the next slot. Root and file
+symlinks, malformed metadata, wrong run, and existing archive refuse. Cross-mount rename refusal falls back to the fixed
+`/usr/bin/mv --no-clobber --no-target-directory -- SOURCE DESTINATION` with a
+15-second deadline and discarded output. Both paths verify source absence and
+the complete original bytes of exactly the three regular files before success.
+Inodes may change across mounts; original evidence bytes do not. No diagnostic sockets or worker code change.
+
+Both operations share the existing lock with publication. Requests have no
+automatic retry or rollback. A command failure or timeout returns
+`command-failed-or-uncertain`; disconnects and I/O failures can leave effects
+uncertain. Consult status, which reports actual socket state, slot presence and
+up to 16 archived run names with a truncation flag. Explicit repeated retirement
+refuses without another move or overwriting an archive. This is ordinary rename or standard move
+and directory synchronization, not power-loss recovery or exactly-once delivery.
+
+Prepare an update for an EXISTING installation from clean committed source:
+
+```
+python3 -I -B validation/maintenance/prepare_mvp_update.py --output /absolute/fresh-update
+```
+
+Preparation reads only public installed broker files and the retained service template.
+It requires the fixed installed 1c13 core/baseline hashes and the unchanged template
+hash; unexpected bytes refuse before creating a package. It writes `manifest.json`
+with exact before/after hashes for only core and baseline, retained unit hash,
+client/recipe hashes, those two replacement files, a client copy, and `UPDATE-REVIEW-ONLY.sh` /
+`RESTORE-REVIEW-ONLY.sh`. Review those exact human root commands. Do not execute
+preparation or package Python as root. The recipe stages checked bytes under a
+fresh protected `/root/eqemu-maintenance-mvp-atime-update-v4`, stops only the maintenance
+socket, refuses active maintenance requests, backs up only core and baseline under a
+fresh `/root/eqemu-maintenance-mvp-atime-backup-v4`, installs checked files, reloads systemd,
+and starts only the maintenance socket. Both recipes use a standalone
+enumeration assignment followed by a separate emptiness test, so an enumeration
+error or active request refuses before file replacement. It never starts ordinary ingress.
+Do not run it automatically; a partial update requires human inspection and the
+explicit restore recipe. Existing backup/staging directories intentionally refuse
+reuse. The original install manifest remains historical; use the backup recipe
+for this update, not the original install/resume/uninstall commands.
+
+The only service-policy change adds `/var/lib/eqemu-validator` to the existing
+`ReadWritePaths`, required for the fixed rename. Existing identities, resource
+limits, worker policy, profiles, code/input selection, and private state layout
+remain intact. Normal broker API requests cannot change broker code or policy.
+Brian reported installing the prior 1c13 production update and successful ordinary
+socket stop/start/stop. A retained-slot retirement then refused `retention-changed`.
+A stale-atime source fixture reproduced that refusal: listing changes access time.
+The new comparison retains device/inode, ownership, mode, link count, size and
+mtime/ctime nanoseconds while ignoring access time, and rechecks all three original
+file bytes before transfer. Replacement/ownership/mode/content changes still
+refuse. The live cause remains unproved because private before/after fields were
+not supplied. This new correction is uninstalled and unqualified on the real host.
+Source-only authorization excludes root commands, Docker redeployment, worker
+runs, and probes of protected runtime state.

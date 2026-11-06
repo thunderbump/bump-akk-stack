@@ -97,8 +97,10 @@ def frontend(repo, output, binding):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     sub = parser.add_subparsers(dest='op', required=True)
-    for name in ('health', 'status', 'diagnose'):
+    for name in ('health', 'status', 'diagnose', 'socket-start', 'socket-stop'):
         sub.add_parser(name)
+    retire = sub.add_parser('retire-failed-integration')
+    retire.add_argument('--expected-run', required=True)
     publish = sub.add_parser('publish')
     publish.add_argument('--repo', type=Path, required=True)
     publish.add_argument('--commit', required=True)
@@ -116,6 +118,8 @@ def main():
             request['id'] = hex_value(args.request_id, 32)
             request['expected'] = hex_value(args.expected, 64)
             request['source'], request['proof'] = source_request(args.repo, args.commit)
+        elif args.op == 'retire-failed-integration':
+            request['expected_run'] = hex_value(args.expected_run, 32)
         elif args.op == 'rollback':
             request['transaction'] = hex_value(args.transaction, 32)
         elif args.op == 'frontend':
