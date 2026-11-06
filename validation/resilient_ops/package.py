@@ -297,19 +297,35 @@ class Operator:
         self.units = self.base / 'etc/systemd/system'
 
     def mkdir(self, path, mode=0o700):
-        if not path.exists():
+        # Internal fixed namespaces only. Revisit ancestors on explicit retries:
+        # existence after an interrupted effect does not establish durability.
+        if path != self.base:
+            if self.base not in path.parents:
+                raise ValueError('directory outside package namespace')
             self.mkdir(path.parent)
+        elif not path.exists():
+            protected(path.parent, self.uid)
+        if not path.exists():
             path.mkdir(mode=mode)
             os.chmod(path, mode)
         protected(path, self.uid)
+        fsync_directory(path)
+        if path.parent != path:
+            fsync_directory(path.parent)
 
     def initialize(self):
         for path in (self.code / 'releases', self.state / 'package-events', self.units):
             self.mkdir(path)
         lock = self.state / 'package.lock'
         fd = os.open(lock, os.O_CREAT | os.O_NOFOLLOW | os.O_RDWR, 0o600)
-        protected(lock, self.uid, leaf_file=True)
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        try:
+            protected(lock, self.uid, leaf_file=True)
+            fcntl.flock(fd, fcntl.LOCK_EX)
+            os.fsync(fd)
+            fsync_directory(self.state)
+        except BaseException:
+            os.close(fd)
+            raise
         return os.fdopen(fd, 'rb')
 
     def active(self):
@@ -426,21 +442,35 @@ class Operator:
             self.mkdir(self.config)
             if (self.config / 'policy.json').exists() or (self.config / 'policy.json').is_symlink():
                 raise ValueError('policy exists; policy upgrade/adoption needs separate review')
+            intent = self.state / 'enrollment-intent.json'
+            record = {'policy_sha256': expected_policy, 'phase': 'intent'}
+            retry = intent.exists() or intent.is_symlink()
+            if retry:
+                protected(intent, self.uid, leaf_file=True)
+                if decode(read_regular(intent, 65536)) != record:
+                    raise ValueError('enrollment already completed or intent content conflict')
             roots = [self.base / target['root'].lstrip('/') for target in policy['targets'].values()]
             for root in roots:
-                # Parent must already be protected or created under the fixed fresh tree.
+                # Existing roots are reusable only under this exact incomplete
+                # enrollment intent, and only while still protected and empty.
                 if root.exists() or root.is_symlink():
-                    raise ValueError('adoption forbidden; fresh target roots required')
+                    if not retry:
+                        raise ValueError('adoption forbidden; fresh target roots required')
+                    protected(root, self.uid)
+                    if stat.S_IMODE(root.stat().st_mode) != 0o711 or any(root.iterdir()):
+                        raise ValueError('interrupted enrollment root contains unknown state')
                 self.mkdir(root.parent, 0o711)
                 if root.parent.stat().st_mode & 0o111 != 0o111:
                     raise ValueError('dedicated target parent must be traversable')
+            # Re-sync identical intent on retry before any further effect.
+            atomic(intent, encode(record))
             self.event('enroll-intent', 'absent', expected_policy)
             for root in roots:
-                root.mkdir(mode=0o711)
-                os.chmod(root, 0o711)
+                self.mkdir(root, 0o711)
             for name in ('plans', 'requests', 'operations', 'locks'):
                 self.mkdir(self.state / name)
             atomic(self.config / 'policy.json', raw)
+            atomic(intent, encode({**record, 'phase': 'complete'}))
             self.event('enroll', 'absent', expected_policy)
             return {'enrolled': expected_policy, 'activation_performed': False}
 

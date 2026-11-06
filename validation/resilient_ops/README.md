@@ -147,3 +147,17 @@ Absence alone does not prove successful retirement or permit a fresh slot.
 Adoption synchronizes both target roots, their common parent and that parent's
 entry before publishing the external launcher binding, policy or success.
 These are source-level durability requirements, not power-loss qualification.
+
+Package install/enroll synchronizes its fixed directory hierarchies and namespace
+entries before dependent unit/current/policy/completion publication. Existing
+directories are synchronized again on explicit retries; existence is not proof
+of durability. The package lock file and its parent are also synchronized.
+Generic enrollment may resume only the identical incomplete policy intent with
+protected empty roots; changed policy, dirty roots and completed enrollment
+refuse. This does not turn enrollment into adoption or replay completed work.
+
+Linked retirement reconciliation performs BOTH source-parent and
+quarantine-parent directory syncs before retire-observed, resolution or success.
+Owned quarantine and sealed evidence establish provenance, not durable rename
+completion. Repeated barrier failures remain failed/gated and leave original
+failure records unchanged; nothing automatically retries or restarts a worker.

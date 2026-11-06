@@ -113,7 +113,7 @@ class PackageTests(unittest.TestCase):
         stage, expected = self.stage()
         sync = package.fsync_directory
         def fail_release_sync(path):
-            if path == self.operator.code / 'releases':
+            if path == self.operator.code / 'releases' and (path/expected).exists():
                 raise OSError('injected directory sync failure')
             sync(path)
         with mock.patch.object(package, 'fsync_directory', side_effect=fail_release_sync):
@@ -152,7 +152,8 @@ class PackageTests(unittest.TestCase):
                 self.operator.apply('install', 'absent', stage, expected)
                 sync = package.fsync_directory
                 def fail_sync(path):
-                    if path == getattr(self.operator, failed_parent):
+                    events = [package.decode(p.read_bytes())['action'] for p in (self.operator.state/'package-events').glob('*.json')]
+                    if path == getattr(self.operator, failed_parent) and 'uninstall-intent' in events:
                         raise OSError('injected unlink sync failure')
                     sync(path)
                 with mock.patch.object(package, 'fsync_directory', side_effect=fail_sync):
@@ -365,3 +366,165 @@ with socket.socket(fileno=os.dup(0)) as connection:
 
 if __name__ == '__main__':
     unittest.main()
+
+class NamespaceDurabilityTests(unittest.TestCase):
+    setUp = PackageTests.setUp
+    stage = PackageTests.stage
+
+    def required_paths(self, enroll=False):
+        leaves=[self.operator.code/'releases',self.operator.state/'package-events',self.operator.units]
+        if enroll:
+            leaves += [self.operator.config,self.operator.base/'var/lib/eqemu-resilient-targets/fixture']
+            leaves += [self.operator.state/name for name in ('plans','requests','operations','locks')]
+        paths=set()
+        for leaf in leaves:
+            path=leaf
+            while path!=self.operator.base:
+                paths.add(path)
+                path=path.parent
+            paths.add(path)
+        return paths
+
+    def trace(self, required, failure=None):
+        from contextlib import contextmanager
+        @contextmanager
+        def capture():
+            events=[]
+            actual_fsync=os.fsync
+            actual_replace=os.replace
+            def fsync(fd):
+                info=os.fstat(fd)
+                observed=None
+                for path in required:
+                    try: candidate=path.stat()
+                    except FileNotFoundError: continue
+                    if (candidate.st_dev,candidate.st_ino)==(info.st_dev,info.st_ino):
+                        observed=path
+                        break
+                if observed==failure and failure is not None:
+                    events.append(('fsync-failed',observed))
+                    raise OSError('injected namespace prerequisite fsync failure')
+                actual_fsync(fd)
+                if observed is not None:
+                    events.append(('fsync',observed))
+            def replace(source,destination,*args,**kwargs):
+                actual_replace(source,destination,*args,**kwargs)
+                events.append(('replace',Path(destination)))
+            with mock.patch.object(os,'fsync',new=fsync),mock.patch.object(os,'replace',new=replace):
+                yield events
+        return capture()
+
+    def assert_barriers(self, events, required, publication):
+        first=next(i for i,e in enumerate(events) if e[0]=='replace' and e[1] in publication)
+        for path in required:
+            self.assertIn(('fsync',path),events[:first],str(path))
+        return first
+
+    def assert_no_install_publication(self):
+        self.assertFalse((self.operator.code/'current').exists())
+        self.assertFalse((self.operator.code/'current').is_symlink())
+        for name in package.UNITS:
+            self.assertFalse((self.operator.units/name).exists())
+        for path in (self.operator.state/'package-events').glob('*.json'):
+            self.assertNotEqual(package.decode(path.read_bytes())['action'],'install')
+
+    def assert_no_enrollment_publication(self):
+        self.assertFalse((self.operator.config/'policy.json').exists())
+        for path in (self.operator.state/'package-events').glob('*.json'):
+            self.assertNotEqual(package.decode(path.read_bytes())['action'],'enroll')
+
+    def test_actual_fresh_install_persists_all_namespace_paths_before_units(self):
+        stage,expected=self.stage()
+        required=self.required_paths()
+        with self.trace(required) as events:
+            result=self.operator.apply('install','absent',stage,expected)
+        self.assertEqual(result['selected'],expected)
+        self.assert_barriers(events,required,{self.operator.units/name for name in package.UNITS}|{self.operator.code/'current'})
+
+    def test_actual_install_reestablishes_preexisting_namespace_durability(self):
+        stage,expected=self.stage()
+        required=self.required_paths()
+        for path in sorted(required,key=lambda p:len(p.parts)):
+            path.mkdir(mode=0o700,exist_ok=True)
+            path.chmod(0o700)
+        with self.trace(required) as events:
+            result=self.operator.apply('install','absent',stage,expected)
+        self.assertEqual(result['selected'],expected)
+        self.assert_barriers(events,required,{self.operator.units/name for name in package.UNITS}|{self.operator.code/'current'})
+
+    def test_install_namespace_sync_faults_remain_nonpass_and_retry_barriers(self):
+        for name,relative in (('code','usr/lib'),('state','var/lib'),('units','etc/systemd')):
+            with self.subTest(namespace=name):
+                self.operator=package.Operator(self.host/name,os.getuid())
+                stage,expected=self.stage(name)
+                required=self.required_paths()
+                failed=self.operator.base/relative
+                with self.trace(required,failed):
+                    with self.assertRaisesRegex(OSError,'namespace prerequisite'):
+                        self.operator.apply('install','absent',stage,expected)
+                    self.assert_no_install_publication()
+                    self.assertTrue(failed.is_dir())
+                    # Explicit identical request must hit the barrier AGAIN,
+                    # even though its previous directory effect is visible.
+                    with self.assertRaisesRegex(OSError,'namespace prerequisite'):
+                        self.operator.apply('install','absent',stage,expected)
+                    self.assert_no_install_publication()
+                with self.trace(required) as events:
+                    result=self.operator.apply('install','absent',stage,expected)
+                self.assertEqual(result['selected'],expected)
+                self.assert_barriers(events,required,{self.operator.units/n for n in package.UNITS}|{self.operator.code/'current'})
+
+    def policy_file(self):
+        path=self.root/'selected-policy.json'
+        raw=package.encode(fixture())
+        path.write_bytes(raw)
+        return path,package.digest(raw)
+
+    def test_actual_fresh_enrollment_persists_target_and_state_namespaces(self):
+        path,expected=self.policy_file()
+        required=self.required_paths(enroll=True)
+        with self.trace(required) as events:
+            result=self.operator.enroll(path,expected)
+        self.assertEqual(result['enrolled'],expected)
+        self.assert_barriers(events,required,{self.operator.config/'policy.json'})
+
+    def test_enrollment_namespace_faults_and_exact_intent_retries(self):
+        cases=(('config','etc'),('common','var/lib/eqemu-resilient-targets'),
+               ('target','var/lib/eqemu-resilient-targets/fixture'),
+               ('plans','var/lib/eqemu-resilient-ops/plans'),
+               ('operations','var/lib/eqemu-resilient-ops/operations'))
+        for name,relative in cases:
+            with self.subTest(namespace=name):
+                self.operator=package.Operator(self.host/name,os.getuid())
+                path,expected=self.policy_file()
+                required=self.required_paths(enroll=True)
+                failed=self.operator.base/relative
+                with self.trace(required,failed):
+                    with self.assertRaisesRegex(OSError,'namespace prerequisite'):
+                        self.operator.enroll(path,expected)
+                    self.assert_no_enrollment_publication()
+                    self.assertTrue(failed.is_dir())
+                    with self.assertRaisesRegex(OSError,'namespace prerequisite'):
+                        self.operator.enroll(path,expected)
+                    self.assert_no_enrollment_publication()
+                with self.trace(required) as events:
+                    result=self.operator.enroll(path,expected)
+                self.assertEqual(result['enrolled'],expected)
+                self.assert_barriers(events,required,{self.operator.config/'policy.json'})
+
+    def test_interrupted_enrollment_rejects_changed_policy_and_dirty_root(self):
+        path,expected=self.policy_file()
+        required=self.required_paths(enroll=True)
+        root=self.operator.base/'var/lib/eqemu-resilient-targets/fixture'
+        with self.trace(required,root):
+            with self.assertRaises(OSError):
+                self.operator.enroll(path,expected)
+        changed=fixture();changed['targets']['fixture']['timeout']=31
+        path.write_bytes(package.encode(changed))
+        with self.assertRaisesRegex(ValueError,'intent content conflict'):
+            self.operator.enroll(path,package.digest(path.read_bytes()))
+        path,expected=self.policy_file()
+        (root/'unknown').write_bytes(b'not an empty owned retry')
+        with self.assertRaisesRegex(ValueError,'unknown state'):
+            self.operator.enroll(path,expected)
+        self.assert_no_enrollment_publication()

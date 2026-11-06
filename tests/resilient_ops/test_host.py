@@ -394,7 +394,7 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
     setUp = HostTests.setUp
     run_systemctl = HostTests.run_systemctl
 
-    def adoption_to_recovery(self, interrupt=False, custody_mode=None, hierarchy_mode=None, workspace_mode=None):
+    def adoption_to_recovery(self, interrupt=False, custody_mode=None, hierarchy_mode=None, workspace_mode=None, retirement_mode=None):
         import base64
         spec = importlib.util.spec_from_file_location('fixture_adopt', SOURCE/'adopt.py')
         adoption = importlib.util.module_from_spec(spec)
@@ -521,7 +521,10 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
                 self.assertTrue(all(v['active'] == 'inactive' for v in accepted['before'].values()))
                 engine = core.Engine(policy, store, self.manager, trusted_uid=os.getuid())
                 pid = prepare('linked-recovery', 'interrupted')
-            result = execute(pid, 'recovered')
+            if retirement_mode:
+                result=self.retirement_sync_reconciliation(engine,target,store,pid,prepare,execute,retirement_mode)
+            else:
+                result = execute(pid, 'recovered')
             self.assertEqual(result['state'], 'succeeded', result)
             self.assertEqual(result['restore_ingress'], before)
             self.assertEqual(legacy_path.read_bytes(), legacy_bytes)
@@ -547,6 +550,82 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             self.assertEqual(self.sockets[h.SOCKETS[4]], 'active')
             self.assertEqual(self.sockets[h.ORDINARY_SOCKET], 'inactive')
             self.assertTrue(all(call[1] in h.SOCKETS for call in self.calls if call[0] == 'start'))
+
+    def retirement_sync_reconciliation(self, engine, target, store, first_plan, prepare, execute, failure_side):
+        core=sys.modules['engine']
+        source_parent=h.WORKSPACE.parent
+        quarantine=h.WORKSPACE_ROOT/'quarantine/0'
+        destination_parent=quarantine.parent
+        barriers=(source_parent,destination_parent)
+        failed=source_parent if failure_side=='source' else destination_parent
+        original_sync=core.sync_dir
+        original_rename=core.os.rename
+        attempts=[]
+        completed=[]
+        renames=[]
+        observed=[]
+        injecting=True
+
+        def sync(path):
+            if path in barriers:
+                self.assertTrue(quarantine.is_dir())
+                # During first retirement and linked missing-source recovery,
+                # a visible rename alone does not establish durable retirement.
+                attempts.append(path)
+                if injecting and path==failed:
+                    raise OSError('injected retirement directory sync failure')
+            original_sync(path)
+            if path in barriers:
+                completed.append(path)
+
+        def rename(source,destination,*args,**kwargs):
+            original_rename(source,destination,*args,**kwargs)
+            if Path(source)==h.WORKSPACE and Path(destination)==quarantine:
+                renames.append((Path(source),Path(destination)))
+
+        def fault(point):
+            if point=='retire-observed':
+                self.assertEqual(attempts,list(barriers))
+                self.assertEqual(completed,list(barriers))
+                observed.append(point)
+
+        engine.fault=fault
+        with patch.object(core,'sync_dir',new=sync),patch.object(core.os,'rename',new=rename):
+            first=execute(first_plan,'retire-failed')
+            self.assertEqual(first['state'],'failed',first)
+            self.assertEqual(first['step'],'retire-intent')
+            self.assertTrue(first['recovery_required'])
+            self.assertFalse(h.WORKSPACE.exists())
+            first_bytes=(store/'operations/retire-failed.json').read_bytes()
+            wanted=[source_parent] if failure_side=='source' else list(barriers)
+            self.assertEqual(attempts,wanted)
+            self.assertEqual(observed,[])
+
+            attempts.clear();completed.clear()
+            linked_plan=prepare('linked-retirement','retire-failed')
+            linked=execute(linked_plan,'linked-failed')
+            self.assertEqual(linked['state'],'failed',linked)
+            self.assertEqual(linked['step'],'retire-intent')
+            self.assertTrue(linked['recovery_required'])
+            self.assertEqual(attempts,wanted)
+            self.assertEqual(observed,[])
+            self.assertEqual((store/'operations/retire-failed.json').read_bytes(),first_bytes)
+            linked_bytes=(store/'operations/linked-failed.json').read_bytes()
+            # Identical retry returns the failure without replaying effects.
+            self.assertEqual(execute(linked_plan,'linked-failed'),linked)
+            self.assertEqual(attempts,wanted)
+            self.assertEqual(core.read(h.WORKSPACE_ROOT/'current.json')['generation'],0)
+
+            attempts.clear();completed.clear()
+            injecting=False
+            result=execute(prepare('explicit-durable-retirement','linked-failed'),'recovered')
+            self.assertEqual(observed,['retire-observed'])
+            self.assertEqual(renames,[(h.WORKSPACE,quarantine)])
+            self.assertEqual((store/'operations/retire-failed.json').read_bytes(),first_bytes)
+            self.assertEqual((store/'operations/linked-failed.json').read_bytes(),linked_bytes)
+            self.assertTrue({'retire-failed','linked-failed'} <= set(result['resolves']))
+        engine.fault=lambda _:None
+        return result
 
     def apply_adoption_fixture(self, adoption, core, packet, policy, store, originals, custody_mode=None, hierarchy_mode=None):
         import copy
@@ -831,3 +910,10 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
 
     def test_unexplained_missing_workspace_refuses(self):
         self.adoption_to_recovery(workspace_mode='missing')
+
+
+    def test_linked_retirement_retries_both_barriers_after_source_sync_failure(self):
+        self.adoption_to_recovery(retirement_mode='source')
+
+    def test_linked_retirement_retries_both_barriers_after_quarantine_sync_failure(self):
+        self.adoption_to_recovery(retirement_mode='quarantine')

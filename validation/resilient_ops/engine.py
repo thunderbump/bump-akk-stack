@@ -529,12 +529,14 @@ class Engine:
             def retire():
                 if self.workspace_root(plan, previous, workspace, target):
                     if quarantine.exists():
-                        if 'host_contract' in target and self.linked_fresh_workspace(plan, previous, workspace, target):
-                            return
-                        raise Rejected('ambiguous workspace ownership')
-                    os.rename(workspace, quarantine)
-                    sync_dir(workspace.parent)
-                    sync_dir(quarantine.parent)
+                        if not ('host_contract' in target and self.linked_fresh_workspace(plan, previous, workspace, target)):
+                            raise Rejected('ambiguous workspace ownership')
+                    else:
+                        os.rename(workspace, quarantine)
+                # An established linked rename/fresh slot still needs BOTH
+                # directory barriers before retire-observed can be persisted.
+                sync_dir(workspace.parent)
+                sync_dir(quarantine.parent)
             self.step(op, path, 'retire', retire)
             fresh = workspace if 'host_contract' in target else root/'workspaces'/str(previous.get('workspace_generation', 0)+1)
             op['fresh_workspace'] = {'generation': previous.get('workspace_generation', 0)+1}
