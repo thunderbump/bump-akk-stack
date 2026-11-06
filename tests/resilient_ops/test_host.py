@@ -384,3 +384,146 @@ class HostRecoveryIntegrationTests(unittest.TestCase):
             self.assertEqual(os.readlink(h.BINDING), str(h.CODE_ROOT/'releases'/old))
             self.assertEqual((store/'operations/interrupted.json').read_bytes(), original)
             self.assertEqual(execute(publish('next', 1), 'subsequent')['state'], 'succeeded')
+
+
+class AdoptionRecoveryIntegrationTests(unittest.TestCase):
+    setUp = HostTests.setUp
+    run_systemctl = HostTests.run_systemctl
+
+    def adoption_to_recovery(self, interrupt=False):
+        import base64
+        spec = importlib.util.spec_from_file_location('fixture_adopt', SOURCE/'adopt.py')
+        adoption = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(adoption)
+        core = sys.modules['engine']
+        packet = adoption.contract()
+        policy = adoption.policy_for(packet)
+        workspace_id = 'validator-integration-evidence'
+        code_id = 'validator-worker-code'
+        target, code = policy['targets'][workspace_id], policy['targets'][code_id]
+        target['root'], code['root'] = str(h.WORKSPACE_ROOT), str(h.CODE_ROOT)
+        peer = (os.getuid(), os.getgid())
+        policy['peers'][0].update(uid=peer[0], gid=peer[1])
+        store = self.base/'store'
+        store.mkdir()
+        h.WORKSPACE.mkdir(mode=0o700)
+        originals = {name: ('failed fixture '+name).encode() for name in target['files']}
+        for name, raw in originals.items():
+            (h.WORKSPACE/name).write_bytes(raw)
+        # Run the actual adoption entry point in a mapped filesystem. Its real
+        # record construction and sealing must carry pre-fence ingress into
+        # Engine recovery, without fabricating a legacy operation in the test.
+        self.sockets[h.SOCKETS[1]] = self.sockets[h.SOCKETS[4]] = 'active'
+        with patch.dict(sys.modules, {'host':h}), patch.object(core, 'protected', lambda path,uid:None), patch.object(core.os, 'chown', lambda *args:None):
+            engine = core.Engine(policy, store, self.manager, trusted_uid=os.getuid())
+            before = self.manager.observe(code)
+            self.apply_adoption_fixture(adoption, core, packet, policy, store, originals)
+            legacy_path = store/'operations/legacy-02fee-retained.json'
+            legacy_bytes = legacy_path.read_bytes()
+            legacy = core.read(legacy_path)
+            self.assertEqual(legacy['restore_ingress'], before)
+            self.assertEqual(legacy['original_outcome'], packet['migration']['original_outcome'])
+            self.assertFalse(legacy['original_outcome']['complete'])
+            self.assertEqual(legacy['original_outcome']['original_transfer'], 'uncertain')
+            self.assertTrue(all(state == 'inactive' for state in self.sockets.values()))
+
+            def prepare(rid, linked):
+                return engine.handle(dict(method='prepare', request_id=rid, target=workspace_id,
+                                          action='recover', generation=engine.current(target)['generation'],
+                                          recovery_of=linked), peer)['plan_id']
+            def execute(pid, oid):
+                return engine.handle(dict(method='execute', plan_id=pid, operation_id=oid), peer)
+            pid = prepare('legacy-recovery', legacy['operation_id'])
+            if interrupt:
+                class Interrupted(BaseException): pass
+                engine.fault = lambda point: (_ for _ in ()).throw(Interrupted()) if point == 'accepted' else None
+                with self.assertRaises(Interrupted):
+                    execute(pid, 'interrupted')
+                accepted = core.read(store/'operations/interrupted.json')
+                self.assertEqual(accepted['restore_ingress'], before)
+                self.assertTrue(all(v['active'] == 'inactive' for v in accepted['before'].values()))
+                engine = core.Engine(policy, store, self.manager, trusted_uid=os.getuid())
+                pid = prepare('linked-recovery', 'interrupted')
+            result = execute(pid, 'recovered')
+            self.assertEqual(result['state'], 'succeeded', result)
+            self.assertEqual(result['restore_ingress'], before)
+            self.assertEqual(legacy_path.read_bytes(), legacy_bytes)
+            self.assertEqual((h.WORKSPACE_ROOT/'evidence/0/original-operation.json').read_bytes(), legacy_bytes)
+            for name, raw in originals.items():
+                self.assertEqual((h.WORKSPACE_ROOT/'evidence/0/workspace'/name).read_bytes(), raw)
+            self.assertEqual(list(h.WORKSPACE.iterdir()), [])
+            self.assertEqual(self.sockets[h.SOCKETS[1]], 'active')
+            self.assertEqual(self.sockets[h.SOCKETS[4]], 'active')
+            self.assertEqual(self.sockets[h.ORDINARY_SOCKET], 'inactive')
+
+            # A separately prepared publication preserves the restored ingress.
+            pid = engine.handle(dict(method='prepare', request_id='next-code', target=code_id,
+                                     action='publish', generation=0,
+                                     artifact={name:base64.b64encode(b'fixture').decode() for name in code['files']}), peer)['plan_id']
+            self.assertEqual(execute(pid, 'published')['state'], 'succeeded')
+            self.assertEqual(self.sockets[h.SOCKETS[1]], 'active')
+            self.assertEqual(self.sockets[h.SOCKETS[4]], 'active')
+            self.assertEqual(self.sockets[h.ORDINARY_SOCKET], 'inactive')
+            self.assertTrue(all(call[1] in h.SOCKETS for call in self.calls if call[0] == 'start'))
+
+    def apply_adoption_fixture(self, adoption, core, packet, policy, store, originals):
+        import copy
+        import hashlib
+        import types
+        # Every inspected/mutated host path is mapped before entering apply().
+        # No real privileged paths, services, users or protected state are read.
+        spec = importlib.util.spec_from_file_location('fixture_package', SOURCE/'package.py')
+        package = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(package)
+        release = self.base/'adoption-package'
+        package.prepare(SOURCE, release)
+        packet = copy.deepcopy(packet)
+        packet['installed_unit_definitions'] = []
+        packet['installed_configs'] = []
+        h.BINDING.mkdir()
+        entries = []
+        for name in h.FILES:
+            path = h.BINDING/name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            raw = ('code fixture '+name).encode()
+            path.write_bytes(raw)
+            entries.append(dict(path=name, bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest()))
+        packet['current_code']['fresh_files'] = entries
+        packet['migration']['workspace'] = str(h.WORKSPACE)
+        for name, raw in originals.items():
+            info = (h.WORKSPACE/name).lstat()
+            packet['migration']['observed_records']['files'][name] = dict(
+                bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest(),
+                uid=info.st_uid, gid=info.st_gid, mode=stat.S_IMODE(info.st_mode))
+        # Adoption, rather than the test, must create the managed generations.
+        h.CODE_ROOT.rmdir()
+        h.WORKSPACE_ROOT.rmdir()
+        paths = {
+            '/var/lib/eqemu-resilient-ops': store,
+            '/srv/eqemu-validator-code': h.BINDING,
+            '/etc/eqemu-resilient-ops/policy.json': self.base/'configuration/policy.json',
+            '/srv/eqemu-resilient-adoption': self.base/'backup',
+        }
+        class RootPath(type(Path())):
+            def lstat(path, *args, **kw):
+                info = super().lstat(*args, **kw)
+                # Simulate immutable root package custody only. Workspace byte
+                # and ownership verification uses its actual fixture metadata.
+                if path == release or release in path.parents or path in release.parents:
+                    return types.SimpleNamespace(st_mode=info.st_mode & ~0o022, st_uid=0)
+                return info
+        def mapped_path(value):
+            return RootPath(paths.get(str(value), value))
+        real_engine = core.Engine
+        operator = release/'adopt.py'
+        with patch.object(adoption, '__file__', str(operator)), patch.object(adoption, 'Path', mapped_path), patch.object(adoption, 'contract', return_value=packet), patch.object(adoption, 'policy_for', return_value=policy), patch.object(adoption.os, 'geteuid', return_value=0), patch.object(core, 'Engine', side_effect=lambda *a, **kw: real_engine(*a, **kw, trusted_uid=os.getuid())), patch.object(h, 'HostManager', return_value=self.manager):
+            result = adoption.apply(hashlib.sha256(operator.read_bytes()).hexdigest(), True)
+        self.assertTrue(result['adopted'])
+        self.assertFalse(result['activation_performed'])
+        self.assertTrue((store/'host-adoption-result.json').is_file())
+
+    def test_adoption_record_restores_original_ingress(self):
+        self.adoption_to_recovery()
+
+    def test_adoption_intent_survives_interrupted_first_recovery(self):
+        self.adoption_to_recovery(interrupt=True)

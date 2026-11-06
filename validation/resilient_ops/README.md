@@ -48,7 +48,10 @@ shared lock and legacy three-file workspace facts. `adopt.py` is a separate
 reviewed root operator, never a protocol action. It revalidates current bytes,
 retains the original code tree, seals legacy evidence, and establishes the
 launcher link and initial failed history without starting anything. Existing
-workspace bytes remain untouched until a subsequent explicit recovery. Lock
+workspace bytes remain untouched until a subsequent explicit recovery. The
+legacy failed record retains the ingress observation from before adoption
+fencing, so that recovery can restore unrelated sockets while retaining the
+ordinary HOLD. Lock
 ancestor protection and AppArmor/launcher compatibility need root adoption
 review. Ordinary package installation performs none of this migration.
 

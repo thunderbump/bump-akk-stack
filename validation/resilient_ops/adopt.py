@@ -142,7 +142,9 @@ def apply(expected_operator, confinement_reviewed):
         evidence_root=Path(policy['targets']['validator-integration-evidence']['root'])
         for name in ('evidence','quarantine','workspaces','releases'):
             (evidence_root/name).mkdir(mode=0o711 if name in ('workspaces','releases') else 0o700)
-        old=dict(operation_id='legacy-02fee-retained',plan_id='root-adoption',target='validator-integration-evidence',resources=['validator-integration-evidence','validator-ordinary-state'],state='failed',step='retained-root-audit-revalidated',recovery_required=True,original_outcome=packet['migration']['original_outcome'],contract=CONTRACT_SHA)
+        # Adoption fences ingress before migration. Carry the original socket
+        # state into linked recovery rather than observing the fenced state.
+        old=dict(operation_id='legacy-02fee-retained',plan_id='root-adoption',target='validator-integration-evidence',resources=['validator-integration-evidence','validator-ordinary-state'],state='failed',step='retained-root-audit-revalidated',recovery_required=True,original_outcome=packet['migration']['original_outcome'],contract=CONTRACT_SHA,restore_ingress=before)
         atomic(store/'operations/legacy-02fee-retained.json',old)
         atomic(evidence_root/'current.json',dict(generation=0,workspace_generation=0,release=None),0o644)
         sealed=evidence_root/'evidence/0'
