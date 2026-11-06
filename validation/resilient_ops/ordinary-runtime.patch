@@ -31,7 +31,7 @@
      if set(value) != required or type(value['version']) is not int or value['version'] != 1:
          raise ValueError('Unsupported worker configuration')
      for key in ('state_dir', 'code_dir', 'socket', 'base_image'):
-@@ -82,9 +88,63 @@
+@@ -82,9 +88,64 @@
      info = state.lstat()
      if not stat.S_ISDIR(info.st_mode) or info.st_uid != account.pw_uid or stat.S_IMODE(info.st_mode) != 0o700:
          raise ValueError('Worker state must be a private owned directory')
@@ -51,7 +51,8 @@
 +        raise ValueError('Expected managed worker binding')
 +    info = path.lstat()
 +    resolved = path.resolve(strict=True)
-+    if (info.st_uid != ROOT_UID or resolved.parent != MANAGED_ROOT/'releases'
++    if (info.st_uid != ROOT_UID or os.readlink(path) != str(resolved)
++            or resolved.parent != MANAGED_ROOT/'releases'
 +            or not re.fullmatch('[a-f0-9]{64}', resolved.name)):
 +        raise ValueError('Unexpected managed worker release')
 +    for directory in (path.parent, *path.parent.parents, resolved, *resolved.parents):
@@ -97,7 +98,7 @@
  
  
  def service_cgroup():
-@@ -196,7 +256,15 @@
+@@ -196,7 +257,15 @@
  
  
  def acquire(value):
@@ -114,7 +115,7 @@
      try:
          fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
      except BaseException:
-@@ -521,10 +589,11 @@
+@@ -521,10 +590,11 @@
  def implementation_identity(value):
      """Digest the finite reviewed worker implementation, independent of candidate inputs."""
      from integration_artifacts import installed_inventory
@@ -128,7 +129,7 @@
              digests[name] = hashlib.file_digest(stream, 'sha256').hexdigest()
      return hashlib.sha256(json.dumps(digests, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
  
-@@ -577,11 +646,8 @@
+@@ -577,11 +647,8 @@
          atomic_json(active, active_record)
          job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
          if build is not None and build.get('integration'):

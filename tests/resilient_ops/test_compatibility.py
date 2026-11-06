@@ -107,6 +107,14 @@ class CompatibilityTests(unittest.TestCase):
         self.worker.MANAGED_LINK=self.root/'different'
         with self.assertRaises(ValueError):self.worker.config(self.config_file)
 
+    def test_managed_binding_rejects_indirect_link_even_to_same_release(self):
+        alias=self.root/'alias'
+        alias.symlink_to(self.release)
+        self.link.unlink()
+        self.link.symlink_to(alias)
+        with self.assertRaisesRegex(ValueError,'Unexpected managed worker release'):
+            self.worker.config(self.config_file)
+
     def test_root_allocated_slot_passes_actual_intake_and_dirty_slot_refuses(self):
         workspace=self.state/'last-integration'
         target=dict(service_uid=os.getuid(),host_contract='fixture')

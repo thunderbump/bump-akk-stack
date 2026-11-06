@@ -102,7 +102,8 @@ def managed_code(selected):
         raise ValueError('Expected managed worker binding')
     info = path.lstat()
     resolved = path.resolve(strict=True)
-    if (info.st_uid != ROOT_UID or resolved.parent != MANAGED_ROOT/'releases'
+    if (info.st_uid != ROOT_UID or os.readlink(path) != str(resolved)
+            or resolved.parent != MANAGED_ROOT/'releases'
             or not re.fullmatch('[a-f0-9]{64}', resolved.name)):
         raise ValueError('Unexpected managed worker release')
     for directory in (path.parent, *path.parent.parents, resolved, *resolved.parents):
