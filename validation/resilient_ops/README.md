@@ -29,9 +29,16 @@ retries return the stored result. A simultaneous retry returns busy; query
 status or retry the same IDs. Interrupted acceptance or an incomplete terminal
 receipt returns uncertainty, never automatic execution. Recovery is explicit
 and linked. Failed original records remain unchanged after successful recovery.
-Recovery leaves owned services stopped and allocates a fresh workspace for
-subsequent separately authorized work. Deployment preserves pre-operation unit
-activation state. Failed health compensation remains a failed deployment.
+Fixture recovery leaves owned services stopped and allocates a fresh workspace.
+Host workspace recovery seals evidence, quarantines the failed generation and
+allocates a fresh empty workspace for subsequent separately authorized work.
+Host code recovery restores the established prior sealed binding and does not
+allocate a workspace. Host recovery durably carries the original ingress state
+through linked interruptions and restores previously active diagnostic, profiling
+and maintenance sockets after safe recovery. It never restarts accepted service
+instances. The ordinary socket remains inactive under the maintenance HOLD.
+Host deployment preserves other socket activation state with the same HOLD
+exception; fixture deployment preserves unit activation state. Failed health compensation remains a failed deployment.
 
 The fixture publication interface is atomic `current.json` under a dedicated
 enrolled root. The fixed host adapter additionally replaces the adopted

@@ -6,7 +6,6 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
-import re
 import shutil
 import stat
 import subprocess
@@ -14,7 +13,10 @@ import time
 import uuid
 
 MAX_RECORDS = 1000
-ID = re.compile(r'[A-Za-z0-9][A-Za-z0-9_.-]{0,79}\Z')
+try:
+    from .package import IDENTIFIER as ID, validate_schema
+except ImportError:  # Installed sibling modules under python -I.
+    from package import IDENTIFIER as ID, validate_schema
 
 
 class Rejected(Exception):
@@ -140,30 +142,17 @@ class Engine:
             protected(self.store / name, trusted_uid)
 
     def validate_policy(self):
-        if set(self.policy) != {'peers', 'targets'}:
-            raise Rejected('invalid policy keys')
-        for name, target in self.policy['targets'].items():
-            identifier(name)
+        try:
+            validate_schema(self.policy)
+        except ValueError as exc:
+            raise Rejected(str(exc)) from None
+        for target in self.policy['targets'].values():
             if 'host_contract' in target:
                 from host import validate_target
                 validate_target(target)
-            required = {'actions', 'resources', 'root', 'units', 'service_uid', 'timeout', 'files', 'max_bytes', 'max_files'}
-            if set(target) not in (required, required | {'host_contract'}) or not set(target['actions']) <= {'publish', 'revert', 'recover'}:
-                raise Rejected('invalid target enrollment')
-            if not 0 < len(target['resources']) <= 16 or not 0 < len(target['units']) <= 8 or not 0 < target['service_uid'] < 2**31:
-                raise Rejected('administrative requirement: explicit owned resources and nonroot units')
-            if not 0 < target['timeout'] <= 120 or not 0 < target['max_bytes'] <= 4*1024*1024 or not 0 < target['max_files'] <= 256:
-                raise Rejected('invalid enrollment bounds')
-            for resource in target['resources']:
-                identifier(resource)
-            for unit in target['units']:
-                if not re.fullmatch(r'[A-Za-z0-9_.@-]+\.service', unit):
-                    raise Rejected('invalid enrolled unit')
             protected(Path(target['root']), self.uid)
             if Path(target['root']).stat().st_mode & 0o111 != 0o111:
                 raise Rejected('administrative requirement: enrolled root must permit nonroot traversal')
-            for name in target['files']:
-                self.safe_name(name)
         # Shared paths/units must share a resource gate, including ancestor roots.
         targets = list(self.policy['targets'].values())
         for i, a in enumerate(targets):
@@ -268,7 +257,7 @@ class Engine:
                 raise Rejected('stale target generation')
             plan = {k: v for k, v in req.items() if k != 'artifact'}
             plan.update(policy=digest(self.policy), effects=req['action'], service_scope=target['units'],
-                        health='remain-stopped' if req['action'] == 'recover' else 'preserve-active-state', timeout=target['timeout'], compensation='restore-previous-release')
+                        health=('restore-ingress-except-ordinary-hold' if 'host_contract' in target else 'remain-stopped') if req['action'] == 'recover' else 'preserve-active-state', timeout=target['timeout'], compensation='restore-previous-release')
             plan_id = digest(req)
             atomic(saved, {'plan_id': plan_id, 'fingerprint': fingerprint, 'phase': 'preparing'})
             root = Path(target['root'])
@@ -388,14 +377,25 @@ class Engine:
                     raise Rejected('resource fenced: linked recovery required')
                 if plan['action'] == 'recover' and plan['recovery_of'] not in {o['operation_id'] for o in unresolved}:
                     raise Rejected('recovery must link an unresolved resource operation')
+                op = {'operation_id': oid, 'plan_id': req['plan_id'], 'target': plan['target'], 'resources': target['resources'],
+                      'state': 'running', 'step': 'accepted', 'recovery_required': True}
+                # Persist the pre-effect binding and restoration intent under all
+                # resource gates before acceptance can become externally visible.
+                op['previous'] = self.current(target)
+                op['before'] = self.manager.observe(target)
+                if 'host_contract' in target:
+                    op['restore_ingress'] = op['before']
+                    if plan['action'] == 'recover':
+                        linked = self.status({'operation_id': plan['recovery_of']})
+                        op['restore_ingress'] = linked.get('restore_ingress', linked.get('before', op['before']))
+                        if 'publish' not in target['actions']:
+                            op['workspace_recovery_base'] = linked.get('workspace_recovery_base', op['previous'])
                 # Allocate receipt space before acceptance. Disk exhaustion cannot authorize a side effect.
                 reserve = self.store / 'operations' / (oid + '.reserve')
                 with reserve.open('xb') as out:
                     os.posix_fallocate(out.fileno(), 0, 65536)
                     os.fsync(out.fileno())
                 sync_dir(reserve.parent)
-                op = {'operation_id': oid, 'plan_id': req['plan_id'], 'target': plan['target'], 'resources': target['resources'],
-                      'state': 'running', 'step': 'accepted', 'recovery_required': True}
                 atomic(path, op)
                 self.fault('accepted')
                 try:
@@ -424,11 +424,10 @@ class Engine:
         return value
 
     def perform(self, plan, target, op, path):
-        root, previous = Path(target['root']), self.current(target)
-        before = self.manager.observe(target)
+        root, previous = Path(target['root']), op['previous']
+        before = op['before']
         if any(v['active'] not in (('active', 'inactive', 'failed') if 'host_contract' in target else ('active', 'inactive')) for v in before.values()):
             raise Rejected('unknown owned lifecycle')
-        op['before'], op['previous'] = before, previous
         self.step(op, path, 'stop', lambda: self.manager.stop(target))
         if plan['action'] == 'recover' and 'host_contract' in target and 'publish' in target['actions']:
             original = self.status({'operation_id': plan['recovery_of']})
@@ -460,10 +459,17 @@ class Engine:
             self.manager.recovery_binding(target, list(dict.fromkeys(candidates)))
             restored = {**restore, 'generation': previous['generation']+1}
             self.step(op, path, 'restore-binding', lambda: self.publish(target, restored))
+            self.step(op, path, 'restore-ingress', lambda: self.manager.start(target, op['restore_ingress']))
             op['resolves'] = [o['operation_id'] for o in self.records('operations') if o['target'] == plan['target'] and o.get('recovery_required') and o['operation_id'] != op['operation_id']]
             op['recovery_required'] = False
             return
         if plan['action'] == 'recover':
+            base = op.get('workspace_recovery_base', previous)
+            completed = {**base, 'generation': base['generation']+1,
+                         'workspace_generation': base.get('workspace_generation', 0)+1}
+            if previous not in (base, completed):
+                raise Rejected('administrative requirement: unknown recovery generation')
+            previous = base
             gen = str(previous.get('workspace_generation', 0))
             workspace = self.manager.workspace(target) if 'host_contract' in target else root/'workspaces'/gen
             evidence, quarantine = root/'evidence'/gen, root/'quarantine'/gen
@@ -534,6 +540,8 @@ class Engine:
             self.step(op, path, 'allocate', lambda: self.allocate(fresh, target))
             self.step(op, path, 'publish', lambda: atomic(root/'current.json', {**previous, 'generation': previous['generation']+1, 'workspace_generation': previous.get('workspace_generation', 0)+1}, 0o644))
             # Preserve original records. Resolution is a separate durable link, never a rewritten failure.
+            if 'host_contract' in target:
+                self.step(op, path, 'restore-ingress', lambda: self.manager.start(target, op['restore_ingress']))
             op['resolves'] = [o['operation_id'] for o in self.records('operations') if o['target'] == plan['target'] and o.get('recovery_required') and o['operation_id'] != op['operation_id']]
             op['recovery_required'] = False
             return

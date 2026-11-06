@@ -6,10 +6,13 @@ import multiprocessing
 import os
 from pathlib import Path
 import socket
+import sys
 import tempfile
 import threading
 import unittest
 from unittest.mock import patch
+
+sys.path.insert(0, str(Path(__file__).parents[2]/'validation/resilient_ops'))
 
 SPEC = importlib.util.spec_from_file_location('resilient_engine', Path(__file__).parents[2]/'validation/resilient_ops/engine.py')
 e = importlib.util.module_from_spec(SPEC)

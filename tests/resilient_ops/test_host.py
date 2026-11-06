@@ -298,6 +298,7 @@ class HostRecoveryIntegrationTests(unittest.TestCase):
         peer=(os.getuid(),os.getgid())
         policy={'peers':[dict(uid=peer[0],gid=peer[1],methods=['prepare','execute','status'],targets=['workspace','code'],actions=['publish','revert','recover'])],'targets':{'workspace':target,'code':code}}
         store=self.base/'store';store.mkdir()
+        self.sockets[h.SOCKETS[1]] = self.sockets[h.SOCKETS[4]] = 'active'
         h.WORKSPACE.mkdir(mode=0o700)
         (h.WORKSPACE/'failure').write_text('old failed evidence')
         with patch.dict(sys.modules,{'host':h}),patch.object(core,'protected',lambda path,uid:None),patch.object(core.os,'chown',lambda *args:None):
@@ -305,7 +306,7 @@ class HostRecoveryIntegrationTests(unittest.TestCase):
             original=dict(operation_id='original',plan_id='legacy',target='workspace',resources=target['resources'],state='failed',step='retained',recovery_required=True)
             core.atomic(store/'operations/original.json',original)
             def prepare(rid, linked):
-                return engine.handle(dict(method='prepare',request_id=rid,target='workspace',action='recover',generation=0,recovery_of=linked),peer)['plan_id']
+                return engine.handle(dict(method='prepare',request_id=rid,target='workspace',action='recover',generation=engine.current(target)['generation'],recovery_of=linked),peer)['plan_id']
             def execute(pid,oid):
                 return engine.handle(dict(method='execute',plan_id=pid,operation_id=oid),peer)
             plan=prepare('first','original')
@@ -318,11 +319,68 @@ class HostRecoveryIntegrationTests(unittest.TestCase):
             self.assertEqual(core.read(store/'operations/original.json'),original)
             self.assertEqual((h.WORKSPACE_ROOT/'evidence/0/workspace/failure').read_text(),'old failed evidence')
             self.assertTrue(h.WORKSPACE.is_dir())
+            self.assertEqual(self.sockets[h.SOCKETS[1]], 'active')
+            self.assertEqual(self.sockets[h.SOCKETS[4]], 'active')
+            self.assertEqual(self.sockets[h.ORDINARY_SOCKET], 'inactive')
             # A separately approved code publication still works after state recovery.
             published=engine.handle(dict(method='prepare',request_id='code',target='code',action='publish',generation=0,artifact={name:base64.b64encode(b'fixture').decode() for name in h.FILES}),peer)['plan_id']
             h.BINDING.symlink_to(h.CODE_ROOT/'releases'/published)
             core.atomic(h.CODE_ROOT/'current.json',dict(generation=0,workspace_generation=0,release=published),0o644)
             self.assertEqual(execute(published,'next-code')['state'],'succeeded')
+            self.assertEqual(self.sockets[h.SOCKETS[1]], 'active')
+            self.assertEqual(self.sockets[h.SOCKETS[4]], 'active')
 
     def test_fixed_workspace_allocation_effect_crash(self): self.interrupted_allocation('allocate-effect')
     def test_fixed_workspace_allocation_observed_crash(self): self.interrupted_allocation('allocate-observed')
+
+    def test_workspace_accepted_crash_restores_ingress(self): self.interrupted_allocation('accepted')
+    def test_workspace_stop_effect_crash_restores_ingress(self): self.interrupted_allocation('stop-effect')
+    def test_workspace_publish_effect_crash_restores_ingress(self): self.interrupted_allocation('publish-effect')
+    def test_workspace_restore_intent_crash(self): self.interrupted_allocation('restore-ingress-intent')
+    def test_workspace_restore_effect_crash(self): self.interrupted_allocation('restore-ingress-effect')
+
+    def test_code_acceptance_crash_linked_recovery_and_next_deployment(self):
+        import base64
+        core = sys.modules['engine']
+        import multiprocessing
+        import signal
+        target = dict(self.target, max_bytes=4096, max_files=20)
+        peer = (os.getuid(), os.getgid())
+        policy = dict(peers=[dict(uid=peer[0], gid=peer[1], methods=['prepare','execute','status'],
+                                 targets=['code'], actions=['publish','revert','recover'])],
+                      targets={'code': target})
+        store = self.base/'store'
+        store.mkdir()
+        with patch.dict(sys.modules, {'host': h}), patch.object(core, 'protected', lambda path,uid:None):
+            engine = core.Engine(policy, store, self.manager, trusted_uid=os.getuid())
+            def prepare(rid, generation, **kw):
+                return engine.handle(dict(method='prepare', request_id=rid, target='code',
+                                          generation=generation, **kw), peer)['plan_id']
+            def publish(rid, generation):
+                return prepare(rid, generation, action='publish',
+                               artifact={name:base64.b64encode(rid.encode()).decode() for name in h.FILES})
+            def execute(pid, oid):
+                return engine.handle(dict(method='execute', plan_id=pid, operation_id=oid), peer)
+            old = publish('adopted', 0)
+            h.BINDING.symlink_to(h.CODE_ROOT/'releases'/old)
+            core.atomic(h.CODE_ROOT/'current.json', dict(generation=0,workspace_generation=0,release=old))
+            candidate = publish('candidate', 0)
+            def killed_executor():
+                engine.fault = lambda point: os.kill(os.getpid(), signal.SIGKILL) if point == 'accepted' else None
+                execute(candidate, 'interrupted')
+            child = multiprocessing.get_context('fork').Process(target=killed_executor)
+            child.start()
+            child.join(5)
+            if child.is_alive():
+                child.kill()
+                child.join(5)
+                self.fail('fixture executor did not reach acceptance')
+            self.assertEqual(child.exitcode, -signal.SIGKILL)
+            original = (store/'operations/interrupted.json').read_bytes()
+            engine = core.Engine(policy, store, self.manager, trusted_uid=os.getuid())
+            self.assertEqual(engine.status(dict(operation_id='interrupted'))['state'], 'uncertain')
+            recovered = execute(prepare('recover', 0, action='recover', recovery_of='interrupted'), 'recovery')
+            self.assertEqual(recovered['state'], 'succeeded', recovered)
+            self.assertEqual(os.readlink(h.BINDING), str(h.CODE_ROOT/'releases'/old))
+            self.assertEqual((store/'operations/interrupted.json').read_bytes(), original)
+            self.assertEqual(execute(publish('next', 1), 'subsequent')['state'], 'succeeded')

@@ -204,6 +204,21 @@ class PackageTests(unittest.TestCase):
             with self.assertRaises(ValueError, msg=mutation):
                 package.validate_policy(value)
 
+    def test_invalid_resource_rejected_by_enrollment_and_service_entry(self):
+        # Exercise real enrollment and main startup, substituting only protected
+        # fixture ancestry. Neither path can accept a malformed resource gate.
+        value = fixture()
+        value['targets']['fixture']['resources'] = ['bad/resource']
+        raw = package.encode(value)
+        policy_path = self.root/'bad-policy.json'
+        policy_path.write_bytes(raw)
+        with self.assertRaisesRegex(ValueError, 'resource ID'):
+            self.operator.enroll(policy_path, package.digest(raw))
+        self.assertFalse(self.operator.code.exists())
+        with mock.patch.object(service, 'POLICY', policy_path), mock.patch.object(service, 'STORE', self.root), mock.patch.object(service, 'protected'), mock.patch.object(service.socket, 'socket', side_effect=AssertionError('invalid enrollment reached transport')):
+            with self.assertRaisesRegex(ValueError, 'resource ID'):
+                service.main()
+
     def test_prepare_prints_pins_and_separate_enrollment_without_activation(self):
         stage, expected = self.stage()
         package.load_package(stage, expected)

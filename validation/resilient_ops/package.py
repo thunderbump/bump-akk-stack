@@ -65,11 +65,13 @@ def path_string(value):
     return Path(value)
 
 
-def validate_policy(policy):
-    """Strict enrollment contract shared by operator and connection service."""
+def validate_schema(policy):
+    """Pure schema shared by enrollment and execution, without filesystem checks."""
     exact(policy, ('peers', 'targets'))
     if not isinstance(policy['peers'], list) or not 1 <= len(policy['peers']) <= 64:
         raise ValueError('bounded peers required')
+    if not isinstance(policy['targets'], dict) or not 0 <= len(policy['targets']) <= 64:
+        raise ValueError('bounded targets required')
     peers = set()
     for peer in policy['peers']:
         exact(peer, ('uid', 'gid', 'methods', 'targets', 'actions'))
@@ -84,23 +86,19 @@ def validate_policy(policy):
                 any(not isinstance(v, str) or v not in policy['targets'] for v in peer['targets']) or
                 len(set(peer['targets'])) != len(peer['targets'])):
             raise ValueError('invalid peer targets')
-        if type(peer['uid']) is not int or type(peer['gid']) is not int or (peer['uid'], peer['gid']) != (1000, 1000):
-            raise ValueError('only reviewed caller UID/GID 1000 may be enrolled')
+        integer(peer['uid'], 0, 2**31 - 1)
+        integer(peer['gid'], 0, 2**31 - 1)
         pair = (peer['uid'], peer['gid'])
         if pair in peers:
             raise ValueError('duplicate peer')
         peers.add(pair)
-    if not isinstance(policy['targets'], dict) or not 0 <= len(policy['targets']) <= 64:
-        raise ValueError('bounded targets required')
     roots = []
     units = set()
     for name, target in policy['targets'].items():
-        if not IDENTIFIER.fullmatch(name):
+        if not isinstance(name, str) or not IDENTIFIER.fullmatch(name):
             raise ValueError('invalid target ID')
         keys = ('actions', 'resources', 'root', 'units', 'service_uid', 'timeout', 'files', 'max_bytes', 'max_files')
         if 'host_contract' in target:
-            from host import validate_target
-            validate_target(target)
             exact(target, (*keys, 'host_contract'))
         else:
             exact(target, keys)
@@ -110,12 +108,12 @@ def validate_policy(policy):
                     any(not isinstance(x, str) or not x or len(x.encode()) > 512 for x in values) or
                     len(set(values)) != len(values)):
                 raise ValueError('invalid bounded unique list')
+        for resource in target['resources']:
+            if not IDENTIFIER.fullmatch(resource):
+                raise ValueError('invalid resource ID')
         if not set(target['actions']) <= {'publish', 'revert', 'recover'}:
             raise ValueError('unknown action')
         root = path_string(target['root'])
-        # Enrollment is for dedicated managed roots, never host system trees.
-        if not (str(root).startswith('/var/lib/eqemu-resilient-targets/') and len(root.parts) == 5):
-            raise ValueError('target root must be a direct child of /var/lib/eqemu-resilient-targets')
         if any(root == other or root in other.parents or other in root.parents for other in roots):
             raise ValueError('overlapping target roots')
         roots.append(root)
@@ -131,12 +129,28 @@ def validate_policy(policy):
             raise ValueError('too many exact release files')
         for item in target['files']:
             relative = PurePosixPath(item)
-            if (not relative.parts or len(item) > 200 or relative.is_absolute() or str(relative) != item or
+            if (not relative.parts or '\x00' in item or len(relative.parts) > 8 or len(item) > 200 or relative.is_absolute() or str(relative) != item or
                     any(x in ('', '.', '..') for x in relative.parts)):
                 raise ValueError('invalid exact release path')
         files = target['files']
         if any(a != b and a.startswith(b + '/') for a in files for b in files):
             raise ValueError('overlapping release files')
+    return policy
+
+
+def validate_policy(policy):
+    """Enrollment adds fixed host-path and caller restrictions to the schema."""
+    validate_schema(policy)
+    for peer in policy['peers']:
+        if (peer['uid'], peer['gid']) != (1000, 1000):
+            raise ValueError('only reviewed caller UID/GID 1000 may be enrolled')
+    for target in policy['targets'].values():
+        root = Path(target['root'])
+        if not (str(root).startswith('/var/lib/eqemu-resilient-targets/') and len(root.parts) == 5):
+            raise ValueError('target root must be a direct child of /var/lib/eqemu-resilient-targets')
+        if 'host_contract' in target:
+            from host import validate_target
+            validate_target(target)
     return policy
 
 
