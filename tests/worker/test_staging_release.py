@@ -189,8 +189,10 @@ class ReleaseTests(unittest.TestCase):
             self.assertEqual(json.loads(path.read_text())['scope'], 'prepared-only')
 
     def test_abi_unknown_dependency_version_symbol_interpreter_refuse(self):
-        library = dict(elf=dict(soname=['libc.so.6'], defined_dynamic_symbols=['known'], version_definitions=['GLIBC_2.2.5']))
-        inventory = dict(runtime_libraries={'usr/lib/libc.so.6': library})
+        library = dict(sha256='a' * 64, elf=dict(needed=[], soname=['libc.so.6'],
+            defined_dynamic_symbols=['known'], version_definitions=['GLIBC_2.2.5']))
+        inventory = dict(runtime_libraries={'usr/lib/libc.so.6': library}, provider_facts={
+            'usr/lib/libc.so.6': dict(sha256='a' * 64, needed=[], defined=['known@@GLIBC_2.2.5'], version_definitions=['GLIBC_2.2.5'])})
         facts = dict(needed=['libc.so.6'], runpath=[], version_needs={'libc.so.6': ['GLIBC_2.2.5']},
                      undefined=['known'], interpreter=['/lib64/ld-linux-x86-64.so.2'])
         container.check_abi(facts, inventory)
@@ -210,7 +212,7 @@ Version needs section '.gnu.version_r' contains 1 entry:
  0x0020: Name: GLIBC_2.2.5 Flags: none Version: 2
 '''
         facts = container.readelf_facts(raw)
-        self.assertEqual(facts['undefined'], ['known'])
+        self.assertEqual(facts['undefined'], ['known@GLIBC_2.2.5'])
         self.assertEqual(facts['version_needs'], {'libc.so.6': ['GLIBC_2.2.5']})
 
     def test_missing_root_admission_refuses_before_lock_or_launch(self):

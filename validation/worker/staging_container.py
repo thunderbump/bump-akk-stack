@@ -72,22 +72,43 @@ def readelf_facts(text):
         raise ValueError('release-architecture')
     needed = re.findall(r'\(NEEDED\).*?\[(.*?)\]', text)
     paths = re.findall(r'\((?:RUNPATH|RPATH)\).*?\[(.*?)\]', text)
-    versions = {}; provider = None; in_needs = False
+    versions = {}; definitions = []; provider = None; section = None
     for line in text.splitlines():
-        if line.startswith('Version needs section'): in_needs = True
-        elif line.startswith('Version ') and 'needs section' not in line: in_needs = False
-        if not in_needs: continue
+        if line.startswith('Version needs section'): section = 'needs'
+        elif line.startswith('Version definition section'): section = 'definitions'
+        elif line.startswith('Version '): section = None
+        if section == 'definitions':
+            found = re.search(r'Name: (\S+)', line)
+            if found: definitions.append(found.group(1))
+        if section != 'needs': continue
         found = re.search(r'File: (\S+)\s+Cnt:', line)
         if found: provider = found.group(1); versions.setdefault(provider, [])
         found = re.search(r'Name: (\S+)\s+Flags:', line)
         if found and provider: versions[provider].append(found.group(1))
-    undefined = []
+    undefined = []; defined = []
     for line in text.splitlines():
         fields = line.split()
         if len(fields) >= 8 and fields[0].rstrip(':').isdigit() and fields[4] == 'GLOBAL' and fields[6] == 'UND':
-            undefined.append(fields[7].split('@')[0])
+            undefined.append(fields[7])
+        if (len(fields) >= 8 and fields[0].rstrip(':').isdigit() and fields[4] in ('GLOBAL', 'WEAK', 'UNIQUE')
+                and fields[5] in ('DEFAULT', 'PROTECTED') and fields[6] != 'UND'):
+            defined.append(fields[7])
     interpreter = re.findall(r'Requesting program interpreter: ([^\]]+)\]', text)
-    return dict(needed=needed, runpath=paths, version_needs=versions, undefined=undefined, interpreter=interpreter)
+    return dict(needed=needed, runpath=paths, version_needs=versions, version_definitions=definitions,
+                undefined=undefined, defined=defined, interpreter=interpreter)
+
+
+def derive_provider_facts(inventory):
+    """Guest only: parse exact verified providers, retaining each symbol's version association."""
+    result = {}
+    for path, entry in inventory['runtime_libraries'].items():
+        if sha('/' + path) != entry['sha256']: raise ValueError('release-runtime-library-bytes')
+        text = run(['readelf', '-W', '-h', '-l', '-d', '-V', '--dyn-syms', '/' + path]).decode()
+        facts = readelf_facts(text)
+        if sha('/' + path) != entry['sha256']: raise ValueError('release-runtime-library-bytes')
+        if facts['needed'] != entry['elf']['needed']: raise ValueError('release-provider-dependencies')
+        result[path] = dict(facts, sha256=entry['sha256'])
+    return result
 
 
 def check_abi(facts, inventory):
@@ -95,19 +116,45 @@ def check_abi(facts, inventory):
         raise ValueError('release-interpreter')
     libraries = inventory['runtime_libraries']
     providers = {}
-    symbols = set()
     for path, entry in libraries.items():
-        for name in (*entry['elf']['soname'], Path(path).name, '/' + path): providers[name] = entry
-        symbols.update(entry['elf']['defined_dynamic_symbols'])
+        for name in (*entry['elf']['soname'], Path(path).name, '/' + path):
+            if name in providers and providers[name] != path: raise ValueError('release-provider-ambiguous')
+            providers[name] = path
     if not facts['needed'] or any(name not in providers for name in facts['needed']):
         raise ValueError('release-needed-library')
     allowed = {PERL, '/usr/lib/x86_64-linux-gnu', '/lib/x86_64-linux-gnu', '/usr/local/lib'}
     if any(part not in allowed for row in facts['runpath'] for part in row.split(':')):
         raise ValueError('release-rpath')
+    # Inventory presence is not loader reachability. Traverse only actual needed edges.
+    closure = set(); pending = list(facts['needed']); measured = inventory.get('provider_facts', {})
+    while pending:
+        name = pending.pop()
+        if name not in providers: raise ValueError('release-needed-library')
+        path = providers[name]
+        if path in closure: continue
+        provider = measured.get(path)
+        if not provider or provider.get('sha256') != libraries[path]['sha256']:
+            raise ValueError('release-provider-version-facts-missing')
+        if provider['needed'] != libraries[path]['elf']['needed']:
+            raise ValueError('release-provider-dependencies')
+        closure.add(path); pending.extend(provider['needed'])
     for name, versions in facts['version_needs'].items():
-        if name not in providers or not set(versions) <= set(providers[name]['elf']['version_definitions']):
+        if (name not in providers or providers[name] not in closure
+                or not set(versions) <= set(measured[providers[name]]['version_definitions'])):
             raise ValueError('release-symbol-version')
-    if not set(facts['undefined']) <= symbols:
+    symbols = set()
+    for path in closure:
+        for symbol in measured[path]['defined']:
+            if '@@' in symbol:
+                name, version = symbol.split('@@', 1)
+                symbols.update(((name, version), (name, None)))
+            elif '@' in symbol:
+                name, version = symbol.split('@', 1); symbols.add((name, version))
+            else:
+                symbols.add((symbol, None))
+    required = {(symbol.split('@', 1)[0], symbol.split('@', 1)[1] if '@' in symbol else None)
+                for symbol in facts['undefined']}
+    if not required <= symbols:
         raise ValueError('release-unresolved-symbol')
 
 
@@ -151,8 +198,7 @@ def main():
     for name in ('configure', 'build', 'rust-checks', 'artifact-checks'): (logs / (name + '.log')).touch()
     inventory = json.loads((ROOT / 'media/RUNTIME-ABI-AND-LIBRARY-INVENTORY.json').read_bytes())
     # Every runtime provider/Perl XS file must match the sealed target filesystem.
-    for path, entry in inventory['runtime_libraries'].items():
-        if sha('/' + path) != entry['sha256']: raise ValueError('release-runtime-library-bytes')
+    inventory['provider_facts'] = derive_provider_facts(inventory)
     for entry in inventory['perl_config_and_xs_inventory']:
         if entry['type'] == 'file' and sha('/' + entry['path']) != entry['sha256']:
             raise ValueError('release-perl-xs-bytes')
@@ -216,7 +262,8 @@ def main():
     (release / 'SOURCE.json').write_bytes(canonical(fixed))
     (release / 'INPUTS.json').write_bytes(canonical(contract()['combined_manifest']))
     (release / 'BUILD.json').write_bytes(canonical(dict(checks=checks, targets=list(TARGETS), abi_complete=True, configure=configure)))
-    (release / 'RUNTIME-ABI.json').write_bytes(canonical(dict(runtime_image=inventory['runtime_image'], checked=abi, perl_config=perl_config)))
+    (release / 'RUNTIME-ABI.json').write_bytes(canonical(dict(runtime_image=inventory['runtime_image'], checked=abi,
+        providers=inventory['provider_facts'], perl_config=perl_config)))
     make_tar(release, Path('/opt/release-output/release.tar'), fixed)
 
 

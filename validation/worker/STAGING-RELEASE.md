@@ -66,6 +66,14 @@ ELF architecture/interpreter, needed-library closure, symbol versions and strong
 dynamic symbols. No libc, Perl or other shared library is shipped. A new needed
 library/version, unresolved symbol, output-size or resource problem is NONPASS.
 
+Provider symbol/version facts are derived inside the guest with the existing
+readelf tool, checking each pinned library's hash before and after inspection.
+Resolution follows only the consumer's transitive DT_NEEDED closure. Required
+`name@version` associations are preserved; default `name@@version` exports also
+serve unversioned references. Independent version-node presence or symbols from
+an unrelated inventory library cannot establish resolution. The derived facts
+are retained in the existing RUNTIME-ABI.json file under its unchanged limits.
+
 ## Separate release transfer and receipts
 
 The fixed release is exactly 28 regular files, six ELFs plus metadata/logs, with
