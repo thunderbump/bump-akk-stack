@@ -63,9 +63,12 @@ class FixedOperations(unittest.TestCase):
             except Exception as error: errors.append(error)
             finally: server.close()
         thread = threading.Thread(target=serve); thread.start()
-        result = client.exchange(dict(schema=1, id='d'*32, op=op, **fields), str(endpoint), os.getuid())
-        thread.join(5); self.assertFalse(thread.is_alive()); self.assertEqual(errors, [])
-        return result
+        try:
+            return client.exchange(dict(schema=1, id='d'*32, op=op, **fields), str(endpoint), os.getuid())
+        finally:
+            thread.join(5)
+            self.assertFalse(thread.is_alive())
+            self.assertEqual(errors, [])
 
     def test_retire_preserves_every_byte_and_explicit_repeat_refuses(self):
         before = {p.name:p.read_bytes() for p in self.slot.iterdir()}
@@ -124,8 +127,14 @@ class FixedOperations(unittest.TestCase):
         self.assertFalse(self.call('retire-failed-integration', expected_run=self.run)['ok'])
         self.host.busy = False
         self.config['submitter_uid'] += 1
-        with self.assertRaisesRegex(m.Refusal, 'response-binding'):
-            self.call('socket-start')
+        before = dict(vars(self.host), controls=list(self.host.controls))
+        try:
+            with self.assertRaises((m.Refusal, BrokenPipeError, ConnectionResetError)) as rejected:
+                self.call('socket-start')
+            if isinstance(rejected.exception, m.Refusal):
+                self.assertEqual(str(rejected.exception), 'response-binding')
+        finally:
+            self.assertEqual(vars(self.host), before)
 
     def test_fixed_systemctl_argv_and_failure_timeout(self):
         host = m.Host()
