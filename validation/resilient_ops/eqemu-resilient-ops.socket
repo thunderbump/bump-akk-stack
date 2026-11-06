@@ -1,0 +1,12 @@
+[Unit]
+Description=Resilient operations admission socket
+
+[Socket]
+ListenStream=/run/eqemu-resilient-ops.sock
+SocketMode=0666
+Accept=yes
+MaxConnections=32
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target
