@@ -26,14 +26,20 @@ def user_data(nonce, control):
     }) + '\n'
 
 
-def build_user_data(nonce, profile=None):
+def build_user_data(nonce, profile=None, integration=None):
     """The reviewed guest command travels in seed data, never executes on the host."""
     from pathlib import Path
     from sanitizers import checks
     selected = checks(BUILD_CHECKS, profile)
+    if integration is not None:
+        from integration_artifacts import SELECTION
+        if integration != SELECTION or profile:
+            raise ValueError('Unknown or incompatible integration selection')
+        selected = (*selected[:-1], 'actor-population-integration')
     failure = dict(version=1, nonce=nonce, scope='worker-build', exit_code=2,
                    stage='guest-launcher', selected_checks=list(selected), completed_checks=[],
                    error='Guest command exited with status %s before normal completion')
+    if integration: failure['integration'] = integration
     # Keep a shell parent alive if Python dies before it can report a result.
     # The shell owns shutdown for both normal completion and abrupt process death.
     # A getty hangup invalidates already-open ttyS0 writers with EIO. Remove
@@ -49,6 +55,9 @@ def build_user_data(nonce, profile=None):
     helpers = [(name, Path(__file__).with_name(name)) for name in ('profiling.py','profile_artifacts.py','profile_inputs.py','profile_contract.py')] + [('normal_world.py', Path(__file__).with_name('normal_world.py')),
                *[(name, Path(__file__).parents[1] / name) for name in
                  ('actor.py', 'actor_runtime.py', 'debugger.py', 'runtime-fixture.json')]]
+    # Fixed full-input verifier closure; does not select integration.
+    helpers += [(name, Path(__file__).with_name(name)) for name in ('actor_integration.py', 'integration_artifacts.py', 'integration-v1.json', 'integration-v1.1.json', 'integration-v1.2.json', 'integration-v1.3.json', 'integration-v1.4.json')]
+    helpers.append(('actor-integration-fixture.json', Path(__file__).parents[1] / 'actor-integration-fixture.json'))
     if profile: helpers.append(('sanitizers.py', Path(__file__).with_name('sanitizers.py')))
     return '#cloud-config\n' + json.dumps({
         'hostname': 'eqemu-worker-build', 'ssh_pwauth': False, 'disable_root': True,
@@ -57,6 +66,7 @@ def build_user_data(nonce, profile=None):
              'content': Path(__file__).with_name('build_guest.py').read_text()},
             {'path': '/opt/eqemu-worker-nonce', 'permissions': '0600', 'content': nonce},
             {'path': '/opt/eqemu-worker-checks.json', 'permissions': '0600', 'content': json.dumps(selected)},
+            *([{'path': '/opt/eqemu-worker-integration', 'permissions': '0600', 'content': integration}] if integration else []),
             *([{'path': '/opt/eqemu-worker-profile', 'permissions': '0600', 'content': profile}] if profile else []),
             *[{'path': '/opt/' + name, 'permissions': '0644', 'content': path.read_text()} for name, path in helpers],
         ],

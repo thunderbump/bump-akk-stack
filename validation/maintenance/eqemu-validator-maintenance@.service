@@ -1,0 +1,26 @@
+[Unit]
+Description=Fixed validator maintenance request
+[Service]
+Type=exec
+User=root
+Group=root
+ExecStart=/usr/bin/python3 -I -S /usr/local/lib/eqemu-validator-maintenance-v1/service.py
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=/srv/eqemu-validator-code
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX
+CapabilityBoundingSet=CAP_DAC_READ_SEARCH CAP_DAC_OVERRIDE CAP_FOWNER CAP_CHOWN
+UMask=0077
+RuntimeMaxSec=80
+TimeoutStopSec=5
+MemoryMax=128M
+TasksMax=8

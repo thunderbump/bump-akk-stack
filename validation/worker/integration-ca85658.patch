@@ -1,0 +1,16 @@
+--- a/validation/actor-integration-fixture.json
++++ b/validation/actor-integration-fixture.json
+@@ -1002,10 +1002,10 @@
+   "schema": 1,
+   "selection": "central-cdau-integration-v1",
+   "server_source": {
+-    "commit": "928d82e3fca80a0be28049330c0f93226b4a3db4",
++    "commit": "7d19508967b0f924ff02441a3065dbfd7ab846cc",
+     "pull_request": "https://github.com/thunderbump/bump-EQEmu/pull/101",
+-    "rust_tree": "4e5e8bd2846fed9efd7f21bf66b8d6ae5fce0eed",
++    "rust_tree": "ec41c9b0ed5d95c546fe3faf971020fac6210f1b",
+     "status": "reviewed-source-only-unrun",
+-    "tree": "6165225b56edb97173420c465aea93bb8fa610ad"
++    "tree": "1d89d42026354b879c4d9246b52f97ee4fe0a675"
+   }
+ }

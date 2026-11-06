@@ -25,7 +25,8 @@ GIB = 1024**3
 
 
 class Runtime:
-    def __init__(self, build, control, fixture):
+    def __init__(self, build, control, fixture, *, integration=None):
+        self.integration = integration
         self.build = build
         self.control = control
         self.fixture = fixture
@@ -354,6 +355,10 @@ SELECT COUNT(*) FROM npc_types WHERE id=2011 AND level=1 AND maxlevel=0 AND hp=1
         if self.query('state', 'SELECT COUNT(*) FROM zone_state_spawns;').strip() != '0':
             raise RuntimeError('Actor fixture zone state is not empty')
         self.check_qeynos_content()
+        if self.integration is not None:
+            from actor_integration import derive_fixture
+            derive_fixture(self, self.integration)
+            return
         self.query('fixture', "DELETE FROM spawn2 WHERE zone='qeynos2' AND NOT (id=10863 AND version=0); DELETE FROM spawn2 WHERE zone='poknowledge'; UPDATE rule_values SET rule_value='false' WHERE ruleset_id=1 AND rule_name IN ('Zone:UseZoneController','Bots:Enabled','Analytics:CrashReporting','Zone:StateSavingOnShutdown'); UPDATE variables SET value='default' WHERE varname='RuleSet'; UPDATE logsys_categories SET log_to_file=0,log_to_gmsay=0,log_to_discord=0,discord_webhook_id=0; UPDATE logsys_categories SET log_to_console=1 WHERE log_category_description IN ('Info','Error','MySQL Error','QuestErrors','Quests','Crash'); UPDATE logsys_categories SET log_to_console=0 WHERE log_category_description='MySQL Query';")
         if self.query('fixture-checked', "SELECT COUNT(*) FROM spawn2 WHERE zone='poknowledge'; SELECT COUNT(*) FROM rule_values WHERE ruleset_id=1 AND rule_name IN ('Zone:UseZoneController','Bots:Enabled','Analytics:CrashReporting','Zone:StateSavingOnShutdown') AND rule_value='false'; SELECT COUNT(*) FROM discord_webhooks WHERE COALESCE(webhook_url,'')<>''; SELECT COUNT(*) FROM spawn2 WHERE zone='qeynos2'; SELECT COUNT(*) FROM spawn2 WHERE zone='qeynos2' AND version=0 AND id=10863 AND spawngroupID=7678;").strip() != '0\n4\n0\n1\n1':
             raise RuntimeError('Actor derived fixture preconditions')
@@ -363,11 +368,16 @@ SELECT COUNT(*) FROM npc_types WHERE id=2011 AND level=1 AND maxlevel=0 AND hp=1
         with tarfile.open(MEDIA/'quests/quests-b3e34b8.tar.gz') as archive:
             archive.extractall(server, filter='data')
         (server/'projecteqquests-b3e34b84457d570401ea954ddd66de19179d0e41').rename(server/'quests')
+        if self.integration is not None:
+            shutil.copytree(self.integration/'maps', server/'integration-maps')
         shutil.copytree(MEDIA/'maps', server/'maps'); shutil.copytree(MEDIA/'opcodes', server/'opcodes')
         for name in ('shared', 'logs'): (server/name).mkdir()
+        if self.integration is not None:
+            for kind, suffix in (('base','map'), ('water','wtr'), ('nav','nav')):
+                shutil.copyfile(server/'integration-maps'/kind/('qeytoqrg.'+suffix), server/'maps'/kind/('qeytoqrg.'+suffix))
         if self.control == 'missing-map': (server/'maps/base/poknowledge.map').unlink()
         # All required maps are a gate. Native boot tolerating a missing map cannot pass.
-        for zone in ('poknowledge', 'qeynos2'):
+        for zone in (('poknowledge', 'qeynos2', 'qeytoqrg') if self.integration is not None else ('poknowledge', 'qeynos2')):
             for name in ('base/'+zone+'.map', 'water/'+zone+'.wtr', 'nav/'+zone+'.nav'):
                 if not (server/'maps'/name).is_file(): raise RuntimeError('Required actor map missing: '+name)
         password = secrets.token_hex(24); key = secrets.token_hex(24)

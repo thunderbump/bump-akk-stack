@@ -1,0 +1,40 @@
+#!/usr/bin/env python3
+"""Prepare the one-off 02fee retirement. No root or worker commands run here."""
+import argparse
+import hashlib
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+sys.dont_write_bytecode=True
+repo=Path(__file__).resolve().parents[1]
+sys.path.insert(0,str(repo/'validation/worker'))
+import integration_retirement as retirement
+
+
+def main():
+    parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--output',required=True);args=parser.parse_args()
+    if subprocess.check_output(['git','status','--porcelain'],cwd=repo): raise ValueError('Clean source required')
+    output=Path(args.output)
+    if not output.is_absolute(): raise ValueError('Absolute fresh output required')
+    output.mkdir(mode=0o700)
+    frozen=Path('/home/bump/.local/state/eqemu-cdau-integration-prep/20261104-source/failure-handling-v6-prep-v1')
+    shutil.copytree(frozen/'package-r5',output/'v6',copy_function=shutil.copyfile)
+    for source,target in [(repo/'validation/worker/integration_retirement.py',output/'operator.py'),(repo/'validation/worker/integration-02fee-retirement.json',output/'binding.json'),(frozen/'audit-02fee-r5/audit.py',output/'audit.py')]:shutil.copyfile(source,target)
+    assets={}
+    for f in sorted(output.rglob('*')):
+        if f.is_file():
+            raw=f.read_bytes();assets[str(f.relative_to(output))]=dict(bytes=len(raw),sha256=retirement.sha(raw));f.chmod(0o600)
+    raw=(json.dumps(dict(schema=1,assets=assets),sort_keys=True,indent=2)+'\n').encode()
+    fd=os.open(output/'manifest.json',os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+    with os.fdopen(fd,'wb') as stream:stream.write(raw);stream.flush();os.fsync(stream.fileno())
+    digest=retirement.sha(raw);retirement.validate_package(output,digest)
+    operator='/usr/local/libexec/eqemu-cdau-retire-02fee-v1.py'
+    argv=['/usr/bin/python3','-I','-B',operator,'--package',str(output),'--sha256',digest]
+    print(json.dumps(dict(source=subprocess.check_output(['git','rev-parse','HEAD'],cwd=repo,text=True).strip(),package=str(output),manifest_sha256=digest,operator_sha256=retirement.sha((output/'operator.py').read_bytes()),commands={name:argv+[name] for name in ['verify','apply','rollback']},executed=False)))
+    return 0
+
+
+if __name__=='__main__':raise SystemExit(main())

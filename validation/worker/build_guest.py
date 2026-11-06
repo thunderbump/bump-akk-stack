@@ -33,6 +33,8 @@ PROFILE = None
 SANITIZERS = None
 COMPLETED = []
 PROFILING = None
+INTEGRATION = None
+FIXED_RUST = False
 BUILD_METADATA = {}
 INFRASTRUCTURE = re.compile(
     r'out of memory|cannot allocate memory|no space left|killed signal|command not found|'
@@ -53,7 +55,7 @@ def sha(path):
 
 def command(name, args, *, cwd=None, candidate=False, seconds=900):
     """Bound and stream tool output. Only candidate phases may return candidate failure."""
-    global STAGE
+    global STAGE, FIXED_RUST
     STAGE = name
     print('EQEMU_STAGE ' + name, flush=True)
     end = min(DEADLINE, time.monotonic() + seconds)
@@ -118,9 +120,15 @@ def extract(archive, target):
 
 def provision():
     """Install only the packages already present in the verified public input ISO."""
-    global STAGE
+    global STAGE, FIXED_RUST
     STAGE = 'input-verification'
     identity = json.loads(Path('/media/eqemu-input/identity.json').read_text())
+    selected=Path('/opt/eqemu-worker-integration').read_text() if Path('/opt/eqemu-worker-integration').exists() else None
+    if identity.get('integration')!=selected: raise RuntimeError('Guest integration selection mismatch')
+    FIXED_RUST=identity.get('files',{}).get('rust-inputs.tar',{}).get('sha256')=='d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461'
+    if selected is not None or FIXED_RUST:
+        from actor_integration import validate_input_identity
+        validate_input_identity(identity)
     for name, expected in identity['files'].items():
         path = Path('/media/eqemu-input') / name
         if path.stat().st_size != expected['bytes'] or sha(path) != expected['sha256']:
@@ -242,6 +250,9 @@ def build():
     if PROFILE is not None and PROFILING is not None:
         raise RuntimeError('Sanitizers and profiling are mutually exclusive')
     source, registry = prepare_source()
+    if INTEGRATION or FIXED_RUST:
+        from actor_integration import verify_dependencies
+        verify_dependencies(json.loads(Path('/media/eqemu-input/identity.json').read_text()), source)
     cargo = prepare_rust()
     if PROFILING: ENV['RUSTFLAGS']='-C force-frame-pointers=yes -C debuginfo=2'
     else: ENV.pop('RUSTFLAGS', None)
@@ -294,7 +305,7 @@ def build():
 
 
 def main():
-    global DEADLINE, CHECKS, STAGE, PROFILE, PROFILING, WORK, LOGS
+    global DEADLINE, CHECKS, STAGE, PROFILE, PROFILING, WORK, LOGS, INTEGRATION
     if os.geteuid() != 0 or not Path('/opt/eqemu-worker-build-guest').is_file():
         raise RuntimeError('Disposable build guest only')
     nonce = Path('/opt/eqemu-worker-nonce').read_text().strip()
@@ -308,6 +319,9 @@ def main():
     COMPLETED.clear()
     result = dict(version=1, scope='worker-build', nonce=nonce, exit_code=2,
                   selected_checks=list(CHECKS), completed_checks=COMPLETED)
+    if Path('/opt/eqemu-worker-integration').exists():
+        from integration_artifacts import SELECTION
+        result['integration']=SELECTION
     DEADLINE = time.monotonic() + 17400
     try:
         WORK.mkdir(); MEDIA.mkdir()
@@ -315,6 +329,13 @@ def main():
         command('mount-job', ['mount', '-o', 'ro,nosuid,nodev', '/dev/sr1', '/media/eqemu-input'])
         identity = provision()
         if identity.get('diagnostic_profile') != PROFILE: raise RuntimeError('Guest input profile mismatch')
+        integration=identity.get('integration')
+        INTEGRATION=integration
+        if integration is not None:
+            from integration_artifacts import SELECTION
+            if integration!=SELECTION or PROFILE is not None or identity.get('profiling') is not None:
+                raise RuntimeError('Invalid fixed integration selection')
+            result['integration']=integration
         PROFILING=identity.get('profiling')
         if PROFILING is not None and PROFILE is not None: raise RuntimeError('Sanitizers and profiling are mutually exclusive')
         if PROFILING is not None:
@@ -325,12 +346,12 @@ def main():
                 install(sys.modules[__name__], '/media/eqemu-input/profilers.tar', PROFILING)
             for path in TOOLS.get(PROFILING,()): file_identity(path)
         result.update(build())
-        STAGE = 'normal-world'
-        print('EQEMU_STAGE normal-world', flush=True)
+        STAGE = 'actor-population-integration' if identity.get('integration') else 'normal-world'
+        print('EQEMU_STAGE '+STAGE, flush=True)
         LOGS.mkdir()
         from normal_world import run
         result['normal_world'] = run(sys.modules[__name__], identity)
-        COMPLETED.append('normal-world')
+        COMPLETED.append('actor-population-integration' if identity.get('integration') else 'normal-world')
         result['exit_code'] = 0
     except Exception as error:
         if getattr(error, 'sanitizers', None): result['sanitizers'] = error.sanitizers
@@ -346,6 +367,9 @@ def main():
     while len(json.dumps(result.get('error', ''))) > 3500:
         result['error'] = result['error'][len(result['error'])//2:]
     result['stage'] = STAGE
+    if result.get('integration'):
+        from integration_artifacts import validate_guest
+        validate_guest(result)
     print('\nEQEMU_WORKER_RESULT ' + json.dumps(result, separators=(',', ':')), flush=True)
 
 

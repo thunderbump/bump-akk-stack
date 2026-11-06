@@ -36,7 +36,7 @@ BASE_LIMIT = 2 * 1024**3
 CONTROLS = ('pass', 'assertion', 'missing-result', 'deadline', 'controller-death')
 OWNED_CONTROLS = (*CONTROLS, 'build', 'format', 'check-format', 'quick')
 FORMAT_SECONDS = 900
-IMPLEMENTATION_FILES = ('validation/worker/runtime.py', 'validation/worker/guest.py',
+IMPLEMENTATION_FILES = ('validation/worker/integration-v1.4.json', 'validation/worker/integration-v1.3.json', 'validation/worker/integration-v1.2.json', 'validation/worker/integration-v1.1.json', 'validation/worker/integration-v1.json', 'validation/worker/actor_integration.py', 'validation/worker/integration_artifacts.py', 'validation/actor-integration-fixture.json', 'validation/worker/runtime.py', 'validation/worker/guest.py',
     'validation/worker/profile_contract.py', 'validation/worker/profiling.py', 'validation/worker/profile_artifacts.py', 'validation/worker/profile_inputs.py',
     'validation/worker/sanitizers.py',
     'validation/worker/build_guest.py', 'validation/worker/normal_world.py', 'validation/actor.py',
@@ -185,6 +185,9 @@ def atomic_json(path, value):
 
 def persisted_report(report):
     """Last-result is an observation, never a second export of source bytes."""
+    if report.get('integration'):
+        from integration_artifacts import validate_outer
+        validate_outer(report)
     if report.get('scope') not in ('working-snapshot-format','working-snapshot-quickcheck'):
         return report
     value = dict(report)
@@ -293,6 +296,17 @@ def cleanup(value):
                 report['scratch_removed'] = True
             except (OSError, ValueError, CleanupError) as error:
                 report['cleanup_error'] = str(error)[:1000]
+            integration_pending=(job/'integration').exists() or (job/'previous-integration').exists()
+            if integration_pending:
+                from integration_artifacts import recover_pending, retain, SELECTION
+                report['integration']=SELECTION
+                try:
+                    if (job/'integration').exists():
+                        report['integration_receipt']=recover_pending(job/'integration',record['run_id'])
+                    retain(job,Path(value['state_dir']),record['run_id'])
+                    report['integration_retention_complete']=True
+                except Exception:
+                    report['integration_retention_complete']=False
             if (job/'profiles').exists():
                 # A client transfer cannot have started before this directory move.
                 report.update(profile_client_export_complete=False,profile_client_export_error='InterruptedBeforeTransfer',
@@ -306,7 +320,7 @@ def cleanup(value):
             else:
                 recover_profile_identity(Path(value['state_dir']),record['run_id'],report)
             atomic_json(Path(value['state_dir']) / 'last-result.json', report)
-            if not report['scratch_removed'] or report.get('profile_retention_complete') is False:
+            if not report['scratch_removed'] or report.get('profile_retention_complete') is False or report.get('integration_retention_complete') is False:
                 return 2  # Retain the active marker and scratch when process absence is uncertain.
             if (job / 'serial.log').exists():
                 os.replace(job / 'serial.log', Path(value['state_dir']) / 'last-serial.log')
@@ -364,7 +378,7 @@ def stop_process(process):
         raise CleanupError('Owned process cleanup could not be confirmed') from error
 
 
-def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None, format_result=None, quick_result=None, diagnostic_profile=None):
+def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, build_result=None, format_result=None, quick_result=None, diagnostic_profile=None, integration_sink=None):
     output = bytearray()
     pending = bytearray()
     discarding = False
@@ -423,6 +437,11 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
                                     connection.sendall(b'{"version":1,"kind":"progress","name":"normal-world-ready"}\n')
                                 finally:
                                     connection.settimeout(None)
+                            if line.startswith(b'EQEMU_INTEGRATION '):
+                                from integration_artifacts import FRAME_CAP, PREFIX, decode
+                                if discarding or integration_sink is None or len(line) + 1 > FRAME_CAP:
+                                    raise ValueError('integration-frame-invalid')
+                                integration_sink.accept(decode(line[len(PREFIX):]))
                             if not discarding and profile_sink is not None and line.startswith(b'EQEMU_PROFILE '):
                                 try:
                                     profile_sink.accept(json.loads(line.removeprefix(b'EQEMU_PROFILE ')))
@@ -475,6 +494,9 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
     if len(results) != 1:
         raise RuntimeError('Missing or duplicate guest completion')
     result = results[0]
+    if integration_sink is not None:
+        from integration_artifacts import validate_guest
+        validate_guest(result)
     if quick_result is not None:
         from quick_snapshot import validate_detail
         validate_detail(result)
@@ -497,6 +519,7 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
         return result['exit_code']
     if (not isinstance(result, dict) or (set(result) != {'version', 'nonce', 'scope', 'exit_code'} if build_result is None
                                                 else not set(result) <= {'version', 'nonce', 'scope', 'exit_code', 'stage', 'error', 'zone_sha256', 'utilities', 'normal_world', 'selected_checks', 'completed_checks',
+                                                    *(['integration'] if integration_sink is not None else []),
                                                     *(['diagnostic_profile', 'sanitizers', 'process_returncode'] if diagnostic_profile else [])})
             or type(result.get('version')) is not int or result['version'] != 1 or result.get('nonce') != nonce or result.get('scope') != ('worker-smoke' if build_result is None else 'worker-build')
             or type(result.get('exit_code')) is not int or result['exit_code'] not in ((0, 1) if build_result is None else (0, 1, 2))):
@@ -504,6 +527,8 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
     if build_result is not None:
         from sanitizers import checks as profile_checks
         selected = profile_checks(BUILD_CHECKS, diagnostic_profile)
+        if integration_sink is not None:
+            selected = (*selected[:-1], 'actor-population-integration')
         if result.get('diagnostic_profile') != diagnostic_profile:
             raise RuntimeError('Guest diagnostic profile mismatch')
         completed = result.get('completed_checks')
@@ -523,12 +548,20 @@ def supervise(args, scratch, log, connection, deadline, nonce, on_started=None, 
             if diagnostic_profile:
                 from sanitizers import validate_controls
                 validate_controls(result.get('sanitizers'))
-            from normal_world import validate
+            from actor_integration import validate_result as validate
+            if integration_sink is None:
+                from normal_world import validate
             normal = validate(result.get('normal_world'))
             if diagnostic_profile and 'native_exit_codes' not in normal:
                 raise RuntimeError('Sanitized native shutdown exit evidence missing')
             if normal['binaries']['zone'] != result['zone_sha256']:
                 raise RuntimeError('Normal-world zone differs from built candidate')
+        if integration_sink is not None:
+            from integration_artifacts import SELECTION
+            if result.get('integration') != SELECTION:
+                raise ValueError('integration-selection-mismatch')
+            if result['exit_code'] == 0 and not integration_sink.valid:
+                raise ValueError('integration-transfer-incomplete')
         build_result.update(result)
         if profile_sink is not None:
             complete=not profile_error and result.get('normal_world',{}).get('profiling',{}).get('complete') is True and result['normal_world']['profiling'].get('mode')==profile_mode
@@ -575,6 +608,7 @@ def implementation_identity(value):
 
 def run_vm(value, connection, control='pass', build=None, formatting=None, quick=None):
     started_at = time.monotonic()
+    integration_sink = None
     lock = acquire(value)
     state = Path(value['state_dir']); active = state / 'active.json'
     run_id = uuid.uuid4().hex; job = state / run_id
@@ -588,6 +622,9 @@ def run_vm(value, connection, control='pass', build=None, formatting=None, quick
         report.update(operation='build', scope='worker-build', control='build',
                       candidate=build['candidate'], tree=build['tree'], payload_sha256=build['sha256'],
                       coverage=[], selected_checks=list(profile_checks(BUILD_CHECKS, diagnostic_profile)), completed_checks=[])
+        if build.get('integration'):
+            report['integration'] = build['integration']
+            report['selected_checks'] = [*report['selected_checks'][:-1], 'actor-population-integration']
         if diagnostic_profile: report['diagnostic_profile'] = diagnostic_profile
     if formatting is not None:
         control = 'format' if formatting['operation'] == 'format' else 'check-format'
@@ -619,6 +656,13 @@ def run_vm(value, connection, control='pass', build=None, formatting=None, quick
         active_record = {'run_id': run_id, 'invocation_id': invocation(), 'control': control, 'qemu_pid': None}
         atomic_json(active, active_record)
         job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
+        if build is not None and build.get('integration'):
+            from integration_artifacts import Sink, retained
+            if (state/'last-integration').exists():
+                _, previous_receipt = retained(state/'last-integration')
+                if previous_receipt['original_transfer'] != 'durable':
+                    raise ValueError('integration-previous-transfer-uncertain')
+            integration_sink = Sink(job/'integration', build['candidate'], run_id)
         deadline = time.monotonic() + (BUILD_SECONDS if build is not None else 3600 if quick is not None else FORMAT_SECONDS if formatting is not None else SECONDS)
         base = root_file(value['base_image'])
         with base.open('rb') as stream:
@@ -628,7 +672,7 @@ def run_vm(value, connection, control='pass', build=None, formatting=None, quick
             receive_payload(connection, scratch / 'payload.iso', payload, time.monotonic() + 120)
         if build is not None and build.get('profiling'):
             (scratch/'profile-requested').write_text(json.dumps({key:build[key] for key in ('profiling','candidate','tree')}))
-        (scratch / 'user-data').write_text((build_user_data(run_id, diagnostic_profile) if diagnostic_profile else build_user_data(run_id)) if build is not None else
+        (scratch / 'user-data').write_text((build_user_data(run_id, integration=build['integration']) if build.get('integration') else build_user_data(run_id, diagnostic_profile) if diagnostic_profile else build_user_data(run_id)) if build is not None else
                                          quick_user_data(run_id,quick) if quick is not None else
                                          format_user_data(run_id, formatting) if formatting is not None else user_data(run_id, control))
         (scratch / 'meta-data').write_text('instance-id: eqemu-smoke-' + run_id + '\n')
@@ -675,13 +719,14 @@ def run_vm(value, connection, control='pass', build=None, formatting=None, quick
         else:
             detail = {}
             options = {'diagnostic_profile': diagnostic_profile} if diagnostic_profile else {}
+            if integration_sink is not None: options['integration_sink'] = integration_sink
             report['guest'] = detail
             report['exit_code'] = supervise(args, scratch, job / 'serial.log', connection, deadline, run_id, started, detail, **options)
             report['completed_checks'] = detail['completed_checks']
             if report['implementation_sha256'] != implementation_identity(value):
                 raise RuntimeError('Worker implementation changed during the job')
             if report['exit_code'] == 0:
-                report['coverage'] = ['rust-checks', 'server-build', 'native-utilities', 'normal-world']
+                report['coverage'] = ['rust-checks', 'server-build', 'native-utilities', 'actor-population-integration' if integration_sink else 'normal-world']
                 if diagnostic_profile: report['coverage'].append(diagnostic_profile)
     except Exception as error:
         report['error'] = str(error)[:1000]
@@ -695,49 +740,94 @@ def run_vm(value, connection, control='pass', build=None, formatting=None, quick
             report.update(unavailable(error))
     finally:
         try:
-            if 'cleanup_error' not in report:
-                if job.exists():
-                    scratch_cleanup(job)
-                report['cleanup_complete'] = True
-        except Exception as error:
-            report['cleanup_error'] = str(error)[:1000]; report['exit_code'] = 2
-        if formatting is not None or quick is not None:
-            report.setdefault('timings', {})['total_seconds'] = round(time.monotonic() - started_at, 3)
-            if formatting is not None and report['exit_code'] != 0:
-                report.update(changed_files=[], output_snapshot_sha256=formatting['input_snapshot_sha256'])
-        if (job/'profiles').exists():
-            try: retain_profiles(job,state,run_id,report)
-            except Exception as error:
-                report.update(exit_code=2,profile_export_error=type(error).__name__,profile_retention_complete=False)
-        if job.exists():
-            if build is not None and diagnostic_profile:
-                report['measurements'] = dict(elapsed_seconds=round(time.monotonic()-started_at, 3),
-                    serial_bytes=(job / 'serial.log').stat().st_size if (job / 'serial.log').exists() else 0)
-                try: report['measurements']['cgroup_memory_peak_bytes'] = (service_cgroup() / 'memory.peak').read_text().strip()
-                except OSError: report['measurements']['cgroup_memory_peak_bytes'] = None
-            atomic_json(state / 'last-result.json', persisted_report(report))
-            if (job / 'serial.log').exists():
-                os.replace(job / 'serial.log', state / 'last-serial.log')
-            if report['cleanup_complete'] and not (job/'profiles').exists():
-                job.rmdir()
-        if report.get('profile_artifacts'):
             try:
-                from profile_artifacts import send
-                connection.settimeout(30)
-                with connection.makefile('wb') as stream:
-                    send(state/'last-profile',stream)
-                report['profile_client_export_complete']=True
+                if 'cleanup_error' not in report:
+                    if job.exists():
+                        scratch_cleanup(job)
+                    report['cleanup_complete'] = True
             except Exception as error:
-                report.update(exit_code=2,profile_client_export_complete=False,profile_client_export_error=type(error).__name__)
-            finally:
-                connection.settimeout(None)
-                try: refresh_profile_receipt(state,run_id,report)
+                report['cleanup_error'] = str(error)[:1000]; report['exit_code'] = 2
+            if formatting is not None or quick is not None:
+                report.setdefault('timings', {})['total_seconds'] = round(time.monotonic() - started_at, 3)
+                if formatting is not None and report['exit_code'] != 0:
+                    report.update(changed_files=[], output_snapshot_sha256=formatting['input_snapshot_sha256'])
+            if (job/'profiles').exists():
+                try: retain_profiles(job,state,run_id,report)
                 except Exception as error:
-                    report.update(exit_code=2,profile_receipt_retention_error=type(error).__name__,profile_retention_complete=False)
-                atomic_json(state/'last-result.json',persisted_report(report))
-        if active.exists() and read_json(active).get('run_id') == run_id and report['cleanup_complete'] and report.get('profile_retention_complete',True):
-            active.unlink()
-        os.close(lock)
+                    report.update(exit_code=2,profile_export_error=type(error).__name__,profile_retention_complete=False)
+            if job.exists():
+                if build is not None and diagnostic_profile:
+                    report['measurements'] = dict(elapsed_seconds=round(time.monotonic()-started_at, 3),
+                        serial_bytes=(job / 'serial.log').stat().st_size if (job / 'serial.log').exists() else 0)
+                    try: report['measurements']['cgroup_memory_peak_bytes'] = (service_cgroup() / 'memory.peak').read_text().strip()
+                    except OSError: report['measurements']['cgroup_memory_peak_bytes'] = None
+                atomic_json(state / 'last-result.json', persisted_report(report))
+                if (job / 'serial.log').exists():
+                    os.replace(job / 'serial.log', state / 'last-serial.log')
+                if report['cleanup_complete'] and not (job/'profiles').exists() and integration_sink is None:
+                    job.rmdir()
+            if report.get('profile_artifacts'):
+                try:
+                    from profile_artifacts import send
+                    connection.settimeout(30)
+                    with connection.makefile('wb') as stream:
+                        send(state/'last-profile',stream)
+                    report['profile_client_export_complete']=True
+                except Exception as error:
+                    report.update(exit_code=2,profile_client_export_complete=False,profile_client_export_error=type(error).__name__)
+                finally:
+                    connection.settimeout(None)
+                    try: refresh_profile_receipt(state,run_id,report)
+                    except Exception as error:
+                        report.update(exit_code=2,profile_receipt_retention_error=type(error).__name__,profile_retention_complete=False)
+                    atomic_json(state/'last-result.json',persisted_report(report))
+            if integration_sink is not None:
+                from integration_artifacts import frames, wire, decode, retain
+                detail=report.get('guest',{}).get('normal_world',{})
+                execution=dict(workload_exit_code=detail.get('exit_code'),validator_exit_code=report['exit_code'],
+                               native_cleanup=detail.get('native_cleanup','unknown'),database_cleanup=detail.get('database_cleanup','unknown'),
+                               vm_cleanup=report['cleanup_complete'])
+                try:
+                    integration_sink.stream.flush()
+                    raw = (job/'integration'/'central-cdau-integration-v1.json').read_bytes()
+                    if raw:
+                        from actor_integration import validate_artifact
+                        artifact=validate_artifact(raw)
+                        if artifact['manifest']['server_commit']!=build['candidate'] or artifact['manifest']['server_tree']!=build['tree'] or artifact['manifest']['run']!=run_id:
+                            raise ValueError('integration-artifact-binding')
+                    connection.settimeout(10)
+                    for frame in frames(raw, build['candidate'], run_id, complete=integration_sink.valid,
+                                        gaps=not integration_sink.ended, overflow=False):
+                        connection.sendall(wire(frame))
+                    ack = bytearray()
+                    while not ack.endswith(b'\n'):
+                        chunk = connection.recv(1)
+                        if not chunk or len(ack) >= 256:
+                            raise ValueError('integration-ack-uncertain')
+                        ack.extend(chunk)
+                    report['integration_receipt'] = integration_sink.finish(decode(ack),execution=execution)
+                    if not report['integration_receipt']['complete']:
+                        report['exit_code'] = 2
+                except Exception:
+                    report['exit_code'] = 2
+                    if not integration_sink.finalized:
+                        try: report['integration_receipt'] = integration_sink.finish(execution=execution)
+                        except Exception: report['integration_finalization_error']='integration-receipt-write-failed'
+                finally:
+                    connection.settimeout(None)
+                    integration_sink.close()
+                try:
+                    if not integration_sink.finalized: raise ValueError('integration-finalization-pending')
+                    retain(job,state,run_id)
+                    report['integration_retention_complete']=True
+                    if job.exists(): job.rmdir()
+                except Exception:
+                    report['integration_retention_complete']=False;report['exit_code']=2
+                atomic_json(state/'last-result.json', persisted_report(report))
+            if active.exists() and read_json(active).get('run_id') == run_id and report['cleanup_complete'] and report.get('profile_retention_complete',True) and (integration_sink is None or report.get('integration_retention_complete') is True):
+                active.unlink()
+        finally:
+            os.close(lock)
     return report
 
 
@@ -868,6 +958,14 @@ def request(connection, value):
     if data == {'version': 1, 'operation': 'last-result'}:
         return {'version': 1, 'operation': 'last-result', 'scope': 'worker-observation',
                 'exit_code': 0, 'result': read_json(Path(value['state_dir']) / 'last-result.json', limit=65536)}
+    if data.get('operation')=='integration-artifacts':
+        if value.get('selection') or value.get('diagnostic_profile'): raise ValueError('Integration uses only the ordinary worker')
+        if set(data)!={'version','operation','run_id'} or not isinstance(data['run_id'],str) or not re.fullmatch('[a-f0-9]{32}',data['run_id']):
+            raise ValueError('Exact integration run ID required')
+        from integration_artifacts import replay
+        lock=acquire(value)
+        try: return replay(Path(value['state_dir'])/'last-integration',data['run_id'],connection)
+        finally: os.close(lock)
     if data.get('operation')=='profile-artifacts':
         if set(data)!={'version','operation','run_id'} or not isinstance(data['run_id'],str) or not re.fullmatch('[a-f0-9]{32}',data['run_id']):
             raise ValueError('Exact profiling run ID required')
@@ -886,15 +984,19 @@ def request(connection, value):
     if data.get('operation') == 'build':
         from sanitizers import PROFILE
         diagnostic_profile = data.get('diagnostic_profile')
-        if (set(data) != {'version', 'operation', 'candidate', 'tree', 'bytes', 'sha256'} | ({'profiling'} if 'profiling' in data else set()) | ({'diagnostic_profile'} if 'diagnostic_profile' in data else set())
+        if (set(data) != {'version', 'operation', 'candidate', 'tree', 'bytes', 'sha256'} | ({'profiling'} if 'profiling' in data else set()) | ({'diagnostic_profile'} if 'diagnostic_profile' in data else set()) | ({'integration'} if 'integration' in data else set())
                 or ('profiling' in data and data['profiling'] not in ('timeline','heaptrack','perf'))
                 or ('diagnostic_profile' in data and diagnostic_profile != PROFILE)
                 or diagnostic_profile != value.get('diagnostic_profile')
                 or ('profiling' in data and 'diagnostic_profile' in data)
+                or ('integration' in data and (data['integration'] != 'central-cdau-integration-v1' or 'profiling' in data or 'diagnostic_profile' in data or value.get('selection') is not None or value.get('diagnostic_profile') is not None))
                 or not all(isinstance(data[key], str) and re.fullmatch('[a-f0-9]{40}', data[key]) for key in ('candidate', 'tree'))
                 or not isinstance(data['sha256'], str) or not re.fullmatch('[a-f0-9]{64}', data['sha256'])
                 or type(data['bytes']) is not int or not 0 < data['bytes'] <= PAYLOAD_LIMIT):
             raise ValueError('Malformed build request')
+        if data.get('integration'):
+            from actor_integration import validate_build_binding
+            validate_build_binding(data)
         connection.settimeout(None)
         return run_vm(value, connection, build=data)
     if data.get('operation')=='quick':
@@ -959,6 +1061,9 @@ def main(argv=None):
         except Exception as error:
             result = {'version': 1, 'exit_code': 2, 'error': str(error)[:1000], 'scope': 'worker-smoke'}
         try:
+            if result.get('integration'):
+                from integration_artifacts import validate_outer
+                validate_outer(result)
             connection.settimeout(30)
             connection.sendall((json.dumps(result, separators=(',', ':')) + '\n').encode())
         except OSError:

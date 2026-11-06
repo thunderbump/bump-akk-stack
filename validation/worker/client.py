@@ -1,5 +1,6 @@
 """Ordinary-user client for the fixed worker socket. Never invokes sudo."""
 import argparse
+from contextlib import ExitStack
 import json
 from pathlib import Path
 import socket
@@ -10,12 +11,12 @@ CONFIG = Path('/etc/eqemu-validator/config.json')
 REPORT_LIMIT = 16384
 
 
-def exchange(path, request, payload=None, profile_output=None):
+def exchange(path, request, payload=None, profile_output=None, *, integration_output=None):
     """Read-only probes may briefly race systemd's previous connection teardown."""
     deadline = time.monotonic() + 2
     while True:
         try:
-            return exchange_once(path, request, payload, profile_output=profile_output)
+            return exchange_once(path, request, payload, profile_output=profile_output, integration_output=integration_output)
         except (ConnectionResetError, BrokenPipeError):
             # Never retry a build/smoke request: it may already have started a VM.
             if (request not in ({'version': 1, 'operation': 'check'}, {'version': 1, 'operation': 'last-result'})
@@ -24,14 +25,23 @@ def exchange(path, request, payload=None, profile_output=None):
             time.sleep(.1)
 
 
-def exchange_once(path, request, payload=None, profile_output=None):
+def exchange_once(path, request, payload=None, profile_output=None, *, integration_output=None):
     from snapshot import RESULT_LIMIT
+    integration_requested=bool(request.get('integration')) or request['operation']=='integration-artifacts'
+    if integration_requested:
+        from integration_artifacts import SELECTION
+        if (request.get('integration') not in (None,SELECTION) or integration_output is None or profile_output is not None):
+            raise ValueError('Fixed integration requires a private output')
+    elif integration_output is not None:
+        raise ValueError('Unrequested integration output')
+    integration_sink = None
+    integration_receipt = None
     profile_sink=None
     if profile_output is not None:
         from profile_artifacts import Sink
         profile_sink=Sink(profile_output)
     report_limit = 65536 if request['operation'] in ('quick', 'build', 'last-result') else RESULT_LIMIT if 'input_snapshot_sha256' in request else REPORT_LIMIT
-    with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
+    with ExitStack() as retained, socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
         formatting = 'input_snapshot_sha256' in request
         connection.settimeout(18330 if request['operation'] == 'build' else 3630 if request['operation']=='quick' else 930 if formatting else 330 if request['operation'] == 'smoke' else 15)
         connection.connect(str(path))
@@ -51,6 +61,41 @@ def exchange_once(path, request, payload=None, profile_output=None):
                 if len(data) > report_limit:
                     raise RuntimeError('Worker report size limit exceeded')
             line, _, rest = data.partition(b'\n')
+            if line.startswith(b'EQEMU_INTEGRATION '):
+                from integration_artifacts import Sink, decode, PREFIX, FRAME_CAP
+                if not integration_requested or len(line) + 1 > FRAME_CAP:
+                    raise ValueError('Unrequested or oversized integration frame')
+                frame = decode(line[len(PREFIX):])
+                if integration_sink is None:
+                    if frame.get('kind') != 'begin':
+                        raise ValueError('Missing integration begin')
+                    integration_sink = Sink(integration_output, request.get('candidate',frame.get('candidate')), request.get('run_id',frame['run_id']))
+                    retained.callback(integration_sink.abandon)
+                try:
+                    integration_sink.accept(frame)
+                    if integration_sink.ended:
+                        # An incomplete prefix is retained, never parsed as a whole artifact or ACKed.
+                        # Keep reading the final worker report so its cleanup facts survive.
+                        if not integration_sink.valid or not integration_sink.total:
+                            integration_receipt = integration_sink.finish()
+                            data = bytearray(rest)
+                            continue
+                        from actor_integration import validate_artifact
+                        artifact=validate_artifact((integration_sink.directory/__import__('integration_artifacts').NAME).read_bytes())
+                        if (artifact['manifest']['server_commit']!=integration_sink.fixed['candidate']
+                                or ('tree' in request and artifact['manifest']['server_tree']!=request['tree'])
+                                or artifact['manifest']['run']!=integration_sink.fixed['run_id']):
+                            raise ValueError('Integration artifact binding mismatch')
+                        ack = integration_sink.ack()
+                        connection.sendall(__import__('integration_artifacts').encoded(ack) + b'\n')
+                        integration_receipt = integration_sink.finish(ack)
+                except BaseException:
+                    if not integration_sink.finalized:
+                        integration_sink.finish()
+                    integration_sink.close()
+                    raise
+                data = bytearray(rest)
+                continue
             if line.startswith(b'EQEMU_PROFILE '):
                 if profile_sink is None: raise RuntimeError('Unrequested raw profiling export')
                 profile_sink.accept(json.loads(line.removeprefix(b'EQEMU_PROFILE ')))
@@ -81,12 +126,14 @@ def exchange_once(path, request, payload=None, profile_output=None):
             if request['operation'] == 'build' and result.get('diagnostic_profile') != request.get('diagnostic_profile'):
                 raise RuntimeError('Mismatched diagnostic profile')
             if request['operation'] == 'build' and result['exit_code'] == 0:
-                from normal_world import validate
+                from actor_integration import validate_result as validate
+                if not request.get('integration'):
+                    from normal_world import validate
                 detail = result.get('guest', {})
                 normal = validate(detail.get('normal_world'))
                 if normal['binaries']['zone'] != detail.get('zone_sha256'):
                     raise RuntimeError('Normal-world zone differs from built candidate')
-                if 'normal-world' not in result.get('coverage', []):
+                if ('actor-population-integration' if request.get('integration') else 'normal-world') not in result.get('coverage', []):
                     raise RuntimeError('Installed worker lacks reviewed normal-world coverage')
             if request['operation'] == 'smoke' and (result.get('scope') != 'worker-smoke'
                     or result.get('operation') != 'smoke' or result.get('cleanup_complete') is not True
@@ -110,6 +157,18 @@ def exchange_once(path, request, payload=None, profile_output=None):
             if result['exit_code']==0 and (not expected or result.get('guest',{}).get('profile_transport',{}).get('complete') is not True
                     or result.get('guest',{}).get('normal_world',{}).get('profiling',{}).get('mode')!=request['profiling']):
                 raise RuntimeError('Requested profiling missing or incomplete')
+        if integration_requested:
+            if integration_sink is not None:
+                try:
+                    if not integration_sink.finalized:
+                        integration_receipt = integration_sink.finish()
+                    if result.get('run_id') != integration_sink.fixed['run_id']:
+                        raise ValueError('Integration run mismatch')
+                finally:
+                    integration_sink.close()
+            if result['exit_code'] == 0 and (not integration_receipt or not integration_receipt['complete']
+                    or (result.get('reexport_complete') is not True if request['operation']=='integration-artifacts' else result.get('integration_receipt', {}).get('complete') is not True)):
+                raise ValueError('Integration export incomplete')
         return result
 
 
