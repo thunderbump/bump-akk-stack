@@ -1,0 +1,937 @@
+{
+  "assigned_resource_ids": [
+    {
+      "conflict": "Serialize code publication with the existing maintenance publisher. Fence the maintenance socket and its accepted instances during adoption/publication, or use an explicitly shared ownership mechanism.",
+      "direct_readers": [
+        "eqemu-validator@.service"
+      ],
+      "id": "validator-worker-code",
+      "kind": "code-release",
+      "path": "/srv/eqemu-validator-code",
+      "writers": [
+        "new operations module when adopted",
+        "eqemu-validator-maintenance@.service"
+      ]
+    },
+    {
+      "basis": "Installed ordinary runtime acquire(); installed ASan runtimes diagnostic_profile branch uses state.parent/worker.lock; profiling configuration shared_lock; maintenance LOCK constant.",
+      "id": "validator-shared-execution",
+      "kind": "exclusive-execution",
+      "participants": [
+        "eqemu-validator@.service",
+        "eqemu-validator-asan-v1@.service",
+        "eqemu-validator-asan-v2@.service",
+        "eqemu-validator-asan-v3@.service",
+        "eqemu-validator-profiling@.service",
+        "eqemu-validator-maintenance@.service"
+      ],
+      "path": "/var/lib/eqemu-validator/worker.lock"
+    },
+    {
+      "child_states": {
+        "asan-v1": "eqemu-validator-asan-v1@.service",
+        "asan-v2": "eqemu-validator-asan-v2@.service",
+        "asan-v3": "eqemu-validator-asan-v3@.service"
+      },
+      "id": "validator-ordinary-state",
+      "kind": "mutable-state",
+      "note": "ASan working directories and writable mounts include the parent, although each configured state_dir is a distinct child. Parent mutation therefore conflicts with these units.",
+      "path": "/var/lib/eqemu-validator",
+      "writers": [
+        "eqemu-validator@.service"
+      ]
+    },
+    {
+      "id": "validator-integration-evidence",
+      "kind": "failed-workspace",
+      "path": "/var/lib/eqemu-validator/last-integration",
+      "recovery_scope": "Preserve and seal the recorded failed evidence; allocate a fresh managed generation. Do not upgrade the old outcome, invent an ACK, or require inode preservation.",
+      "writers": [
+        "eqemu-validator@.service"
+      ]
+    },
+    {
+      "id": "validator-profiling-state",
+      "kind": "mutable-state",
+      "path": "/var/lib/eqemu-validator-profiling",
+      "scope": "Conflict dependency only; not an initial deploy or recovery target.",
+      "writers": [
+        "eqemu-validator-profiling@.service"
+      ]
+    }
+  ],
+  "authority": {
+    "adoption_status": "source-and-package preparation authorized; root adoption and live operations separately selected",
+    "approved_release_paths": [
+      "integration-release.json",
+      "scripts/check-validation-worker",
+      "validation/actor-integration-fixture.json",
+      "validation/actor.py",
+      "validation/actor_runtime.py",
+      "validation/debugger.py",
+      "validation/runtime-fixture.json",
+      "validation/worker/actor_integration.py",
+      "validation/worker/build_guest.py",
+      "validation/worker/client.py",
+      "validation/worker/format_guest.py",
+      "validation/worker/guest.py",
+      "validation/worker/integration-v1.4.json",
+      "validation/worker/integration_artifacts.py",
+      "validation/worker/normal_world.py",
+      "validation/worker/quick_guest.py",
+      "validation/worker/quick_snapshot.py",
+      "validation/worker/runtime.py",
+      "validation/worker/snapshot.py"
+    ],
+    "approved_root": "/srv/eqemu-validator-code",
+    "deployment_does_not_authorize": [
+      "validator workload execution",
+      "integration attempt",
+      "changing resource caps",
+      "upgrading the privileged executor or its imports/policy",
+      "deleting or rewriting historical results"
+    ],
+    "excluded_from_release": [
+      "/usr/local/lib/eqemu-validator-maintenance-v1",
+      "/usr/local/libexec",
+      "/etc/systemd/system",
+      "/etc/eqemu-validator",
+      "/etc/apparmor.d",
+      "/var/lib/eqemu-validator-inputs",
+      "hidden backup directories and existing evidence"
+    ],
+    "inode_note": "Current inode values bind this observation only. Preserving original inodes is not an acceptance requirement.",
+    "launcher_binding": "Existing fixed ExecStart and ExecStopPost resolve /srv/eqemu-validator-code. Any changed launcher or privileged unit definition is explicit root-adoption scope, not release content.",
+    "ownership_note": "Observed UID1000 file exceptions are current facts, not a preservation requirement. A new sealed authoritative release must be protected from callers and runtime identities.",
+    "release_scope": "Coherent unprivileged validator worker Python and fixed JSON data only. The 19 listed paths are the initial exact release set.",
+    "target_id": "validator-worker-code"
+  },
+  "cgroup_contract": {
+    "owned_unit_templates": [
+      "eqemu-validator@.service",
+      "eqemu-validator-asan-v1@.service",
+      "eqemu-validator-asan-v2@.service",
+      "eqemu-validator-asan-v3@.service",
+      "eqemu-validator-profiling@.service"
+    ],
+    "privileged_competing_publisher_template": "eqemu-validator-maintenance@.service",
+    "resolution": "At execution ask systemd for accepted instances of these exact configured templates and their ControlGroup/invocation identities. No live cgroup path has been observed here. No arbitrary caller-supplied unit name and no host-wide PID stability requirement.",
+    "scope": "Diagnostic/profiling units are dependencies for shared state and execution only, not additional deployable roots."
+  },
+  "current_code": {
+    "fresh_files": [
+      {
+        "bytes": 3016,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642052,
+        "mode": 420,
+        "path": "integration-release.json",
+        "sha256": "9c79ca373dc412f808b71be279085bf986dc6afa81a81fad80c42904d8596aaa",
+        "uid": 0
+      },
+      {
+        "bytes": 312,
+        "device": 66306,
+        "gid": 1000,
+        "inode": 24700198,
+        "mode": 493,
+        "path": "scripts/check-validation-worker",
+        "sha256": "c06ef3b4b71d49de4986ceb75b041796a6378cae7cbc78715b2784248dbfef7b",
+        "uid": 1000
+      },
+      {
+        "bytes": 34871,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642045,
+        "mode": 420,
+        "path": "validation/actor-integration-fixture.json",
+        "sha256": "4abd05fbd817946146badfb493c248a953f8278ca30faa0da750de45c5c6e0c0",
+        "uid": 0
+      },
+      {
+        "bytes": 9193,
+        "device": 66306,
+        "gid": 1000,
+        "inode": 24700584,
+        "mode": 420,
+        "path": "validation/actor.py",
+        "sha256": "c647fe5abd7391be7668bdf3caac2af1270dd8c14e70ea2888fd76ac17ba83cd",
+        "uid": 1000
+      },
+      {
+        "bytes": 30715,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642021,
+        "mode": 420,
+        "path": "validation/actor_runtime.py",
+        "sha256": "3e19788e73d82a7241b1c96e8cc0950d6542fe7310ad4912a66af4109992a3f8",
+        "uid": 0
+      },
+      {
+        "bytes": 4633,
+        "device": 66306,
+        "gid": 1000,
+        "inode": 24700195,
+        "mode": 420,
+        "path": "validation/debugger.py",
+        "sha256": "f3994febc3bdd20126e20c340fd83a8ad4de347ba5038d590f80984bb2e2ca80",
+        "uid": 1000
+      },
+      {
+        "bytes": 13988,
+        "device": 66306,
+        "gid": 1000,
+        "inode": 24700196,
+        "mode": 420,
+        "path": "validation/runtime-fixture.json",
+        "sha256": "16ca34a8ccf961a76bed03f19bb6127a05a91d95e625be8971e826e8d436e9c2",
+        "uid": 1000
+      },
+      {
+        "bytes": 81815,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642050,
+        "mode": 420,
+        "path": "validation/worker/actor_integration.py",
+        "sha256": "03e07c020534a02af1d9481e2def65139274ac77f9fa67e894eeb266e63d6c8e",
+        "uid": 0
+      },
+      {
+        "bytes": 15957,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642031,
+        "mode": 420,
+        "path": "validation/worker/build_guest.py",
+        "sha256": "24a5afb1bf946d0dd70a90d868f8954174f0529fc13c87ff7b3f415663bbe8b1",
+        "uid": 0
+      },
+      {
+        "bytes": 11283,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642051,
+        "mode": 420,
+        "path": "validation/worker/client.py",
+        "sha256": "7577c8e782d0e94265f09042417e1a112bd50fe26bb01e45d960dd8d8e44b4c1",
+        "uid": 0
+      },
+      {
+        "bytes": 7636,
+        "device": 66306,
+        "gid": 1000,
+        "inode": 24700586,
+        "mode": 420,
+        "path": "validation/worker/format_guest.py",
+        "sha256": "b3a1aa2de9a3e4bc72f211966e434d38b85802bbc3026d5788994e7e4f504f6f",
+        "uid": 1000
+      },
+      {
+        "bytes": 6244,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642030,
+        "mode": 420,
+        "path": "validation/worker/guest.py",
+        "sha256": "f4882bcc56fdc49872887e1da9c11646ce57dda9731ee21b12b9976352eda825",
+        "uid": 0
+      },
+      {
+        "bytes": 16115,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642024,
+        "mode": 420,
+        "path": "validation/worker/integration-v1.4.json",
+        "sha256": "c604e154baf96908e2d6707714875924a198793438ec219565f05dc4e6cf6eb0",
+        "uid": 0
+      },
+      {
+        "bytes": 20934,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642023,
+        "mode": 420,
+        "path": "validation/worker/integration_artifacts.py",
+        "sha256": "47bba4fae69d3765cf00ed3302f500d6802e99221f1bde3ac894b212f621e26e",
+        "uid": 0
+      },
+      {
+        "bytes": 36419,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642018,
+        "mode": 420,
+        "path": "validation/worker/normal_world.py",
+        "sha256": "6f423b7e72fdeedc547ff0a603594c46e4493696258e10b302fa26b5b7ed2461",
+        "uid": 0
+      },
+      {
+        "bytes": 10145,
+        "device": 66306,
+        "gid": 1000,
+        "inode": 24700201,
+        "mode": 420,
+        "path": "validation/worker/quick_guest.py",
+        "sha256": "ace14babb9c3b6224c5f3382744b6de420aa7542ea4574f1977e38d9f7f38208",
+        "uid": 1000
+      },
+      {
+        "bytes": 15486,
+        "device": 66306,
+        "gid": 1000,
+        "inode": 24700202,
+        "mode": 420,
+        "path": "validation/worker/quick_snapshot.py",
+        "sha256": "322a6ed5492cc00d685e38bf627ffc9a4a7ce176b2d040079cc48b75133f3df5",
+        "uid": 1000
+      },
+      {
+        "bytes": 49277,
+        "device": 66306,
+        "gid": 0,
+        "inode": 24642015,
+        "mode": 420,
+        "path": "validation/worker/runtime.py",
+        "sha256": "37ceb3371e34e92917cb51609aba244d86191857f029bb71cc5f8b3603fa40f8",
+        "uid": 0
+      },
+      {
+        "bytes": 11985,
+        "device": 66306,
+        "gid": 1000,
+        "inode": 24700200,
+        "mode": 420,
+        "path": "validation/worker/snapshot.py",
+        "sha256": "a577645d2c71cd7e96bd9a53e953fb1e094d3be3ea3630b5c3e3f2dc77f5f4cc",
+        "uid": 1000
+      }
+    ],
+    "implementation": "9960d78d7758721c13347a9d243790cd6ac10796574e05db8d153bbd5e25e61f",
+    "implementation_provenance": "retained publication observation, not recomputed by a worker request",
+    "matches_public_receipt": {
+      "path": "/home/bump/.local/state/eqemu-cdau-integration-prep/20261104-source/ROOT-V6-POST-PUBLICATION-READBACK.json",
+      "sha256": "d130dd59ae33a27a415bd88e707e213c4634f4a82030560eadaa9d572be360d8"
+    },
+    "stack_source": "a8f8a29c5225cdbc593880eb21e5e127a72b14ac"
+  },
+  "installed_configs": [
+    {
+      "definition": "/etc/eqemu-validator/config.json",
+      "settings": {
+        "base_image": "/var/lib/eqemu-validator-inputs/base.qcow2",
+        "code_dir": "/srv/eqemu-validator-code",
+        "socket": "/run/eqemu-validator.sock",
+        "state_dir": "/var/lib/eqemu-validator",
+        "submitter": "bump",
+        "user": "eqemu-validator",
+        "version": 1,
+        "worker_gid": 980,
+        "worker_uid": 995
+      },
+      "sha256": "c792ffed4a2a2ea8e5fe3821326d9f613c767e0a6b3303214b707406864611c8"
+    },
+    {
+      "definition": "/etc/eqemu-validator/asan-v1.json",
+      "settings": {
+        "base_image": "/var/lib/eqemu-validator-inputs/base.qcow2",
+        "code_dir": "/srv/eqemu-validator-asan-v1/6bcd71010acfc1ebe8ac1264f5b9b90537ab2d69",
+        "diagnostic_profile": "asan-ubsan-native-v1",
+        "socket": "/run/eqemu-validator-asan-v1.sock",
+        "state_dir": "/var/lib/eqemu-validator/asan-v1",
+        "submitter": "bump",
+        "user": "eqemu-validator",
+        "version": 1,
+        "worker_gid": 980,
+        "worker_uid": 995
+      },
+      "sha256": "9bb5a1449d684d5e5a2aff53c7ad43a638d91c5398954da64648c4dd3c1a0d7e"
+    },
+    {
+      "definition": "/etc/eqemu-validator/asan-v2.json",
+      "settings": {
+        "base_image": "/var/lib/eqemu-validator-inputs/base.qcow2",
+        "code_dir": "/srv/eqemu-validator-asan-v2/22f4ea6bf6070014e29bc4eb156b9c8a65dcb197",
+        "diagnostic_profile": "asan-ubsan-native-v1",
+        "socket": "/run/eqemu-validator-asan-v2.sock",
+        "state_dir": "/var/lib/eqemu-validator/asan-v2",
+        "submitter": "bump",
+        "user": "eqemu-validator",
+        "version": 1,
+        "worker_gid": 980,
+        "worker_uid": 995
+      },
+      "sha256": "be950658d59722b2985e1b10ecf357093e09956f3c499c7e08628e45435bd889"
+    },
+    {
+      "definition": "/etc/eqemu-validator/asan-v3.json",
+      "settings": {
+        "base_image": "/var/lib/eqemu-validator-inputs/base.qcow2",
+        "code_dir": "/srv/eqemu-validator-asan-v3/29c1e8457196c73ee19d8922d0ee913d3375098f",
+        "diagnostic_profile": "asan-ubsan-native-v1",
+        "socket": "/run/eqemu-validator-asan-v3.sock",
+        "state_dir": "/var/lib/eqemu-validator/asan-v3",
+        "submitter": "bump",
+        "user": "eqemu-validator",
+        "version": 1,
+        "worker_gid": 980,
+        "worker_uid": 995
+      },
+      "sha256": "de2782dbd93f9d1550051c914be2a6cfa547c9d328cbf3bd5ef37287b75a7f66"
+    },
+    {
+      "definition": "/etc/eqemu-validator/profiling.json",
+      "settings": {
+        "base_image": "/var/lib/eqemu-validator-inputs/base.qcow2",
+        "code_dir": "/srv/eqemu-validator-profiling/12e7336375981098334278ae68633a3d372cb17f",
+        "shared_lock": "/var/lib/eqemu-validator/worker.lock",
+        "socket": "/run/eqemu-validator-profiling.sock",
+        "state_dir": "/var/lib/eqemu-validator-profiling",
+        "submitter": "bump",
+        "user": "eqemu-validator",
+        "version": 1,
+        "worker_gid": 980,
+        "worker_uid": 995
+      },
+      "sha256": "3e17fcf34e3d3bc822881d167a188a80452838aef2c5fe9bdc86c7303f657cfc"
+    }
+  ],
+  "installed_unit_definitions": [
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-asan-v1.socket",
+      "settings": {
+        "Accept": [
+          "yes"
+        ],
+        "ListenStream": [
+          "/run/eqemu-validator-asan-v1.sock"
+        ],
+        "SocketGroup": [
+          "bump"
+        ],
+        "SocketMode": [
+          "0660"
+        ],
+        "SocketUser": [
+          "root"
+        ]
+      },
+      "sha256": "55a82d4b7b2cfe9eff1dfd2d4f374eb69c1cbeeb79a919bf0831835094efaf60",
+      "unit": "eqemu-validator-asan-v1.socket"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-asan-v1@.service",
+      "settings": {
+        "AppArmorProfile": [
+          "eqemu-validator-asan-v1"
+        ],
+        "CPUQuota": [
+          "200%"
+        ],
+        "ExecStart": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-asan-v1/6bcd71010acfc1ebe8ac1264f5b9b90537ab2d69/validation/worker/runtime.py serve --config /etc/eqemu-validator/asan-v1.json"
+        ],
+        "ExecStopPost": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-asan-v1/6bcd71010acfc1ebe8ac1264f5b9b90537ab2d69/validation/worker/runtime.py cleanup --config /etc/eqemu-validator/asan-v1.json"
+        ],
+        "Group": [
+          "eqemu-validator"
+        ],
+        "KillMode": [
+          "control-group"
+        ],
+        "MemoryMax": [
+          "6G"
+        ],
+        "MemorySwapMax": [
+          "0"
+        ],
+        "NoNewPrivileges": [
+          "yes"
+        ],
+        "ReadWritePaths": [
+          "/var/lib/eqemu-validator"
+        ],
+        "TasksMax": [
+          "64"
+        ],
+        "TimeoutStopSec": [
+          "15"
+        ],
+        "User": [
+          "eqemu-validator"
+        ],
+        "WorkingDirectory": [
+          "/var/lib/eqemu-validator"
+        ]
+      },
+      "sha256": "6d6793dcceff87fccf3401152a4fce6107b6abe289d59e34f3faceae6c3800e7",
+      "unit": "eqemu-validator-asan-v1@.service"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-asan-v2.socket",
+      "settings": {
+        "Accept": [
+          "yes"
+        ],
+        "ListenStream": [
+          "/run/eqemu-validator-asan-v2.sock"
+        ],
+        "SocketGroup": [
+          "bump"
+        ],
+        "SocketMode": [
+          "0660"
+        ],
+        "SocketUser": [
+          "root"
+        ]
+      },
+      "sha256": "352462d291ab1e9eaad72079cbe155c3ffda4b28c3b567bb4675cd54090f295d",
+      "unit": "eqemu-validator-asan-v2.socket"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-asan-v2@.service",
+      "settings": {
+        "AppArmorProfile": [
+          "eqemu-validator-asan-v2"
+        ],
+        "CPUQuota": [
+          "200%"
+        ],
+        "ExecStart": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-asan-v2/22f4ea6bf6070014e29bc4eb156b9c8a65dcb197/validation/worker/runtime.py serve --config /etc/eqemu-validator/asan-v2.json"
+        ],
+        "ExecStopPost": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-asan-v2/22f4ea6bf6070014e29bc4eb156b9c8a65dcb197/validation/worker/runtime.py cleanup --config /etc/eqemu-validator/asan-v2.json"
+        ],
+        "Group": [
+          "eqemu-validator"
+        ],
+        "KillMode": [
+          "control-group"
+        ],
+        "MemoryMax": [
+          "6G"
+        ],
+        "MemorySwapMax": [
+          "0"
+        ],
+        "NoNewPrivileges": [
+          "yes"
+        ],
+        "ReadWritePaths": [
+          "/var/lib/eqemu-validator"
+        ],
+        "TasksMax": [
+          "64"
+        ],
+        "TimeoutStopSec": [
+          "15"
+        ],
+        "User": [
+          "eqemu-validator"
+        ],
+        "WorkingDirectory": [
+          "/var/lib/eqemu-validator"
+        ]
+      },
+      "sha256": "f79cda7aa1e67982de3c962dc2037cd7de13d245d71bdbf1c5877b590a32531b",
+      "unit": "eqemu-validator-asan-v2@.service"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-asan-v3.socket",
+      "settings": {
+        "Accept": [
+          "yes"
+        ],
+        "ListenStream": [
+          "/run/eqemu-validator-asan-v3.sock"
+        ],
+        "SocketGroup": [
+          "bump"
+        ],
+        "SocketMode": [
+          "0660"
+        ],
+        "SocketUser": [
+          "root"
+        ]
+      },
+      "sha256": "693adb048255c919a7799d2cd077445bf40e3cc7e674c173da848916f0ad8f7d",
+      "unit": "eqemu-validator-asan-v3.socket"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-asan-v3@.service",
+      "settings": {
+        "AppArmorProfile": [
+          "eqemu-validator-asan-v3"
+        ],
+        "CPUQuota": [
+          "200%"
+        ],
+        "ExecStart": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-asan-v3/29c1e8457196c73ee19d8922d0ee913d3375098f/validation/worker/runtime.py serve --config /etc/eqemu-validator/asan-v3.json"
+        ],
+        "ExecStopPost": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-asan-v3/29c1e8457196c73ee19d8922d0ee913d3375098f/validation/worker/runtime.py cleanup --config /etc/eqemu-validator/asan-v3.json"
+        ],
+        "Group": [
+          "eqemu-validator"
+        ],
+        "KillMode": [
+          "control-group"
+        ],
+        "MemoryMax": [
+          "6G"
+        ],
+        "MemorySwapMax": [
+          "0"
+        ],
+        "NoNewPrivileges": [
+          "yes"
+        ],
+        "ReadWritePaths": [
+          "/var/lib/eqemu-validator"
+        ],
+        "TasksMax": [
+          "64"
+        ],
+        "TimeoutStopSec": [
+          "15"
+        ],
+        "User": [
+          "eqemu-validator"
+        ],
+        "WorkingDirectory": [
+          "/var/lib/eqemu-validator"
+        ]
+      },
+      "sha256": "b6ec72d146d8a67eda825d48f04d3ca79e2bed37762ad4ce49294b1f54fe8cd8",
+      "unit": "eqemu-validator-asan-v3@.service"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-maintenance.socket",
+      "settings": {
+        "Accept": [
+          "yes"
+        ],
+        "ListenStream": [
+          "/run/eqemu-validator-maintenance.sock"
+        ],
+        "SocketGroup": [
+          "1000"
+        ],
+        "SocketMode": [
+          "0660"
+        ],
+        "SocketUser": [
+          "root"
+        ]
+      },
+      "sha256": "d1cfc4f6470a0a7c0e7b29238a9dbb9407884a424b05aca9a5aa734946b77081",
+      "unit": "eqemu-validator-maintenance.socket"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-maintenance@.service",
+      "settings": {
+        "ExecStart": [
+          "/usr/bin/python3 -I -S /usr/local/lib/eqemu-validator-maintenance-v1/service.py"
+        ],
+        "Group": [
+          "root"
+        ],
+        "MemoryMax": [
+          "128M"
+        ],
+        "NoNewPrivileges": [
+          "yes"
+        ],
+        "ReadWritePaths": [
+          "/srv/eqemu-validator-code"
+        ],
+        "TasksMax": [
+          "8"
+        ],
+        "TimeoutStopSec": [
+          "5"
+        ],
+        "User": [
+          "root"
+        ]
+      },
+      "sha256": "91458720f876fa14fc62b66c722a34c993dc3c86961aa6b3d734bc53ffee05a2",
+      "unit": "eqemu-validator-maintenance@.service"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-profiling.socket",
+      "settings": {
+        "Accept": [
+          "yes"
+        ],
+        "ListenStream": [
+          "/run/eqemu-validator-profiling.sock"
+        ],
+        "SocketGroup": [
+          "1000"
+        ],
+        "SocketMode": [
+          "0660"
+        ],
+        "SocketUser": [
+          "root"
+        ]
+      },
+      "sha256": "04f7f0caaf447f478dcd3570bcfbc1861e0e7d306cc72f239f94d3832ef7175b",
+      "unit": "eqemu-validator-profiling.socket"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator-profiling@.service",
+      "settings": {
+        "AppArmorProfile": [
+          "eqemu-validator-profiling"
+        ],
+        "CPUQuota": [
+          "200%"
+        ],
+        "ExecStart": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-profiling/12e7336375981098334278ae68633a3d372cb17f/validation/worker/runtime.py serve --config /etc/eqemu-validator/profiling.json"
+        ],
+        "ExecStopPost": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-profiling/12e7336375981098334278ae68633a3d372cb17f/validation/worker/runtime.py cleanup --config /etc/eqemu-validator/profiling.json"
+        ],
+        "Group": [
+          "eqemu-validator"
+        ],
+        "KillMode": [
+          "control-group"
+        ],
+        "MemoryMax": [
+          "6G"
+        ],
+        "MemorySwapMax": [
+          "0"
+        ],
+        "NoNewPrivileges": [
+          "yes"
+        ],
+        "ReadWritePaths": [
+          "/var/lib/eqemu-validator-profiling /var/lib/eqemu-validator/worker.lock"
+        ],
+        "TasksMax": [
+          "64"
+        ],
+        "TimeoutStopSec": [
+          "15"
+        ],
+        "User": [
+          "eqemu-validator"
+        ],
+        "WorkingDirectory": [
+          "/var/lib/eqemu-validator-profiling"
+        ]
+      },
+      "sha256": "45ff275b3d3e976489ee86db8d868756bc01eaea064701cc1fcbd536885db15e",
+      "unit": "eqemu-validator-profiling@.service"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator.socket",
+      "settings": {
+        "Accept": [
+          "yes"
+        ],
+        "ListenStream": [
+          "/run/eqemu-validator.sock"
+        ],
+        "SocketGroup": [
+          "bump"
+        ],
+        "SocketMode": [
+          "0660"
+        ],
+        "SocketUser": [
+          "root"
+        ]
+      },
+      "sha256": "852f85a6a40bb6a3378501ec98233c06ccdea1ca704cd7c7060ba8f1560f99df",
+      "unit": "eqemu-validator.socket"
+    },
+    {
+      "definition": "/etc/systemd/system/eqemu-validator@.service",
+      "settings": {
+        "AppArmorProfile": [
+          "eqemu-validator"
+        ],
+        "CPUQuota": [
+          "200%"
+        ],
+        "ExecStart": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-code/validation/worker/runtime.py serve --config /etc/eqemu-validator/config.json"
+        ],
+        "ExecStopPost": [
+          "/usr/bin/python3 -I /srv/eqemu-validator-code/validation/worker/runtime.py cleanup --config /etc/eqemu-validator/config.json"
+        ],
+        "Group": [
+          "eqemu-validator"
+        ],
+        "KillMode": [
+          "control-group"
+        ],
+        "MemoryMax": [
+          "6G"
+        ],
+        "MemorySwapMax": [
+          "0"
+        ],
+        "NoNewPrivileges": [
+          "yes"
+        ],
+        "ReadWritePaths": [
+          "/var/lib/eqemu-validator"
+        ],
+        "TasksMax": [
+          "64"
+        ],
+        "TimeoutStopSec": [
+          "15"
+        ],
+        "User": [
+          "eqemu-validator"
+        ],
+        "WorkingDirectory": [
+          "/var/lib/eqemu-validator"
+        ]
+      },
+      "sha256": "32d84dd1302dda1857959b7918b79be6cc0fa1db8e6884f2072207ae4e4f3145",
+      "unit": "eqemu-validator@.service"
+    }
+  ],
+  "migration": {
+    "binding": {
+      "candidate": "e35d4513c44e5eacac796a36fd68cd30acb7706a",
+      "fixture_sha256": "cf71b70acf549328552b3c203d2760571cb40b4d816f8aaf0ee447629039c48c",
+      "name": "central-cdau-integration-v1.json",
+      "run_id": "461d7aad57cb41e8ade9e7e1afcc1ab3",
+      "version": 1
+    },
+    "external_receipt_binding": {
+      "observation_sha256": "07e1226c4dbe8e923f97037216abf806284ff078f35bbfe4ad23f014dcb472ea",
+      "observed_in_protected_files": false,
+      "payload_sha256": "46465bd9d7a68517e7571d40be3ab9118ed8e58198308a93bdfdf5fcec6be4ba",
+      "provenance": "compiled-reviewed-trusted-worker-observation",
+      "server_tree": "f288d612781a4ceb9d8595f4d36d797c863080b1"
+    },
+    "frontend_job": {
+      "cleanup_complete": null,
+      "job_id": "02fee8be02e5453b8f0f096577dfdf74",
+      "returncode": 2
+    },
+    "observed_records": {
+      "directory": {
+        "bytes": 4096,
+        "device": 66306,
+        "gid": 980,
+        "inode": 44838093,
+        "mode": 448,
+        "uid": 995
+      },
+      "files": {
+        "central-cdau-integration-v1.json": {
+          "bytes": 0,
+          "device": 66306,
+          "gid": 980,
+          "inode": 44838094,
+          "mode": 384,
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+          "uid": 995
+        },
+        "pending.json": {
+          "bytes": 239,
+          "device": 66306,
+          "gid": 980,
+          "inode": 44838095,
+          "mode": 384,
+          "sha256": "4ed628722c0c858d0f32550a062403a8dfc0f8f7d40692f10c14a05e46dd7ce1",
+          "uid": 995
+        },
+        "receipt.json": {
+          "bytes": 576,
+          "device": 66306,
+          "gid": 980,
+          "inode": 44838088,
+          "mode": 384,
+          "sha256": "9cd97340da60ceccbb1c435ecc7a68042fe3a9b4f03fc924b9bbb4cbea47679f",
+          "uid": 995
+        }
+      }
+    },
+    "original_outcome": {
+      "client_durable": false,
+      "complete": false,
+      "error": "integration-incomplete",
+      "execution": {
+        "database_cleanup": true,
+        "native_cleanup": "not-run",
+        "validator_exit_code": 2,
+        "vm_cleanup": true,
+        "workload_exit_code": 2
+      },
+      "original_transfer": "uncertain"
+    },
+    "provenance": "Retained Brian-supplied root read-only audit transcription. Not a fresh protected-file read. Revalidate exact contents and ownership through the reviewed adoption flow before migration.",
+    "receipt_path": "/home/bump/.local/state/eqemu-cdau-integration-prep/20261104-source/ROOT-REPORTED-02FEE-AUDIT-AND-V6.json",
+    "receipt_sha256": "3b90f7f15479588e11a6ccb0aaeb73f7c4b90bc50f2200917940545791f039d3",
+    "requirements": [
+      "Preserve original bytes and outcome as a sealed failed generation with provenance.",
+      "Record recovery as a separate operation and generation.",
+      "The external tree/payload binding is not a field observed inside the three protected files.",
+      "Do not infer native cleanup from VM/database cleanup.",
+      "Root-private current state and unit/cgroup membership remain adoption-time checks."
+    ],
+    "workspace": "/var/lib/eqemu-validator/last-integration"
+  },
+  "observations": {
+    "fresh_public_reads": [
+      "19 exact regular-file bytes/SHA256/metadata, matched retained public receipt",
+      "installed unit definitions and absence of matching .d/*.conf in /etc,/run,/usr/lib",
+      "five sanitized configuration projections",
+      "NSS account name/UID/GID"
+    ],
+    "not_performed": [
+      "root probe",
+      "service-manager request",
+      "live process/cgroup inspection",
+      "protected workspace read",
+      "service activation",
+      "candidate workload"
+    ],
+    "runtime_status": "Ordinary socket last reported inactive under maintenance HOLD; no fresh runtime status observation."
+  },
+  "prepared_at_utc": "2026-11-06T02:56:08.158275+00:00",
+  "purpose": "Current external facts and approved initial target scope for the fresh implementation. No inherited implementation prescriptions.",
+  "remaining_adoption_facts": [
+    "Current root-private workspace bytes must match the retained binding, or migration refuses for review.",
+    "Current named systemd instances/cgroup membership and fencing must be established at adoption or operation time.",
+    "The new executor policy, store and selected initial generation are established by the separately reviewed root-adoption package."
+  ],
+  "runtime_identity": {
+    "basis": "Installed service User/Group plus configuration worker_uid/worker_gid and NSS, not file ownership",
+    "gid": 980,
+    "group": "eqemu-validator",
+    "uid": 995,
+    "user": "eqemu-validator"
+  },
+  "schema": 1,
+  "scope": "central-016p-current-enrollment-v1",
+  "submitter_identity": {
+    "gid": 1000,
+    "same_uid_trust_domain": true,
+    "uid": 1000,
+    "user": "bump"
+  },
+  "unit_dropins_observed": []
+}

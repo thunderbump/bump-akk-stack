@@ -1,0 +1,145 @@
+--- baseline/validation/worker/runtime.py
++++ managed/validation/worker/runtime.py
+@@ -25,6 +25,12 @@
+ from guest import user_data, build_user_data, format_user_data, quick_user_data, BUILD_CHECKS
+ 
+ CONFIG = Path('/etc/eqemu-validator/config.json')
++ROOT_UID = 0
++ORDINARY_STATE = Path('/var/lib/eqemu-validator/ordinary')
++SHARED_LOCK = Path('/var/lib/eqemu-validator/worker.lock')
++MANAGED_LINK = Path('/srv/eqemu-validator-code')
++MANAGED_ROOT = Path('/var/lib/eqemu-resilient-targets/validator-worker-code')
++FRESH_MARKER = '.rootops-fresh.json'
+ QEMU = '/usr/bin/qemu-system-x86_64'
+ QEMU_IMG = '/usr/bin/qemu-img'
+ GENISOIMAGE = '/usr/bin/genisoimage'
+@@ -59,7 +65,7 @@
+         raise ValueError('Unsupported absolute path')
+     for parent in (*reversed(path.parents), path):
+         info = parent.lstat()
+-        if info.st_uid != 0 or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
++        if info.st_uid != ROOT_UID or info.st_mode & 0o022 or stat.S_ISLNK(info.st_mode):
+             raise ValueError('Expected root-owned nonwritable input: ' + str(parent))
+     if not stat.S_ISREG(path.lstat().st_mode):
+         raise ValueError('Expected regular input: ' + str(path))
+@@ -68,7 +74,7 @@
+ 
+ def config(path=CONFIG):
+     value = read_json(root_file(path))
+-    required = {'version', 'user', 'worker_uid', 'worker_gid', 'state_dir', 'code_dir', 'submitter', 'socket', 'base_image'}
++    required = {'version', 'user', 'worker_uid', 'worker_gid', 'state_dir', 'code_dir', 'submitter', 'socket', 'base_image', 'shared_lock', 'managed_binding'}
+     if set(value) != required or type(value['version']) is not int or value['version'] != 1:
+         raise ValueError('Unsupported worker configuration')
+     for key in ('state_dir', 'code_dir', 'socket', 'base_image'):
+@@ -82,9 +88,64 @@
+     info = state.lstat()
+     if not stat.S_ISDIR(info.st_mode) or info.st_uid != account.pw_uid or stat.S_IMODE(info.st_mode) != 0o700:
+         raise ValueError('Worker state must be a private owned directory')
+-    if state.resolve() != state or Path(value['code_dir']).resolve() != Path(value['code_dir']):
+-        raise ValueError('Worker paths must not traverse symlinks')
++    if (state != ORDINARY_STATE or state.resolve() != state
++            or value['shared_lock'] != str(SHARED_LOCK) or value['managed_binding'] != 'sealed-worker-v1'):
++        raise ValueError('Unexpected managed worker state/lock selection')
++    managed_code(value['code_dir'])
+     return value
++
++
++def managed_code(selected):
++    """Only the fixed protected root-managed binding may traverse a symlink."""
++    path = Path(selected)
++    if path != MANAGED_LINK or not path.is_symlink():
++        raise ValueError('Expected managed worker binding')
++    info = path.lstat()
++    resolved = path.resolve(strict=True)
++    if (info.st_uid != ROOT_UID or os.readlink(path) != str(resolved)
++            or resolved.parent != MANAGED_ROOT/'releases'
++            or not re.fullmatch('[a-f0-9]{64}', resolved.name)):
++        raise ValueError('Unexpected managed worker release')
++    for directory in (path.parent, *path.parent.parents, resolved, *resolved.parents):
++        info = directory.lstat()
++        if not stat.S_ISDIR(info.st_mode) or info.st_uid != ROOT_UID or info.st_mode & 0o022:
++            raise ValueError('Unprotected managed binding ancestor')
++    current = read_json(root_file(MANAGED_ROOT/'current.json'))
++    if current.get('release') != resolved.name:
++        raise ValueError('Managed binding/current generation disagree')
++    if Path(__file__).resolve().parents[2] != resolved:
++        raise ValueError('Worker entry point differs from managed generation')
++    return resolved
++
++
++def integration_intake(state):
++    """A root-created clean slot is consumed; dirty/uncertain evidence refuses."""
++    directory = Path(state)/'last-integration'
++    if not directory.exists() and not directory.is_symlink():
++        return
++    if directory.is_symlink() or not directory.is_dir():
++        raise ValueError('Unexpected integration slot')
++    if {p.name for p in directory.iterdir()} == {FRESH_MARKER}:
++        marker = directory/FRESH_MARKER
++        info = marker.lstat()
++        if (not stat.S_ISREG(info.st_mode) or info.st_uid != ROOT_UID
++                or info.st_nlink != 1 or stat.S_IMODE(info.st_mode) != 0o644):
++            raise ValueError('Untrusted integration clean-slot marker')
++        data = read_json(marker, limit=512)
++        if (set(data) != {'version','workspace','generation'} or data['version'] != 1
++                or data['workspace'] != str(directory) or type(data['generation']) is not int
++                or data['generation'] < 1):
++            raise ValueError('Invalid integration clean-slot marker')
++        marker.unlink()
++        directory.rmdir()
++        fd = os.open(state, os.O_RDONLY|os.O_DIRECTORY)
++        try: os.fsync(fd)
++        finally: os.close(fd)
++        return
++    from integration_artifacts import retained
++    _, receipt = retained(directory)
++    if receipt['original_transfer'] != 'durable':
++        raise ValueError('integration-previous-transfer-uncertain')
+ 
+ 
+ def service_cgroup():
+@@ -196,7 +257,15 @@
+ 
+ 
+ def acquire(value):
+-    fd = os.open(Path(value['state_dir']) / 'worker.lock', os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
++    if value.get('shared_lock') != str(SHARED_LOCK):
++        raise ValueError('Unexpected shared worker lock')
++    fd = os.open(SHARED_LOCK, os.O_RDWR | os.O_NOFOLLOW)
++    info = os.fstat(fd)
++    if (not stat.S_ISREG(info.st_mode) or info.st_uid != value['worker_uid']
++            or info.st_gid != value['worker_gid'] or stat.S_IMODE(info.st_mode) != 0o600
++            or info.st_nlink != 1):
++        os.close(fd)
++        raise ValueError('Untrusted shared worker lock')
+     try:
+         fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+     except BaseException:
+@@ -521,10 +590,11 @@
+ def implementation_identity(value):
+     """Digest the finite reviewed worker implementation, independent of candidate inputs."""
+     from integration_artifacts import installed_inventory
+-    installed_inventory(Path(value['code_dir']))
++    code = managed_code(value['code_dir'])
++    installed_inventory(code)
+     digests = {}
+     for name in IMPLEMENTATION_FILES:
+-        with (Path(value['code_dir']) / name).open('rb') as stream:
++        with (code / name).open('rb') as stream:
+             digests[name] = hashlib.file_digest(stream, 'sha256').hexdigest()
+     return hashlib.sha256(json.dumps(digests, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+ 
+@@ -577,11 +647,8 @@
+         atomic_json(active, active_record)
+         job.mkdir(mode=0o700); scratch = job / 'scratch'; scratch.mkdir(mode=0o700)
+         if build is not None and build.get('integration'):
+-            from integration_artifacts import Sink, retained
+-            if (state/'last-integration').exists():
+-                _, previous_receipt = retained(state/'last-integration')
+-                if previous_receipt['original_transfer'] != 'durable':
+-                    raise ValueError('integration-previous-transfer-uncertain')
++            from integration_artifacts import Sink
++            integration_intake(state)
+             integration_sink = Sink(job/'integration', build['candidate'], run_id)
+         deadline = time.monotonic() + (BUILD_SECONDS if build is not None else 3600 if quick is not None else FORMAT_SECONDS if formatting is not None else SECONDS)
+         base = root_file(value['base_image'])
