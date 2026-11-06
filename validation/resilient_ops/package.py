@@ -20,6 +20,8 @@ MAX_ASSET = 1024 * 1024
 MAX_PACKAGE = 4 * MAX_ASSET
 ASSETS = ('engine.py', 'client.py', 'service.py', 'package.py',
           'host.py', 'adopt.py', 'enrollment-contract.json',
+          'transition.py','bootstrap.py','ordinary-runtime.py','ordinary-runtime-baseline.py',
+          'ordinary-apparmor-baseline','integration-release-baseline.json','ordinary-runtime.patch','worker-release.json','ordinary-unit','ordinary-config.json','ordinary-apparmor',
           'eqemu-resilient-ops.socket', 'eqemu-resilient-ops@.service')
 UNITS = ASSETS[-2:]
 HEX = re.compile(r'[a-f0-9]{64}\Z')
@@ -254,6 +256,23 @@ def prepare(source, output, policy_path=None, expected_assets=None):
             'rollback_argv': common + ['rollback', '--release', 'REVIEWED_PREVIOUS_MANIFEST_SHA256', '--expected-active', manifest_hash],
             'uninstall_argv': common + ['uninstall', '--expected-active', manifest_hash],
             'install_command': shlex.join(common + ['install', '--package', str(output), '--expected-manifest', manifest_hash, '--expected-active', 'absent'])}
+    bootstrap_hash = digest(assets['bootstrap.py'])
+    bootstrap = '/usr/local/libexec/eqemu-resilient-ops-bootstrap-' + bootstrap_hash + '.py'
+    release = '/usr/lib/eqemu-resilient-ops/releases/' + manifest_hash
+    result['bootstrap_sha256'] = bootstrap_hash
+    result['bootstrap_root_recipe'] = [
+        ['/usr/bin/install','-o','root','-g','root','-m','0600','--',str(output/'bootstrap.py'),bootstrap],
+        ['/usr/bin/sha256sum','--',bootstrap],
+        ['/usr/bin/python3','-I',bootstrap,'--expected-bootstrap',bootstrap_hash,
+         '--package',str(output),'--expected-manifest',manifest_hash],
+        ['/usr/bin/sha256sum','--',operator]]
+    result['verify_argv'] = common + ['verify','--package',str(output),'--expected-manifest',manifest_hash,'--expected-active',manifest_hash]
+    result['adoption_argv'] = ['/usr/bin/python3','-I',release+'/adopt.py','--expected-operator',
+                              digest(assets['adopt.py']),'--confinement-reviewed',
+                              '--state-manifest','/root/eqemu-rootops-state-selection.json',
+                              '--expected-state-manifest','EXTERNALLY_REVIEWED_PRIVATE_STATE_SELECTION_SHA256']
+    result['confinement_argv'] = ['/usr/sbin/apparmor_parser','--replace','/etc/apparmor.d/eqemu-validator']
+    result['rollback_limit'] = 'Package rollback cannot undo host adoption. Retained original authority bytes and state are evidence, not an automatic reinstall recipe. Publisher masks must remain until a separately reviewed namespace rollback. Do not run any old publisher against adopted sealed releases.'
     if policy_path is not None:
         policy_path = Path(policy_path).absolute()
         policy_raw = read_regular(policy_path, 65536)
@@ -430,10 +449,10 @@ def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--expected-operator', required=True)
     commands = parser.add_subparsers(dest='action', required=True)
-    for action in ('install', 'upgrade', 'rollback', 'uninstall'):
+    for action in ('install', 'upgrade', 'rollback', 'uninstall', 'verify'):
         command = commands.add_parser(action)
         command.add_argument('--expected-active', required=True)
-        if action in ('install', 'upgrade'):
+        if action in ('install', 'upgrade','verify'):
             command.add_argument('--package', type=Path, required=True)
             command.add_argument('--expected-manifest', required=True)
         if action == 'rollback':
@@ -451,6 +470,14 @@ def main(argv=None):
         raise ValueError('operator hash mismatch')
     instance = Operator()
     action = args.pop('action')
+    if action == 'verify':
+        load_package(args['package'], args['expected_manifest'])
+        if instance.active() != args['expected_active'] or args['expected_active'] != args['expected_manifest']:
+            raise ValueError('selected installed package differs')
+        instance.verify_release(args['expected_manifest'])
+        instance.check_units(args['expected_manifest'])
+        print(json.dumps({'verified':args['expected_manifest'],'activation_performed':False}))
+        return
     result = instance.enroll(args['policy'], args['expected_policy']) if action == 'enroll' else instance.apply(action, **args)
     print(json.dumps(result, sort_keys=True))
 

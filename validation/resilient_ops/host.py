@@ -26,7 +26,7 @@ SERVICE_UID, SERVICE_GID = 995, 980
 CODE_ROOT = Path('/var/lib/eqemu-resilient-targets/validator-worker-code')
 WORKSPACE_ROOT = Path('/var/lib/eqemu-resilient-targets/validator-integration-evidence')
 BINDING = Path('/srv/eqemu-validator-code')
-WORKSPACE = Path('/var/lib/eqemu-validator/last-integration')
+WORKSPACE = Path('/var/lib/eqemu-validator/ordinary/last-integration')
 SHARED_LOCK = Path('/var/lib/eqemu-validator/worker.lock')
 CGROUP_ROOT = Path('/sys/fs/cgroup')
 FILES = (
@@ -261,11 +261,11 @@ class HostManager:
         # Never start services, including the competing root publisher.
         self._quiescent(target)
         for socket in SOCKETS:
-            if socket != ORDINARY_SOCKET and before.get(socket, {}).get('active') == 'active':
+            if socket not in (ORDINARY_SOCKET, SOCKETS[-1]) and before.get(socket, {}).get('active') == 'active':
                 self._run(['start', socket], target['timeout'])
         after = self.observe(target)
         for socket in SOCKETS:
-            expected = 'active' if socket != ORDINARY_SOCKET and before.get(socket, {}).get('active') == 'active' else 'inactive'
+            expected = 'active' if socket not in (ORDINARY_SOCKET, SOCKETS[-1]) and before.get(socket, {}).get('active') == 'active' else 'inactive'
             if after[socket]['active'] != expected:
                 raise Rejected('socket restoration failed')
         self._fenced = False

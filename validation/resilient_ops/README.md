@@ -35,7 +35,7 @@ allocates a fresh empty workspace for subsequent separately authorized work.
 Host code recovery restores the established prior sealed binding and does not
 allocate a workspace. Host recovery durably carries the original ingress state
 through linked interruptions and restores previously active diagnostic, profiling
-and maintenance sockets after safe recovery. It never restarts accepted service
+sockets after safe recovery. The old maintenance publisher stays retired. It never restarts accepted service
 instances. The ordinary socket remains inactive under the maintenance HOLD.
 Host deployment preserves other socket activation state with the same HOLD
 exception; fixture deployment preserves unit activation state. Failed health compensation remains a failed deployment.
@@ -76,3 +76,64 @@ enable or start units. Enrollment is a separate hash-pinned root action for
 fresh dedicated roots. Policy expansion and executor upgrades cannot be
 requested through the automation protocol. No root action is authorized merely
 by preparing the package.
+
+## Host compatibility successor
+
+R3 accepted only commit 24a0fd6 and source-v4. This successor requires fresh
+review. It packages the exact 19-file installed baseline and an explicit
+ordinary-runtime.patch, rather than promoting the combined repository worker.
+Only runtime.py and its integration-release.json data binding change.
+The latter records root-owned mode0644 sealed files and the changed runtime
+hash. Existing recipes/implementation identities do not match this release.
+
+ordinary-config.json selects private UID995:GID980/mode0700
+/var/lib/eqemu-validator/ordinary and the explicit existing common
+/var/lib/eqemu-validator/worker.lock. The parent becomes root-owned0711 only
+inside the fenced finite adoption transition; the leaf remains995:980/0600.
+ASan and profiling roots/code/config/caps/profiles are unchanged. Ordinary
+serve and ExecStopPost retain the existing launcher. The proposed ordinary
+worker accepts only that root-owned symlink into a protected hash-named managed
+release matching current.json and its own resolved entry point.
+
+ordinary-unit changes only working directory and writable paths.
+ordinary-apparmor grants read access to the physical managed code/current
+binding and limits ordinary writes to its state child and common lock.
+No unconfined execution or additional worker resource authority is introduced.
+The exact profile still requires separate root loading and effective admission;
+an acknowledgment flag is not proof of loaded confinement.
+
+Adoption now requires a separately reviewed private selection JSON and its
+SHA256. Its exact shape is {"version":1,"entries":[...],"records":{...}}.
+Entries must enumerate the current parent exactly, at most16 names, restricted
+to worker.lock, last-integration, three ASan children, last-result.json and
+last-serial.log. Each present last-result/serial requires exact bytes and SHA256
+in records, at most1MiB each, owned995:980/mode0600. Active markers, job
+directories, unknown entries, existing ordinary child or changed protected
+facts refuse and retain adoption intent. Current private data is not invented.
+
+The transition archives selected bytes and original ordinary unit/config/profile
+and publisher units in protected custody; copies only selected records and the
+three verified legacy evidence files into the new state; leaves old data
+in place; and converts only the parent directory custody. It masks the old
+publisher socket AND service template after fencing and retains their bytes.
+Subsequent operations never restore publisher ingress. No automatic rollback
+reinstalls publisher authority into the adopted namespace.
+
+Recovery seals old history and allocates a root-authored .rootops-fresh.json
+marker. The actual proposed worker intake consumes only a valid otherwise-empty
+marked slot. Unmarked empty, malformed, dirty or uncertain retained collections
+refuse. No ACK or successful historical result is fabricated.
+
+Preparation prints a bounded bootstrap recipe: a normal authorized root terminal
+stages the hash-named bootstrap with /usr/bin/install, externally compares its
+sha256sum, runs it to stage only manifest-pinned package.py, and externally
+verifies that operator. NoNewPrivs callers use the installed protocol; they do
+not execute this root bootstrap. Exact selected-package install/verify argv and
+adoption executable/hash are printed. The private state-selection hash is an
+external fact still required, never a guessed selected-package token.
+
+Rollback/uninstall of executor packaging does not undo host custody/adoption.
+Original assets are preserved evidence, not an authorized automatic rollback.
+Effective systemd/cgroup ownership, loaded AppArmor and private selection remain
+separate bounded root prerequisites. No installation, profile loading, service
+activation or workload has been performed by source/package preparation.

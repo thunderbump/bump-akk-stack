@@ -59,7 +59,7 @@ def verified_files(root, entries):
     return result
 
 
-def apply(expected_operator, confinement_reviewed):
+def apply(expected_operator, confinement_reviewed, state_manifest, expected_state_manifest):
     # Check ancestors and every dependency before importing privileged helpers.
     here = Path(__file__).resolve().parent
     for path in (here, *here.parents):
@@ -84,7 +84,9 @@ def apply(expected_operator, confinement_reviewed):
         raise ValueError('reviewed root adoption operator required')
     if not confinement_reviewed:
         raise ValueError('administrative requirement: separately review confinement and fixed launcher compatibility')
+    from transition import manifest_data, prepare_state, release_bytes
     packet=contract()
+    selected_state=manifest_data(state_manifest, expected_state_manifest)
     policy=policy_for(packet)
     store=Path('/var/lib/eqemu-resilient-ops')
     protected(store,0)
@@ -111,15 +113,22 @@ def apply(expected_operator, confinement_reviewed):
     code=policy['targets']['validator-worker-code']
     before=manager.observe(code)
     manager.stop(code)
-    # guard is a fixed existing worker.lock. No force-unlock or inode replacement.
+    original=Path('/srv/eqemu-validator-code')
+    if original.is_symlink() or not original.is_dir():
+        raise ValueError('initial code binding must be original reviewed directory')
+    verified_files(original,packet['current_code']['fresh_files'])
+    legacy_workspace=Path(packet['migration']['workspace'])
+    legacy_entries=[dict(info,path=name) for name,info in packet['migration']['observed_records']['files'].items()]
+    legacy_bytes=verified_files(legacy_workspace,legacy_entries)
+    for name, info in packet['migration']['observed_records']['files'].items():
+        st=(legacy_workspace/name).lstat()
+        if (st.st_uid,st.st_gid,stat.S_IMODE(st.st_mode))!=(info['uid'],info['gid'],info['mode']):
+            raise ValueError('retained workspace ownership differs; preserve for review')
+    release=release_bytes(here,packet)
+    prepare_state(manager,code,here,packet,legacy_bytes,selected_state)
     with manager.guard(code):
-        original=Path('/srv/eqemu-validator-code')
-        if original.is_symlink() or not original.is_dir():
-            raise ValueError('initial code binding must be original reviewed directory')
-        release_bytes=verified_files(original,packet['current_code']['fresh_files'])
-        workspace=Path(packet['migration']['workspace'])
-        legacy_entries=[dict(info,path=name) for name,info in packet['migration']['observed_records']['files'].items()]
-        legacy_bytes=verified_files(workspace,legacy_entries)
+        release_bytes=release
+        workspace=Path('/var/lib/eqemu-validator/ordinary/last-integration')
         # Historical metadata is revalidated; no inference from missing cleanup/ACK.
         for name,info in packet['migration']['observed_records']['files'].items():
             st=(workspace/name).lstat()
@@ -182,8 +191,10 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--expected-operator',required=True)
     parser.add_argument('--confinement-reviewed',action='store_true')
+    parser.add_argument('--state-manifest',type=Path,required=True)
+    parser.add_argument('--expected-state-manifest',required=True)
     args=parser.parse_args()
-    print(json.dumps(apply(args.expected_operator,args.confinement_reviewed),sort_keys=True))
+    print(json.dumps(apply(args.expected_operator,args.confinement_reviewed,args.state_manifest,args.expected_state_manifest),sort_keys=True))
 
 
 if __name__=='__main__':

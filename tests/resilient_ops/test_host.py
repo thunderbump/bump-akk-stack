@@ -26,7 +26,7 @@ class HostTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.base = Path(self.temp.name)
         for name, relative in [('CODE_ROOT', 'managed/code'), ('WORKSPACE_ROOT', 'managed/evidence'),
-                               ('BINDING', 'srv/code'), ('WORKSPACE', 'state/last-integration'),
+                               ('BINDING', 'srv/code'), ('WORKSPACE', 'state/ordinary/last-integration'),
                                ('SHARED_LOCK', 'state/worker.lock'), ('CGROUP_ROOT', 'cgroup')]:
             path = self.base / relative
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -67,6 +67,8 @@ class HostTests(unittest.TestCase):
 
     def run_systemctl(self, args, timeout):
         self.calls.append(args)
+        if args == ['daemon-reload']:
+            return b''
         if args[0] == 'list-units':
             self.assertEqual(args[1:4], ['--all', '--plain', '--no-legend'])
             return ''.join(u + ' loaded active running fixture\n' for u in self.instances).encode()
@@ -139,7 +141,7 @@ class HostTests(unittest.TestCase):
 
     def test_adoption_stop_before_guard_publisher_stop_only_restore_diagnostics(self):
         publisher = self.instance(h.PUBLISHER)
-        self.sockets[h.SOCKETS[1]] = self.sockets[h.SOCKETS[-1]] = 'active'
+        self.sockets[h.SOCKETS[1]] = self.sockets[h.SOCKETS[4]] = 'active'
         before = self.manager.observe(self.target)
         self.manager.stop(self.target)
         with self.manager.guard(self.target):
@@ -147,7 +149,7 @@ class HostTests(unittest.TestCase):
         effects = [c for c in self.calls if c[0] in ('start', 'stop')]
         self.assertEqual(effects[:6], [['stop', s] for s in h.SOCKETS])
         self.assertIn(['stop', publisher], effects)
-        self.assertEqual([c for c in effects if c[0] == 'start'], [['start', h.SOCKETS[1]], ['start', h.SOCKETS[-1]]])
+        self.assertEqual([c for c in effects if c[0] == 'start'], [['start', h.SOCKETS[1]], ['start', h.SOCKETS[4]]])
         self.assertEqual(self.sockets[h.ORDINARY_SOCKET], 'inactive')
 
     def test_lock_preserves_inode_and_bytes_busy_missing_symlink(self):
@@ -410,6 +412,7 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
         originals = {name: ('failed fixture '+name).encode() for name in target['files']}
         for name, raw in originals.items():
             (h.WORKSPACE/name).write_bytes(raw)
+            (h.WORKSPACE/name).chmod(0o600)
         # Run the actual adoption entry point in a mapped filesystem. Its real
         # record construction and sealing must carry pre-fence ingress into
         # Engine recovery, without fabricating a legacy operation in the test.
@@ -433,6 +436,12 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
                                           recovery_of=linked), peer)['plan_id']
             def execute(pid, oid):
                 return engine.handle(dict(method='execute', plan_id=pid, operation_id=oid), peer)
+            worker_spec=importlib.util.spec_from_file_location('adopted_worker',h.BINDING/'validation/worker/runtime.py')
+            worker=importlib.util.module_from_spec(worker_spec)
+            worker_spec.loader.exec_module(worker)
+            worker.ROOT_UID=os.getuid()
+            with self.assertRaises(ValueError):
+                worker.integration_intake(h.WORKSPACE.parent)
             pid = prepare('legacy-recovery', legacy['operation_id'])
             if interrupt:
                 class Interrupted(BaseException): pass
@@ -451,10 +460,15 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             self.assertEqual((h.WORKSPACE_ROOT/'evidence/0/original-operation.json').read_bytes(), legacy_bytes)
             for name, raw in originals.items():
                 self.assertEqual((h.WORKSPACE_ROOT/'evidence/0/workspace'/name).read_bytes(), raw)
-            self.assertEqual(list(h.WORKSPACE.iterdir()), [])
+            self.assertEqual({p.name for p in h.WORKSPACE.iterdir()}, {'.rootops-fresh.json'})
             self.assertEqual(self.sockets[h.SOCKETS[1]], 'active')
             self.assertEqual(self.sockets[h.SOCKETS[4]], 'active')
             self.assertEqual(self.sockets[h.ORDINARY_SOCKET], 'inactive')
+
+            # Actual next-worker intake consumes only the root allocation marker.
+            worker.integration_intake(h.WORKSPACE.parent)
+            self.assertFalse(h.WORKSPACE.exists())
+            self.assertEqual((h.WORKSPACE_ROOT/'evidence/0/original-operation.json').read_bytes(),legacy_bytes)
 
             # A separately prepared publication preserves the restored ingress.
             pid = engine.handle(dict(method='prepare', request_id='next-code', target=code_id,
@@ -482,16 +496,21 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
         packet['installed_configs'] = []
         h.BINDING.mkdir()
         entries = []
+        import base64
+        artifact = package.decode((SOURCE/'worker-release.json').read_bytes())
         for name in h.FILES:
             path = h.BINDING/name
             path.parent.mkdir(parents=True, exist_ok=True)
-            raw = ('code fixture '+name).encode()
+            raw = ((SOURCE/'ordinary-runtime-baseline.py').read_bytes() if name == 'validation/worker/runtime.py' else (SOURCE/'integration-release-baseline.json').read_bytes() if name == 'integration-release.json' else base64.b64decode(artifact[name]))
             path.write_bytes(raw)
             entries.append(dict(path=name, bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest()))
         packet['current_code']['fresh_files'] = entries
-        packet['migration']['workspace'] = str(h.WORKSPACE)
+        old_workspace = h.SHARED_LOCK.parent/'last-integration'
+        os.rename(h.WORKSPACE, old_workspace)
+        h.WORKSPACE.parent.rmdir()
+        packet['migration']['workspace'] = str(old_workspace)
         for name, raw in originals.items():
-            info = (h.WORKSPACE/name).lstat()
+            info = (old_workspace/name).lstat()
             packet['migration']['observed_records']['files'][name] = dict(
                 bytes=len(raw), sha256=hashlib.sha256(raw).hexdigest(),
                 uid=info.st_uid, gid=info.st_gid, mode=stat.S_IMODE(info.st_mode))
@@ -503,6 +522,7 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             '/srv/eqemu-validator-code': h.BINDING,
             '/etc/eqemu-resilient-ops/policy.json': self.base/'configuration/policy.json',
             '/srv/eqemu-resilient-adoption': self.base/'backup',
+            '/var/lib/eqemu-validator/ordinary/last-integration': h.WORKSPACE,
         }
         class RootPath(type(Path())):
             def lstat(path, *args, **kw):
@@ -516,8 +536,35 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             return RootPath(paths.get(str(value), value))
         real_engine = core.Engine
         operator = release/'adopt.py'
-        with patch.object(adoption, '__file__', str(operator)), patch.object(adoption, 'Path', mapped_path), patch.object(adoption, 'contract', return_value=packet), patch.object(adoption, 'policy_for', return_value=policy), patch.object(adoption.os, 'geteuid', return_value=0), patch.object(core, 'Engine', side_effect=lambda *a, **kw: real_engine(*a, **kw, trusted_uid=os.getuid())), patch.object(h, 'HostManager', return_value=self.manager):
-            result = adoption.apply(hashlib.sha256(operator.read_bytes()).hexdigest(), True)
+        import transition
+        from contextlib import ExitStack
+        h.SHARED_LOCK.parent.chmod(0o700)
+        fixtures = {'PARENT':h.SHARED_LOCK.parent,'STATE':h.WORKSPACE.parent,
+                    'OLD_WORKSPACE':old_workspace,'BACKUP':self.base/'backup',
+                    'CONFIG':self.base/'configuration/config.json',
+                    'UNIT':self.base/'units/ordinary.service','PROFILE':self.base/'profile',
+                    'PUBLISHER_UNITS':(self.base/'units/legacy.socket',self.base/'units/legacy@.service'),
+                    'TRUSTED_UID':os.getuid(),'WORKER_UID':os.getuid(),'WORKER_GID':os.getgid()}
+        for path in (fixtures['CONFIG'],fixtures['UNIT'],fixtures['PROFILE'],*fixtures['PUBLISHER_UNITS']):
+            path.parent.mkdir(parents=True,exist_ok=True)
+            path.write_bytes((SOURCE/'ordinary-apparmor-baseline').read_bytes() if path==fixtures['PROFILE'] else b'original authority')
+        selection={'version':1,'entries':sorted(p.name for p in h.SHARED_LOCK.parent.iterdir()),'records':{}}
+        selection_path=self.base/'selection.json'
+        selection_path.write_bytes(package.encode(selection))
+        with ExitStack() as stack:
+            for key,value in fixtures.items():
+                stack.enter_context(patch.object(transition,key,value))
+            stack.enter_context(patch.object(adoption,'__file__',str(operator)))
+            stack.enter_context(patch.object(adoption,'Path',mapped_path))
+            stack.enter_context(patch.object(adoption,'contract',return_value=packet))
+            stack.enter_context(patch.object(adoption,'policy_for',return_value=policy))
+            stack.enter_context(patch.object(adoption.os,'geteuid',return_value=0))
+            stack.enter_context(patch.object(core,'Engine',side_effect=lambda *a,**kw:real_engine(*a,**kw,trusted_uid=os.getuid())))
+            stack.enter_context(patch.object(h,'HostManager',return_value=self.manager))
+            result=adoption.apply(hashlib.sha256(operator.read_bytes()).hexdigest(),True,selection_path,hashlib.sha256(selection_path.read_bytes()).hexdigest())
+        self.assertTrue(all(path.is_symlink() and os.readlink(path)=='/dev/null' for path in fixtures['PUBLISHER_UNITS']))
+        self.assertEqual((fixtures['BACKUP']/'custody/legacy.socket').read_bytes(),b'original authority')
+        self.assertEqual(stat.S_IMODE(h.SHARED_LOCK.parent.stat().st_mode),0o711)
         self.assertTrue(result['adopted'])
         self.assertFalse(result['activation_performed'])
         self.assertTrue((store/'host-adoption-result.json').is_file())

@@ -537,7 +537,7 @@ class Engine:
             self.step(op, path, 'retire', retire)
             fresh = workspace if 'host_contract' in target else root/'workspaces'/str(previous.get('workspace_generation', 0)+1)
             op['fresh_workspace'] = {'generation': previous.get('workspace_generation', 0)+1}
-            self.step(op, path, 'allocate', lambda: self.allocate(fresh, target))
+            self.step(op, path, 'allocate', lambda: self.allocate(fresh, target, previous.get('workspace_generation', 0)+1))
             self.step(op, path, 'publish', lambda: atomic(root/'current.json', {**previous, 'generation': previous['generation']+1, 'workspace_generation': previous.get('workspace_generation', 0)+1}, 0o644))
             # Preserve original records. Resolution is a separate durable link, never a rewritten failure.
             if 'host_contract' in target:
@@ -562,13 +562,15 @@ class Engine:
             raise
         op['recovery_required'] = False
 
-    def allocate(self, fresh, target):
+    def allocate(self, fresh, target, generation):
         if fresh.exists():
-            if fresh.is_symlink() or not fresh.is_dir() or any(fresh.iterdir()):
+            if fresh.is_symlink() or not fresh.is_dir() or (any(fresh.iterdir()) and not self.clean_slot(fresh, generation)):
                 raise Rejected('fresh generation already contains unknown work')
         else:
             fresh.mkdir(mode=0o700)
         os.chown(fresh, target['service_uid'], 980 if 'host_contract' in target else -1)
+        if 'host_contract' in target:
+            atomic(fresh/'.rootops-fresh.json', {'version':1,'workspace':str(fresh),'generation':generation}, 0o644)
         sync_dir(fresh)
         sync_dir(fresh.parent)
 
@@ -577,6 +579,15 @@ class Engine:
         if 'host_contract' in target:
             self.manager.publish_binding(target, root/'releases'/selected['release'])
         atomic(root/'current.json', selected, 0o644)
+
+    def clean_slot(self, workspace, generation):
+        marker = workspace/'.rootops-fresh.json'
+        if {p.name for p in workspace.iterdir()} != {marker.name}:
+            return False
+        info = marker.lstat()
+        return (stat.S_ISREG(info.st_mode) and info.st_uid == self.uid and info.st_nlink == 1
+                and stat.S_IMODE(info.st_mode) == 0o644
+                and read(marker) == {'version':1,'workspace':str(workspace),'generation':generation})
 
     def linked_fresh_workspace(self, plan, previous, workspace, target):
         """Explicit recovery may finish only a prior recorded empty allocation.
@@ -591,7 +602,8 @@ class Engine:
             if intended == previous.get('workspace_generation', 0)+1:
                 info = workspace.lstat()
                 return (stat.S_ISDIR(info.st_mode) and info.st_uid in (self.uid, target['service_uid'])
-                        and stat.S_IMODE(info.st_mode) == 0o700 and not any(workspace.iterdir()))
+                        and stat.S_IMODE(info.st_mode) == 0o700 and
+                        (not any(workspace.iterdir()) or self.clean_slot(workspace, intended)))
             prior_plan = read(self.store/'plans'/(prior['plan_id']+'.json'))
             if prior_plan['action'] != 'recover':
                 return False
