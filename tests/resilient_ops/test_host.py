@@ -392,7 +392,7 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
     setUp = HostTests.setUp
     run_systemctl = HostTests.run_systemctl
 
-    def adoption_to_recovery(self, interrupt=False):
+    def adoption_to_recovery(self, interrupt=False, custody_mode=None):
         import base64
         spec = importlib.util.spec_from_file_location('fixture_adopt', SOURCE/'adopt.py')
         adoption = importlib.util.module_from_spec(spec)
@@ -420,7 +420,8 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
         with patch.dict(sys.modules, {'host':h}), patch.object(core, 'protected', lambda path,uid:None), patch.object(core.os, 'chown', lambda *args:None):
             engine = core.Engine(policy, store, self.manager, trusted_uid=os.getuid())
             before = self.manager.observe(code)
-            self.apply_adoption_fixture(adoption, core, packet, policy, store, originals)
+            if not self.apply_adoption_fixture(adoption, core, packet, policy, store, originals, custody_mode):
+                return
             legacy_path = store/'operations/legacy-02fee-retained.json'
             legacy_bytes = legacy_path.read_bytes()
             legacy = core.read(legacy_path)
@@ -480,7 +481,7 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             self.assertEqual(self.sockets[h.ORDINARY_SOCKET], 'inactive')
             self.assertTrue(all(call[1] in h.SOCKETS for call in self.calls if call[0] == 'start'))
 
-    def apply_adoption_fixture(self, adoption, core, packet, policy, store, originals):
+    def apply_adoption_fixture(self, adoption, core, packet, policy, store, originals, custody_mode=None):
         import copy
         import hashlib
         import types
@@ -551,6 +552,48 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
         selection={'version':1,'entries':sorted(p.name for p in h.SHARED_LOCK.parent.iterdir()),'records':{}}
         selection_path=self.base/'selection.json'
         selection_path.write_bytes(package.encode(selection))
+        backup=fixtures['BACKUP']
+        custody=backup/'custody'
+        self.assertFalse(backup.exists(), 'control requires a newly created backup')
+        authority=(fixtures['CONFIG'],fixtures['UNIT'],fixtures['PROFILE'],*fixtures['PUBLISHER_UNITS'])
+        original_authority={path:path.read_bytes() for path in authority}
+        expected_custody={'state-selection.json','custody-observed.json',*(path.name for path in authority)}
+        events=[]
+        real_fsync=os.fsync
+        real_replace=os.replace
+
+        def traced_fsync(fd):
+            # Resolve only this fixture's finite custody paths by descriptor
+            # identity. Every successful event represents a REAL fsync syscall.
+            info=os.fstat(fd)
+            candidates=[backup.parent,backup,custody]
+            if custody.exists():
+                entries=list(custody.iterdir())
+                self.assertLessEqual(len(entries),16)
+                candidates.extend(entries)
+            observed=None
+            for path in candidates:
+                try:
+                    candidate=path.stat()
+                except FileNotFoundError:
+                    continue
+                if (candidate.st_dev,candidate.st_ino)==(info.st_dev,info.st_ino):
+                    observed=path
+                    break
+            failed=backup if custody_mode=='backup' else backup.parent if custody_mode=='ancestor' else None
+            if observed is not None and observed==failed:
+                self.assertTrue(all((custody/name).is_file() for name in expected_custody))
+                events.append(('fsync-failed',observed))
+                raise OSError('injected custody prerequisite fsync failure')
+            real_fsync(fd)
+            if observed is not None:
+                events.append(('fsync',observed))
+
+        def traced_replace(source,destination,*args,**kwargs):
+            source,destination=Path(source),Path(destination)
+            real_replace(source,destination,*args,**kwargs)
+            events.append(('replace',source,destination))
+
         with ExitStack() as stack:
             for key,value in fixtures.items():
                 stack.enter_context(patch.object(transition,key,value))
@@ -561,16 +604,58 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             stack.enter_context(patch.object(adoption.os,'geteuid',return_value=0))
             stack.enter_context(patch.object(core,'Engine',side_effect=lambda *a,**kw:real_engine(*a,**kw,trusted_uid=os.getuid())))
             stack.enter_context(patch.object(h,'HostManager',return_value=self.manager))
+            if custody_mode:
+                stack.enter_context(patch.object(os,'fsync',new=traced_fsync))
+                stack.enter_context(patch.object(os,'replace',new=traced_replace))
+            if custody_mode in ('backup','ancestor'):
+                with self.assertRaisesRegex(OSError,'custody prerequisite'):
+                    adoption.apply(hashlib.sha256(operator.read_bytes()).hexdigest(),True,selection_path,hashlib.sha256(selection_path.read_bytes()).hexdigest())
+                for path,raw in original_authority.items():
+                    self.assertFalse(path.is_symlink())
+                    self.assertEqual(path.read_bytes(),raw)
+                self.assertFalse(any(e[0]=='replace' and e[2] in authority for e in events))
+                self.assertTrue((store/'host-adoption-intent.json').is_file())
+                self.assertFalse((store/'host-adoption-result.json').exists())
+                self.assertFalse(any(call[0]=='start' for call in self.calls))
+                return False
             result=adoption.apply(hashlib.sha256(operator.read_bytes()).hexdigest(),True,selection_path,hashlib.sha256(selection_path.read_bytes()).hexdigest())
+            if custody_mode=='trace':
+                first_authority=min(i for i,e in enumerate(events) if e[0]=='replace' and e[2] in authority)
+                completed=[]
+                for name in expected_custody:
+                    index=next(i for i,e in enumerate(events) if e[0]=='replace' and e[2]==custody/name)
+                    temporary=events[index][1]
+                    self.assertTrue(any(e==('fsync',temporary) for e in events[:index]), name)
+                    completed.append(index)
+                # The barrier must follow EVERY completed custody write and
+                # precede the first authority replacement, not a later backup
+                # fsync elsewhere in adoption.
+                window=events[max(completed)+1:first_authority]
+                last=-1
+                for path in (custody,backup,backup.parent):
+                    index=next((i for i,e in enumerate(window) if i>last and e==('fsync',path)),None)
+                    self.assertIsNotNone(index,str(path))
+                    last=index
         self.assertTrue(all(path.is_symlink() and os.readlink(path)=='/dev/null' for path in fixtures['PUBLISHER_UNITS']))
         self.assertEqual((fixtures['BACKUP']/'custody/legacy.socket').read_bytes(),b'original authority')
         self.assertEqual(stat.S_IMODE(h.SHARED_LOCK.parent.stat().st_mode),0o711)
         self.assertTrue(result['adopted'])
         self.assertFalse(result['activation_performed'])
         self.assertTrue((store/'host-adoption-result.json').is_file())
+        return True
 
     def test_adoption_record_restores_original_ingress(self):
         self.adoption_to_recovery()
 
     def test_adoption_intent_survives_interrupted_first_recovery(self):
         self.adoption_to_recovery(interrupt=True)
+
+
+    def test_new_backup_custody_fsync_precedes_authority_replacement(self):
+        self.adoption_to_recovery(custody_mode='trace')
+
+    def test_backup_fsync_failure_preserves_original_authority(self):
+        self.adoption_to_recovery(custody_mode='backup')
+
+    def test_backup_parent_fsync_failure_preserves_original_authority(self):
+        self.adoption_to_recovery(custody_mode='ancestor')

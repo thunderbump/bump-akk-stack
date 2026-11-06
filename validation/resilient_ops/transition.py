@@ -124,6 +124,11 @@ def prepare_state(manager, target, here, packet, legacy_bytes, manifest):
         os.chmod(PARENT, 0o711)
         sync_dir(PARENT)
         atomic(custody/'custody-observed.json', {'state':'seeded','original_outcome':packet['migration']['original_outcome']})
+        # Persist the complete custody tree and both directory entries before
+        # any original authority asset can be replaced, including a new BACKUP.
+        sync_dir(custody)
+        sync_dir(BACKUP)
+        sync_dir(BACKUP.parent)
     finally:
         os.close(fd)
     # Prevent every subsequent invocation of the competing publisher, including
