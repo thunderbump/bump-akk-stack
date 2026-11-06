@@ -12,6 +12,10 @@ You can have an entire server running within minutes, configured and ready to go
 
 </p>
 
+## Validator maintenance
+
+For the fixed maintenance service, start with the [repository guide](validation/maintenance/README.md) and the [Operations walkthrough on the LAN](http://192.168.1.230:8081/projects/bump-akk-stack/documentation/central-ng41-validator-maintenance.html).
+
 # Feature Requests
 
 Want a feature that isn't already available? Open an issue with the title "[Feature Request]" and we will see about getting it added
