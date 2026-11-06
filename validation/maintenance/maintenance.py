@@ -4,6 +4,7 @@ import contextlib
 import fcntl
 import hashlib
 import json
+import itertools
 import os
 from pathlib import Path
 import re
@@ -15,6 +16,8 @@ import subprocess
 CODE = Path('/srv/eqemu-validator-code')
 STATE = CODE / '.maintenance-v1'
 LOCK = Path('/var/lib/eqemu-validator/worker.lock')
+RETAINED = LOCK.parent / 'last-integration'
+ARTIFACT = 'central-cdau-integration-v1.json'
 SOCKET = '/run/eqemu-validator-maintenance.sock'
 FIXTURE = 'validation/actor-integration-fixture.json'
 RELEASE = 'integration-release.json'
@@ -341,21 +344,107 @@ class Store:
         pending = self.pending()
         require(pending is not None or not present(self.state / '.head.json.new'), 'journal-drift')
         if pending:
-            return dict(state='interrupted', transaction=pending['id'], archive_supported=False)
+            return dict(state='interrupted', transaction=pending['id'], archive_supported=True, ordinary_socket_active=self.host.socket_active())
         records = self.snapshot(head['records'])
         fixture, _ = self.binding(records)
         return dict(state='ready', source=decode(fixture)['server_source'], expected=sha(canonical(records)),
-                    transaction=head['transaction'], archive_supported=False,
-                    retention_present=self.retention())
+                    transaction=head['transaction'], archive_supported=True, ordinary_socket_active=self.host.socket_active(),
+                    retention_present=self.retention(), retired_integrations=self.retired_runs())
+
+    def retired_runs(self):
+        archive = self.state / 'retired-integrations'
+        if not present(archive):
+            return dict(runs=[], truncated=False)
+        with directory(archive, self.owner):
+            with os.scandir(archive) as entries:
+                names = [entry.name for entry in itertools.islice(entries, 17)]
+            for name in names:
+                hex_value(name, 32)
+            return dict(runs=names[:16], truncated=len(names) > 16)
 
     def retention(self):
         try:
-            Path('/var/lib/eqemu-validator/last-integration').lstat()
+            RETAINED.lstat()
             return True
         except FileNotFoundError:
             return False
         except PermissionError:
             return None
+
+    def retire(self, run):
+        """Move only a confirmed failed retained slot; never rewrite its evidence."""
+        require(self.pending() is None, 'interrupted')
+        source = RETAINED
+        archive = self.state / 'retired-integrations'
+        # worker.lock excludes worker intake/retention and all broker mutators.
+        # The worker owns its state child; its ancestors remain root protected.
+        with directory(source.parent.parent, self.owner):
+            info = source.parent.lstat()
+            require(stat.S_ISDIR(info.st_mode) and info.st_uid == 995
+                    and stat.S_IMODE(info.st_mode) == 0o700, 'retention-parent')
+            info = source.lstat()
+            require(stat.S_ISDIR(info.st_mode) and info.st_uid == 995
+                    and stat.S_IMODE(info.st_mode) == 0o700, 'retention-root')
+            names = {ARTIFACT: 851968, 'pending.json': 1024, 'receipt.json': 4096}
+            require({p.name for p in source.iterdir()} == set(names), 'retention-files')
+            raw = {}
+            for name, limit in names.items():
+                raw[name], item = read(source / name, limit)
+                require((item['uid'], item['gid'], item['mode']) == (995, 980, 0o600),
+                        'retention-metadata')
+            pending, receipt = decode(raw['pending.json']), decode(raw['receipt.json'])
+            require(type(pending) is dict and type(receipt) is dict
+                    and set(pending) == {'version', 'name', 'candidate', 'run_id', 'fixture_sha256'},
+                    'retention-schema')
+            require(pending.get('run_id') == receipt.get('run_id') == run, 'expected-run-mismatch')
+            for key, width in (('candidate', 40), ('fixture_sha256', 64)):
+                hex_value(pending.get(key), width)
+            require(type(pending.get('version')) is int and type(receipt.get('version')) is int
+                    and pending.get('version') == receipt.get('version') == 1
+                    and pending.get('name') == ARTIFACT
+                    and all(receipt.get(k) == v for k, v in pending.items())
+                    and type(receipt.get('bytes')) is int
+                    and receipt['bytes'] == len(raw[ARTIFACT])
+                    and receipt.get('sha256') == sha(raw[ARTIFACT]), 'retention-schema')
+            execution = receipt.get('execution')
+            require(type(execution) is dict and execution.get('vm_cleanup') is True,
+                    'vm-cleanup-unconfirmed')
+            for key in ('native_cleanup', 'database_cleanup'):
+                value = execution.get(key)
+                require(type(value) is bool or value in ('unknown', 'not-run'), 'retention-schema')
+            for key in ('workload_exit_code', 'validator_exit_code'):
+                value = execution.get(key)
+                require(value is None or type(value) is int and value in (0, 1, 2), 'retention-schema')
+            require(all(type(receipt.get(k)) is bool for k in ('terminal', 'complete', 'client_durable'))
+                    and receipt.get('original_transfer') in ('durable', 'uncertain')
+                    and receipt.get('error') in ('none', 'integration-transfer-invalid',
+                                                'integration-incomplete', 'integration-interrupted'), 'retention-schema')
+            require(not receipt['complete'] or receipt['terminal'] and receipt['client_durable']
+                    and receipt['original_transfer'] == 'durable' and receipt['error'] == 'none',
+                    'retention-schema')
+            require(execution.get('workload_exit_code') in (1, 2)
+                    or execution.get('validator_exit_code') in (1, 2)
+                    or not receipt['complete'] and receipt['error'] != 'none', 'not-failed')
+            if not present(archive):
+                archive.mkdir(mode=0o700)
+            with directory(archive, self.owner) as (fd, _):
+                require(stat.S_IMODE(os.fstat(fd).st_mode) == 0o700, 'archive-mode')
+                target = archive / run
+                require(not present(target), 'archive-exists')
+                require(info.st_dev == os.fstat(fd).st_dev, 'retirement-cross-filesystem')
+                self.host.socket(False)
+                self.host.quiescent()
+                require(info == source.lstat(), 'retention-changed')
+                # Both parents are protected and all writers share worker.lock.
+                os.rename(source, target)
+                os.fsync(fd)
+                parent = os.open(source.parent, FLAGS | os.O_DIRECTORY)
+                try:
+                    os.fsync(parent)
+                finally:
+                    os.close(parent)
+        return dict(state='retired', run_id=run, archive=str(target), ordinary_socket_active=False,
+                    execution=execution, original_transfer=receipt['original_transfer'])
 
     def event(self, tx, name, value):
         with directory(tx, self.owner) as (fd, _):
@@ -488,11 +577,14 @@ def validate_request(request):
     if op == 'publish':
         fields |= {'expected', 'source', 'proof'}
         hex_value(request.get('expected'), 64)
+    elif op == 'retire-failed-integration':
+        fields.add('expected_run')
+        hex_value(request.get('expected_run'), 32)
     elif op == 'rollback':
         fields.add('transaction')
         hex_value(request.get('transaction'), 32)
     else:
-        require(op in ('health', 'status', 'diagnose', 'fixture'), 'unsupported-operation')
+        require(op in ('health', 'status', 'diagnose', 'fixture', 'socket-start', 'socket-stop'), 'unsupported-operation')
     require(set(request) == fields, 'schema')
     return op
 
@@ -507,13 +599,19 @@ def dispatch(request, config, store):
             if op=='diagnose':
                 same_mount(store.code,store.state)
                 value.update(same_mount=True, checks=['worker-lock','active-work','installed-closure','policy','journal'],
-                             archive_reason='unsupported-separate-02fee-maintenance', automatic_retry=False)
+                             archive_reason='explicit-failed-run-only', automatic_retry=False)
             return value
         if op == 'fixture':
             require(store.pending() is None, 'interrupted')
             records = store.snapshot(store.head()['records'])
             raw, _ = store.binding(records)
             return dict(fixture=base64.b64encode(raw).decode(), sha256=sha(raw))
+        if op in ('socket-start', 'socket-stop'):
+            require(store.pending() is None, 'interrupted')
+            store.host.socket(op == 'socket-start')
+            return dict(ordinary_socket_active=store.host.socket_active())
+        if op == 'retire-failed-integration':
+            return store.retire(request['expected_run'])
         if op == 'publish':
             return store.publish(request)
         return store.rollback(request['transaction'])
@@ -539,8 +637,10 @@ def serve(connection, config, store):
         value = dict(schema=1, id=identifier, ok=True, result=data)
     except Refusal as error:
         value = dict(schema=1, id=identifier, ok=False, reason=str(error))
+    except (subprocess.TimeoutExpired, subprocess.CalledProcessError):
+        value = dict(schema=1, id=identifier, ok=False, reason='command-failed-or-uncertain')
     except Exception:
-        value = dict(schema=1, id=identifier, ok=False, reason='io-or-interruption')
+        value = dict(schema=1, id=identifier, ok=False, reason='io-or-interruption-result-uncertain')
     raw = canonical(value)
     require(len(raw) <= RESPONSE_LIMIT, 'response-bound')
     connection.sendall(raw)
