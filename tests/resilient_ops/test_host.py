@@ -332,6 +332,8 @@ class HostRecoveryIntegrationTests(unittest.TestCase):
             self.assertEqual(self.sockets[h.SOCKETS[1]], 'active')
             self.assertEqual(self.sockets[h.SOCKETS[4]], 'active')
 
+    def test_fixed_workspace_retirement_effect_crash(self): self.interrupted_allocation('retire-effect')
+
     def test_fixed_workspace_allocation_effect_crash(self): self.interrupted_allocation('allocate-effect')
     def test_fixed_workspace_allocation_observed_crash(self): self.interrupted_allocation('allocate-observed')
 
@@ -392,7 +394,7 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
     setUp = HostTests.setUp
     run_systemctl = HostTests.run_systemctl
 
-    def adoption_to_recovery(self, interrupt=False, custody_mode=None):
+    def adoption_to_recovery(self, interrupt=False, custody_mode=None, hierarchy_mode=None, workspace_mode=None):
         import base64
         spec = importlib.util.spec_from_file_location('fixture_adopt', SOURCE/'adopt.py')
         adoption = importlib.util.module_from_spec(spec)
@@ -420,7 +422,7 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
         with patch.dict(sys.modules, {'host':h}), patch.object(core, 'protected', lambda path,uid:None), patch.object(core.os, 'chown', lambda *args:None):
             engine = core.Engine(policy, store, self.manager, trusted_uid=os.getuid())
             before = self.manager.observe(code)
-            if not self.apply_adoption_fixture(adoption, core, packet, policy, store, originals, custody_mode):
+            if not self.apply_adoption_fixture(adoption, core, packet, policy, store, originals, custody_mode, hierarchy_mode):
                 return
             legacy_path = store/'operations/legacy-02fee-retained.json'
             legacy_bytes = legacy_path.read_bytes()
@@ -437,6 +439,71 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
                                           recovery_of=linked), peer)['plan_id']
             def execute(pid, oid):
                 return engine.handle(dict(method='execute', plan_id=pid, operation_id=oid), peer)
+            if workspace_mode:
+                from contextlib import ExitStack
+                unrelated=self.base/'unrelated-private'
+                unrelated.mkdir(mode=0o700)
+                canary=unrelated/'secret-canary'
+                canary.write_bytes(b'unrelated private canary: must never enter root evidence')
+                canary_bytes=canary.read_bytes()
+                preserved=self.base/'preserved-original-workspace'
+                if workspace_mode!='owner':
+                    os.rename(h.WORKSPACE,preserved)
+                    if workspace_mode in ('link-copy','link-evidence'):
+                        h.WORKSPACE.symlink_to(unrelated,target_is_directory=True)
+                    elif workspace_mode=='missing':
+                        pass
+                    elif workspace_mode=='dangling':
+                        h.WORKSPACE.symlink_to(self.base/'absent-referent')
+                    else:
+                        h.WORKSPACE.write_bytes(b'not a directory')
+                evidence=h.WORKSPACE_ROOT/'evidence/0'
+                if workspace_mode=='link-copy':
+                    os.rename(evidence,self.base/'preserved-sealed-evidence')
+                evidence_before={name:(evidence/'workspace'/name).read_bytes() for name in originals} if evidence.exists() else None
+                traversed=[]
+                real_rglob=Path.rglob
+                real_lstat=Path.lstat
+                def traced_rglob(path,*args,**kwargs):
+                    if path==h.WORKSPACE:
+                        traversed.append(path)
+                    return real_rglob(path,*args,**kwargs)
+                def unknown_owner(path,*args,**kwargs):
+                    info=real_lstat(path,*args,**kwargs)
+                    if path==h.WORKSPACE:
+                        data=list(info);data[4]=987654
+                        return os.stat_result(data)
+                    return info
+                with ExitStack() as stack:
+                    stack.enter_context(patch.object(Path,'rglob',new=traced_rglob))
+                    if workspace_mode=='owner':
+                        stack.enter_context(patch.object(Path,'lstat',new=unknown_owner))
+                    allocated=stack.enter_context(patch.object(engine,'allocate',wraps=engine.allocate))
+                    result=execute(prepare('invalid-root',legacy['operation_id']),'rejected-root')
+                    allocated.assert_not_called()
+                self.assertEqual(result['state'],'failed',result)
+                self.assertTrue(result['recovery_required'])
+                self.assertEqual(traversed,[])
+                self.assertEqual(legacy_path.read_bytes(),legacy_bytes)
+                self.assertFalse((h.WORKSPACE_ROOT/'quarantine/0').exists())
+                self.assertFalse(any(h.WORKSPACE_ROOT.glob('evidence-stage-*')))
+                self.assertEqual(canary.read_bytes(),canary_bytes)
+                self.assertEqual({p.name for p in unrelated.iterdir()},{canary.name})
+                if workspace_mode in ('link-copy','link-evidence','dangling'):
+                    self.assertTrue(h.WORKSPACE.is_symlink())
+                    self.assertEqual(os.readlink(h.WORKSPACE),str(unrelated if workspace_mode!='dangling' else self.base/'absent-referent'))
+                elif workspace_mode=='missing':
+                    self.assertFalse(h.WORKSPACE.exists())
+                    self.assertFalse(h.WORKSPACE.is_symlink())
+                elif workspace_mode=='file':
+                    self.assertEqual(h.WORKSPACE.read_bytes(),b'not a directory')
+                else:
+                    self.assertTrue(h.WORKSPACE.is_dir())
+                if evidence_before is None:
+                    self.assertFalse(evidence.exists())
+                else:
+                    self.assertEqual({name:(evidence/'workspace'/name).read_bytes() for name in originals},evidence_before)
+                return
             worker_spec=importlib.util.spec_from_file_location('adopted_worker',h.BINDING/'validation/worker/runtime.py')
             worker=importlib.util.module_from_spec(worker_spec)
             worker_spec.loader.exec_module(worker)
@@ -481,7 +548,7 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             self.assertEqual(self.sockets[h.ORDINARY_SOCKET], 'inactive')
             self.assertTrue(all(call[1] in h.SOCKETS for call in self.calls if call[0] == 'start'))
 
-    def apply_adoption_fixture(self, adoption, core, packet, policy, store, originals, custody_mode=None):
+    def apply_adoption_fixture(self, adoption, core, packet, policy, store, originals, custody_mode=None, hierarchy_mode=None):
         import copy
         import hashlib
         import types
@@ -518,6 +585,14 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
         # Adoption, rather than the test, must create the managed generations.
         h.CODE_ROOT.rmdir()
         h.WORKSPACE_ROOT.rmdir()
+        managed_parent=h.CODE_ROOT.parent
+        managed_roots=(h.CODE_ROOT,h.WORKSPACE_ROOT)
+        self.assertEqual(h.WORKSPACE_ROOT.parent,managed_parent)
+        if hierarchy_mode and hierarchy_mode.startswith('new-'):
+            managed_parent.rmdir()
+            self.assertFalse(managed_parent.exists())
+        elif hierarchy_mode:
+            self.assertTrue(managed_parent.is_dir())
         paths = {
             '/var/lib/eqemu-resilient-ops': store,
             '/srv/eqemu-validator-code': h.BINDING,
@@ -561,12 +636,16 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
         events=[]
         real_fsync=os.fsync
         real_replace=os.replace
+        real_rename=os.rename
+        real_mkdir=Path.mkdir
+        real_symlink=Path.symlink_to
+        original_code={name:(h.BINDING/name).read_bytes() for name in h.FILES}
 
         def traced_fsync(fd):
             # Resolve only this fixture's finite custody paths by descriptor
             # identity. Every successful event represents a REAL fsync syscall.
             info=os.fstat(fd)
-            candidates=[backup.parent,backup,custody]
+            candidates=[backup.parent,backup,custody,*managed_roots,managed_parent,managed_parent.parent]
             if custody.exists():
                 entries=list(custody.iterdir())
                 self.assertLessEqual(len(entries),16)
@@ -585,6 +664,13 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
                 self.assertTrue(all((custody/name).is_file() for name in expected_custody))
                 events.append(('fsync-failed',observed))
                 raise OSError('injected custody prerequisite fsync failure')
+            hierarchy_failure=(managed_parent if hierarchy_mode in ('new-parent-failure','existing-parent-failure')
+                               else managed_parent.parent if hierarchy_mode=='new-ancestor-failure'
+                               else managed_roots[0] if hierarchy_mode=='new-root-failure' else None)
+            if (observed is not None and observed==hierarchy_failure
+                    and all(path.is_dir() for path in managed_roots)):
+                events.append(('hierarchy-fsync-failed',observed))
+                raise OSError('injected managed hierarchy prerequisite fsync failure')
             real_fsync(fd)
             if observed is not None:
                 events.append(('fsync',observed))
@@ -593,6 +679,22 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             source,destination=Path(source),Path(destination)
             real_replace(source,destination,*args,**kwargs)
             events.append(('replace',source,destination))
+
+        def traced_rename(source,destination,*args,**kwargs):
+            real_rename(source,destination,*args,**kwargs)
+            events.append(('rename',Path(source),Path(destination)))
+
+        def traced_mkdir(path,*args,**kwargs):
+            existed=path.exists()
+            result=real_mkdir(path,*args,**kwargs)
+            if path in (*managed_roots,managed_parent):
+                events.append(('mkdir-existing' if existed else 'mkdir',Path(path)))
+            return result
+
+        def traced_symlink(path,target,*args,**kwargs):
+            result=real_symlink(path,target,*args,**kwargs)
+            events.append(('symlink',Path(path),str(target)))
+            return result
 
         with ExitStack() as stack:
             for key,value in fixtures.items():
@@ -604,9 +706,27 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
             stack.enter_context(patch.object(adoption.os,'geteuid',return_value=0))
             stack.enter_context(patch.object(core,'Engine',side_effect=lambda *a,**kw:real_engine(*a,**kw,trusted_uid=os.getuid())))
             stack.enter_context(patch.object(h,'HostManager',return_value=self.manager))
-            if custody_mode:
+            if custody_mode or hierarchy_mode:
                 stack.enter_context(patch.object(os,'fsync',new=traced_fsync))
                 stack.enter_context(patch.object(os,'replace',new=traced_replace))
+            if hierarchy_mode:
+                stack.enter_context(patch.object(os,'rename',new=traced_rename))
+                stack.enter_context(patch.object(Path,'mkdir',new=traced_mkdir))
+                stack.enter_context(patch.object(Path,'symlink_to',new=traced_symlink))
+            if hierarchy_mode and hierarchy_mode.endswith('failure'):
+                with self.assertRaisesRegex(OSError,'managed hierarchy prerequisite'):
+                    adoption.apply(hashlib.sha256(operator.read_bytes()).hexdigest(),True,selection_path,hashlib.sha256(selection_path.read_bytes()).hexdigest())
+                self.assertTrue(h.BINDING.is_dir())
+                self.assertFalse(h.BINDING.is_symlink())
+                self.assertEqual({name:(h.BINDING/name).read_bytes() for name in h.FILES},original_code)
+                self.assertFalse((backup/'original-code').exists())
+                self.assertFalse(paths['/etc/eqemu-resilient-ops/policy.json'].exists())
+                self.assertFalse((store/'host-adoption-result.json').exists())
+                self.assertFalse((h.CODE_ROOT/'current.json').exists())
+                self.assertTrue((store/'host-adoption-intent.json').is_file())
+                self.assertFalse(any(call[0]=='start' for call in self.calls))
+                self.assertEqual({name:(old_workspace/name).read_bytes() for name in originals},originals)
+                return False
             if custody_mode in ('backup','ancestor'):
                 with self.assertRaisesRegex(OSError,'custody prerequisite'):
                     adoption.apply(hashlib.sha256(operator.read_bytes()).hexdigest(),True,selection_path,hashlib.sha256(selection_path.read_bytes()).hexdigest())
@@ -619,6 +739,20 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
                 self.assertFalse(any(call[0]=='start' for call in self.calls))
                 return False
             result=adoption.apply(hashlib.sha256(operator.read_bytes()).hexdigest(),True,selection_path,hashlib.sha256(selection_path.read_bytes()).hexdigest())
+            if hierarchy_mode and hierarchy_mode.endswith('trace'):
+                creates=[next(i for i,e in enumerate(events) if e==('mkdir',path)) for path in managed_roots]
+                if hierarchy_mode.startswith('new-'):
+                    self.assertTrue(any(e==('mkdir',managed_parent) for e in events[:min(creates)]))
+                else:
+                    self.assertFalse(any(e==('mkdir',managed_parent) for e in events))
+                external=min(i for i,e in enumerate(events) if
+                             (e[0]=='rename' and e[1]==h.BINDING) or
+                             (e[0]=='symlink' and e[1]==h.BINDING) or
+                             (e[0]=='replace' and e[2] in (paths['/etc/eqemu-resilient-ops/policy.json'],store/'host-adoption-result.json')))
+                window=events[max(creates)+1:external]
+                roots=[next(i for i,e in enumerate(window) if e==('fsync',path)) for path in managed_roots]
+                parent=next(i for i,e in enumerate(window) if i>max(roots) and e==('fsync',managed_parent))
+                self.assertTrue(any(i>parent and e==('fsync',managed_parent.parent) for i,e in enumerate(window)))
             if custody_mode=='trace':
                 first_authority=min(i for i,e in enumerate(events) if e[0]=='replace' and e[2] in authority)
                 completed=[]
@@ -659,3 +793,41 @@ class AdoptionRecoveryIntegrationTests(unittest.TestCase):
 
     def test_backup_parent_fsync_failure_preserves_original_authority(self):
         self.adoption_to_recovery(custody_mode='ancestor')
+
+
+    def test_workspace_root_directory_link_refuses_copy(self):
+        self.adoption_to_recovery(workspace_mode='link-copy')
+
+    def test_workspace_root_link_refuses_existing_evidence_shortcut(self):
+        self.adoption_to_recovery(workspace_mode='link-evidence')
+
+    def test_workspace_root_dangling_link_refuses(self):
+        self.adoption_to_recovery(workspace_mode='dangling')
+
+    def test_workspace_root_nondirectory_refuses(self):
+        self.adoption_to_recovery(workspace_mode='file')
+
+    def test_workspace_root_unknown_owner_refuses(self):
+        self.adoption_to_recovery(workspace_mode='owner')
+
+    def test_new_managed_parent_is_durable_before_external_references(self):
+        self.adoption_to_recovery(hierarchy_mode='new-trace')
+
+    def test_existing_managed_parent_is_durable_before_external_references(self):
+        self.adoption_to_recovery(hierarchy_mode='existing-trace')
+
+    def test_new_managed_parent_sync_failure_prevents_external_references(self):
+        self.adoption_to_recovery(hierarchy_mode='new-parent-failure')
+
+    def test_existing_managed_parent_sync_failure_prevents_external_references(self):
+        self.adoption_to_recovery(hierarchy_mode='existing-parent-failure')
+
+    def test_new_managed_ancestor_sync_failure_prevents_external_references(self):
+        self.adoption_to_recovery(hierarchy_mode='new-ancestor-failure')
+
+    def test_new_managed_root_sync_failure_prevents_external_references(self):
+        self.adoption_to_recovery(hierarchy_mode='new-root-failure')
+
+
+    def test_unexplained_missing_workspace_refuses(self):
+        self.adoption_to_recovery(workspace_mode='missing')

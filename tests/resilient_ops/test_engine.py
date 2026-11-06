@@ -296,6 +296,9 @@ class RegressionTests(unittest.TestCase):
             self.assertEqual(self.call({'method':'status','target':'a'})['operations'][0]['state'],'failed')
             with self.assertRaises(e.Rejected): self.prepare('no-normal')
             self.manager.fail_stop=False
+            # Capacity is tested against an established owned workspace. An
+            # unexplained absent root is no longer a recoverable empty tree.
+            (self.root/'a/workspaces/0').mkdir()
             recovery=self.prepare('recovery',action='recover',artifact={},recovery_of='op')
             self.assertEqual(self.execute(recovery,'recovery')['state'],'succeeded')
 

@@ -143,6 +143,13 @@ def apply(expected_operator, confinement_reviewed, state_manifest, expected_stat
             protected(root.parent,0)
             root.mkdir(mode=0o711)
             os.chmod(root,0o711)
+        # Persist both fresh target roots, their entries in the common parent,
+        # and that parent's own entry before publishing any external binding.
+        for target in policy['targets'].values():
+            sync_dir(Path(target['root']))
+        for parent in {Path(target['root']).parent for target in policy['targets'].values()}:
+            sync_dir(parent)
+            sync_dir(parent.parent)
         engine=Engine(policy,store,manager)
         prepared=engine.handle(dict(method='prepare',request_id='host-adoption-initial-code',target='validator-worker-code',action='publish',generation=0,artifact={k:base64.b64encode(v).decode() for k,v in release_bytes.items()}),(1000,1000))
         code_root=Path(code['root'])

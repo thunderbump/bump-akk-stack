@@ -473,6 +473,7 @@ class Engine:
             gen = str(previous.get('workspace_generation', 0))
             workspace = self.manager.workspace(target) if 'host_contract' in target else root/'workspaces'/gen
             evidence, quarantine = root/'evidence'/gen, root/'quarantine'/gen
+            self.workspace_root(plan, previous, workspace, target)
             def preserve():
                 if evidence.exists():
                     for directory, _, files in os.walk(evidence, topdown=False):
@@ -489,7 +490,7 @@ class Engine:
                 payload = stage / 'workspace'
                 payload.mkdir(mode=0o700)
                 total, count = 0, 0
-                if workspace.exists():
+                if self.workspace_root(plan, previous, workspace, target):
                     for item in workspace.rglob('*'):
                         info = item.lstat()
                         count += 1
@@ -526,7 +527,7 @@ class Engine:
                 sync_dir(evidence.parent)
             self.step(op, path, 'preserve', preserve)
             def retire():
-                if workspace.exists():
+                if self.workspace_root(plan, previous, workspace, target):
                     if quarantine.exists():
                         if 'host_contract' in target and self.linked_fresh_workspace(plan, previous, workspace, target):
                             return
@@ -561,6 +562,49 @@ class Engine:
             op['recovery_required'] = False
             raise
         op['recovery_required'] = False
+
+    def workspace_root(self, plan, previous, workspace, target):
+        """Validate the root itself even when sealed evidence already exists."""
+        try:
+            info = workspace.lstat()
+        except FileNotFoundError:
+            if self.linked_retired_workspace(plan, previous, target):
+                return False
+            raise Rejected('missing workspace requires established linked retirement') from None
+        if not stat.S_ISDIR(info.st_mode) or info.st_uid not in (self.uid, target['service_uid']):
+            raise Rejected('workspace root must be an owned directory, never a link')
+        return True
+
+    def linked_retired_workspace(self, plan, previous, target):
+        """Missing source is reconcilable only with linked retirement and custody."""
+        generation = previous.get('workspace_generation', 0)
+        root = Path(target['root'])
+        try:
+            for path, owners in ((root/'quarantine'/str(generation), (self.uid, target['service_uid'])),
+                                 (root/'evidence'/str(generation), (self.uid,))):
+                info = path.lstat()
+                if not stat.S_ISDIR(info.st_mode) or info.st_uid not in owners:
+                    return False
+        except FileNotFoundError:
+            return False
+        linked = plan['recovery_of']
+        for _ in range(MAX_RECORDS):
+            prior = self.status({'operation_id': linked})
+            try:
+                prior_plan = read(self.store/'plans'/(prior['plan_id']+'.json'))
+            except FileNotFoundError:
+                return False
+            if prior_plan['action'] != 'recover' or prior['target'] != plan['target']:
+                return False
+            base = prior.get('workspace_recovery_base', prior.get('previous', {}))
+            if base.get('workspace_generation', 0) != generation:
+                return False
+            if prior['step'] in {'retire-intent', 'retire-observed', 'allocate-intent',
+                                 'allocate-observed', 'publish-intent', 'publish-observed',
+                                 'restore-ingress-intent', 'restore-ingress-observed'}:
+                return True
+            linked = prior_plan['recovery_of']
+        raise Rejected('administrative requirement: retirement recovery link bound exceeded')
 
     def allocate(self, fresh, target, generation):
         if fresh.exists():

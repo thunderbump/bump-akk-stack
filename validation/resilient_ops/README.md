@@ -137,3 +137,13 @@ Original assets are preserved evidence, not an authorized automatic rollback.
 Effective systemd/cgroup ownership, loaded AppArmor and private selection remain
 separate bounded root prerequisites. No installation, profile loading, service
 activation or workload has been performed by source/package preparation.
+
+Recovery validates the workspace ROOT with lstat before traversal or retirement,
+even when sealed evidence already exists. It must be a directory owned by the
+trusted root or enrolled service UID; links, dangling links, files and unknown
+owners refuse. A missing root is reconcilable only through an explicitly linked
+retirement record with established owned quarantine and sealed evidence.
+Absence alone does not prove successful retirement or permit a fresh slot.
+Adoption synchronizes both target roots, their common parent and that parent's
+entry before publishing the external launcher binding, policy or success.
+These are source-level durability requirements, not power-loss qualification.
