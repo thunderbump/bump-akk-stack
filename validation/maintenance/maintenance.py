@@ -270,7 +270,7 @@ class Host:
         require(result.returncode == 0 and not result.stdout.strip(), 'worker-active')
         for suffix in ('', '-asan-v1', '-asan-v2', '-asan-v3', '-profiling'):
             path = Path('/var/lib/eqemu-validator' + suffix) / 'active.json'
-            require(not path.exists() and not path.is_symlink(), 'active-record')
+            require(not present(path), 'active-record')
 
     @contextlib.contextmanager
     def guard(self):

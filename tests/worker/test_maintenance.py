@@ -182,6 +182,14 @@ class Proof(unittest.TestCase):
         m.prove_source(source,proof,fixture)
         source['tree']='0'*40
         with self.assertRaises(m.Refusal):m.prove_source(source,proof,fixture)
+    def test_active_record_inspection_denial_is_not_absence(self):
+        from types import SimpleNamespace
+        real=Path.lstat
+        def denied(path,*a,**kw):
+            if path.name=='active.json':raise PermissionError('injected denied inspection')
+            return real(path,*a,**kw)
+        with patch.object(m.subprocess,'run',return_value=SimpleNamespace(returncode=0,stdout=b'')),patch.object(Path,'lstat',new=denied):
+            with self.assertRaises(PermissionError):m.Host().quiescent()
     def test_duplicate_keys_and_limits(self):
         with self.assertRaises(m.Refusal):m.decode(b'{"schema":1,"schema":2}')
         with self.assertRaises(m.Refusal):m.prove_source({}, {}, {})
