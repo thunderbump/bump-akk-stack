@@ -39,14 +39,28 @@ done
 docker_proof info --format '{{json .SecurityOptions}}' | grep '"name=rootless"'
 printf 'Artifacts: %s\n' "$output"
 git -C "$repo" archive "$commit" > "$output/source.tar"
+git -C "$repo" submodule status --recursive > "$output/submodules.txt"
+while read -r sha path rest; do
+    [[ $sha =~ ^[0-9a-f]{40}$ ]] || exit 2
+    test "$(git -C "$repo" rev-parse "$commit:$path")" = "$sha"
+    git -C "$repo/$path" archive --prefix="$path/" "$sha" > "$output/submodule.tar"
+    tar --concatenate --file="$output/source.tar" "$output/submodule.tar"
+done < "$output/submodules.txt"
+rm -f "$output/submodule.tar"
 printf '%s\n' "$commit" > "$output/commit.txt"
 docker_proof pull "$image"
 image=$(docker_proof image inspect --format '{{index .RepoDigests 0}}' "$image")
 printf '%s\n' "$image" > "$output/image.txt"
+rust_version=$(git -C "$repo" show "$commit:rust-toolchain.toml" | sed -n 's/^channel = "\(.*\)"/\1/p')
+docker_proof build --build-arg BASE="$image" --build-arg RUST_VERSION="$rust_version" -t eqemu-rootless-candidate:proof "$here" > "$output/image-build.log" 2>&1
+image=$(docker_proof image inspect --format '{{.Id}}' eqemu-rootless-candidate:proof)
+printf '%s\n' "$image" > "$output/derived-image.txt"
 docker_proof create --name "$name" --user 0 --entrypoint /bin/bash \
     --memory 7g --memory-swap 7g --cpus 2 --pids-limit 512 \
     "$image" /candidate/build.sh
 docker_proof cp "$here/." "$name:/candidate"
+git -C "$repo" rev-parse "$commit:submodules/vcpkg" > "$output/vcpkg-commit"
+docker_proof cp "$output/vcpkg-commit" "$name:/candidate/vcpkg-commit"
 docker_proof cp "$output/source.tar" "$name:/candidate/source.tar"
 set +e
 timeout --signal=TERM --kill-after=30 7200 docker --host "$socket" start -a "$name" > "$output/build.log" 2>&1

@@ -12,6 +12,13 @@ command -v cargo
 rustc --version
 cargo test --locked --manifest-path rust/actors/Cargo.toml
 cargo build --locked --release --manifest-path rust/actors/Cargo.toml
-cmake -S . -B /candidate/build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DEQEMU_BUILD_TESTS=ON -DEQEMU_SANITIZERS=ON -DPERL_EXECUTABLE=/opt/eqemu-perl/bin/perl
+# vcpkg version baselines require Git objects, which source archives omit.
+vcpkg_commit=$(cat /candidate/vcpkg-commit)
+rm -rf submodules/vcpkg
+git clone https://github.com/microsoft/vcpkg.git submodules/vcpkg
+git -C submodules/vcpkg checkout "$vcpkg_commit"
+perl_core=$(/opt/eqemu-perl/bin/perl -MConfig -e 'print "$Config{archlib}/CORE"')
+perl_lib=$(/opt/eqemu-perl/bin/perl -MConfig -e 'print $Config{libperl}')
+cmake -S . -B /candidate/build -G Ninja -DCMAKE_BUILD_TYPE=RelWithDebInfo -DEQEMU_BUILD_TESTS=ON -DEQEMU_SANITIZERS=ON -DPERL_EXECUTABLE=/opt/eqemu-perl/bin/perl -DPERL_INCLUDE_PATH="$perl_core" -DPERL_LIBRARY="$perl_core/$perl_lib"
 cmake --build /candidate/build --parallel 2
 /candidate/build/bin/tests
