@@ -57,3 +57,13 @@ Repeat:
 ```
 validation/rootless-candidate/run /absolute/clean/Server d58d1fa4cb5ce656984d6ebaaeb78c8b70b06c85 eqemulator/eqemu-server@sha256:b6f46ebc00f8da8f103197cf2252be8173317b85fbc42716c994ad33d5da39f7
 ```
+
+## Control checks (not yet qualified)
+
+`controls.sh` runs the existing native control executable after compilation,
+requires the normal case to exit zero, and checks each deliberate failure for
+its expected sanitizer report and a symbolized sanitizer_controls.cpp line.
+Ordinary utility execution retains fatal ASan/UBSan options. This addition has
+not completed actual qualification. Attempt `run-LK4vFVPI` was interrupted during
+dependency rebuilding; it establishes no control or smoke result. DB/world/zone
+smoke remains unimplemented.
