@@ -58,15 +58,13 @@ Repeat:
 validation/rootless-candidate/run /absolute/clean/Server d58d1fa4cb5ce656984d6ebaaeb78c8b70b06c85 eqemulator/eqemu-server@sha256:b6f46ebc00f8da8f103197cf2252be8173317b85fbc42716c994ad33d5da39f7
 ```
 
-## Control checks (not yet qualified)
+## Control checks
 
 `controls.sh` runs the existing native control executable after compilation,
 requires the normal case to exit zero, and checks each deliberate failure for
 its expected sanitizer report and a symbolized sanitizer_controls.cpp line.
-Ordinary utility execution retains fatal ASan/UBSan options. This addition has
-not completed actual qualification. Attempt `run-LK4vFVPI` was interrupted during
-dependency rebuilding; it establishes no control or smoke result. DB/world/zone
-smoke remains unimplemented.
+Ordinary utility execution retains fatal ASan/UBSan options. The initial attempt `run-LK4vFVPI` was interrupted during
+dependency rebuilding; it establishes no control or smoke result. DB/world/zone smoke was added in the next increment below.
 
 ## Increment evidence, 2026-11-09
 
@@ -100,4 +98,41 @@ OOMKilled false. This does not establish the reason for daemon shutdown.
 Repeat the full corrected runner:
 ```
 ROOTLESS_SMOKE_FIXTURE="$HOME/.local/state/eqemu-vm-proof/runtime-qeynos2-inputs-20261025/payload" validation/rootless-candidate/run "$HOME/.local/state/eqemu-rootless-proof/source-proof" d58d1fa4cb5ce656984d6ebaaeb78c8b70b06c85 eqemulator/eqemu-server@sha256:b6f46ebc00f8da8f103197cf2252be8173317b85fbc42716c994ad33d5da39f7
+```
+
+## Ownership and startup diagnosis, 2026-11-09
+
+The diagnostic build now links native executables with `-no-pie`. With the same
+Clang 14 source and sanitizer flags, the PIE control exited 139 without a report
+in 7/30 pass cases and 9/30 leak cases. Non-PIE controls passed 100/100 normal
+runs and produced the expected leak report with source lines in 100/100 leak
+runs. UAF, OOB and UB controls also produced their expected reports. This is a
+container diagnostic setting; it changes neither host ASLR nor upstream release
+flags. Leak detection remains fatal. Evidence is in
+`~/.local/state/eqemu-rootless-proof/parent-diagnosis/`.
+
+Server candidate `4b549ab5ad9634457b67ba14aee7b6c03e4952b4` fixes `SetMySQL`
+replacing an owned connection without closing it. A focused real-MySQL-handle
+control leaked 2,848 bytes before the fix and exited zero with no LSan report
+afterward. It covers self-assignment, alias assignment, repeated borrowing and
+replacing a borrowed connection. The runner executes this control when the
+selected source includes it. Rust and Cargo-generated CXX remain uninstrumented.
+
+Fresh run `run-Y4BJPVlC` completed against this candidate and derived image
+`sha256:6dbfb5bf82f235bd9e8f4ca5a67e44c9ddc66ce1738561c1c1022c7928f25e7d`.
+Rust 44 tests/release, all 427 native build steps, all five sanitizer controls,
+the DB ownership control and 95/95 utilities passed. Fresh DB import and
+`shared_memory` completed without the original leak.
+
+Full smoke still failed (runner exit 1): world reported an invalid bool read at
+`world/world_boot.cpp:437` (`DisableConfigChecks`), and zone reported a null
+`Zone` member call at `zone/quest_parser_collection.cpp:87`. Readiness was not
+reached. Smoke child exits were world=1, zone=1, database=0. These new candidate
+startup defects remain unfixed; no suppression was added. Container removal and
+daemon inactivity were verified in `cleanup.log`. The read-only review found no
+concrete issues in the ownership fix or diagnostic linker change.
+
+Repeat this candidate:
+```sh
+ROOTLESS_SMOKE_FIXTURE="$HOME/.local/state/eqemu-vm-proof/runtime-qeynos2-inputs-20261025/payload" validation/rootless-candidate/run "$HOME/.local/state/eqemu-rootless-proof/server-db-fix-20261109" 4b549ab5ad9634457b67ba14aee7b6c03e4952b4 eqemulator/eqemu-server@sha256:b6f46ebc00f8da8f103197cf2252be8173317b85fbc42716c994ad33d5da39f7
 ```
