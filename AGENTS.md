@@ -1,11 +1,19 @@
 # Stack validation
 
 Use central Beads at `/home/bump/Projects/beads` with `project:bump-akk-stack`.
-Candidate native/Cargo execution belongs only in the disposable worker. Keep
+Routine build/test work may run in disposable rootless Docker containers or the
+existing disposable VM worker. The rootless validation path is being extended;
+claim only checks actually completed. Do not execute candidate binaries or Cargo
+directly on the host. Routine testing does not require privileged source-binding
+publication, maintenance-broker calls, or a separate approval per build. Host
+provisioning and changes to live deployments remain separate operations. Keep
 ordinary installed client/profile selection unchanged when preparing diagnostics.
 Operations documentation and Server source have separate owners.
 
-The foreground full validator remains `scripts/validate-worker-candidate`.
+The commands and admission procedures below describe the legacy VM runner only.
+They do not gate rootless Docker builds or require installing a maintenance broker.
+
+The legacy VM foreground validator is `scripts/validate-worker-candidate`.
 It packages a clean checkout at the exact selected commit. Dirty edits are
 rejected, never silently committed or claimed as tested.
 

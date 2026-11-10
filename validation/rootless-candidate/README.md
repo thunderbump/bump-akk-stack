@@ -1,5 +1,9 @@
 # Rootless candidate validation
 
+Experimental opt-in runner. It is not installed as a routine test gate.
+Builds and native diagnostic controls have passed; full world/zone smoke has not.
+See the latest result below before interpreting the historical runs.
+
 Run `validation/rootless-candidate/run /absolute/Server FULL_40_CHARACTER_HEAD [IMAGE_DIGEST]`.
 Requires Docker rootless prerequisites, systemd user service support, and network access.
 Uses only the explicit proof socket; never selects a Docker context. Serializes with
@@ -136,3 +140,25 @@ Repeat this candidate:
 ```sh
 ROOTLESS_SMOKE_FIXTURE="$HOME/.local/state/eqemu-vm-proof/runtime-qeynos2-inputs-20261025/payload" validation/rootless-candidate/run "$HOME/.local/state/eqemu-rootless-proof/server-db-fix-20261109" 4b549ab5ad9634457b67ba14aee7b6c03e4952b4 eqemulator/eqemu-server@sha256:b6f46ebc00f8da8f103197cf2252be8173317b85fbc42716c994ad33d5da39f7
 ```
+
+## Latest completed run
+
+`run-N8kJWrne` used Server `d24e5f7f436a830d937be445a1e84d1f9aaa4a16`
+and the unchanged runner at Stack `619d2e7`. Rust 44 tests/release, native 427
+build steps, all five sanitizer controls, DB ownership control, 96 utilities,
+fresh database import and shared-memory startup passed. The real-parser config
+regression passed under sanitizers and zone passed the earlier null reload call.
+
+Full smoke failed, exit 1, readiness false. Zone reported a misaligned uint32
+read at `zone/map.cpp:556`; world reported 8,261 leaked bytes in 135 allocations.
+World/zone exits were 1 and database exit was 0. Container removal and rootless
+daemon inactivity were verified. These are candidate-source findings, not passing
+smoke qualification. Later map source changes have not been runtime validated.
+No candidate source fixes are included in this Stack PR.
+
+The runner requires a prepared public fixture with the existing runtime-input
+contract and sibling manifest. Fixture acquisition is not automated here. Rust,
+Cargo-generated CXX and separately built dependencies do not gain sanitizer
+coverage from the native CMake setting. Downloads are not fully hermetic, and
+interruption/failure cleanup is not comprehensively qualified. This remains a
+small opt-in diagnostic proof, not a general deployment service.
