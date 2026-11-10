@@ -19,8 +19,11 @@ output=$(mktemp -d "$state/run-XXXXXXXX")
 name="eqemu-rootless-proof-${output##*/}"
 docker_proof() { docker --host "$socket" "$@"; }
 cleanup() {
-    docker_proof rm -f "$name" >/dev/null 2>&1 || true
+    docker_proof rm -f "$name" > "$output/cleanup.log" 2>&1
+    test -z "$(docker_proof ps -aq --filter "name=^${name}$")"
     systemctl --user stop "$unit"
+    test "$(systemctl --user is-active "$unit" || :)" = inactive
+    printf "container absent; daemon inactive\n" >> "$output/cleanup.log"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
@@ -59,6 +62,9 @@ docker_proof create --name "$name" --user 0 --entrypoint /bin/bash \
     --memory 7g --memory-swap 7g --cpus 2 --pids-limit 512 \
     "$image" /candidate/build.sh
 docker_proof cp "$here/." "$name:/candidate"
+fixture=${ROOTLESS_SMOKE_FIXTURE:?Set ROOTLESS_SMOKE_FIXTURE to the approved public runtime payload}
+docker_proof cp "$fixture" "$name:/candidate/fixture"
+docker_proof cp "$fixture/../runtime-bundle-manifest.json" "$name:/candidate/fixture-manifest.json"
 git -C "$repo" rev-parse "$commit:submodules/vcpkg" > "$output/vcpkg-commit"
 docker_proof cp "$output/vcpkg-commit" "$name:/candidate/vcpkg-commit"
 docker_proof cp "$output/source.tar" "$name:/candidate/source.tar"

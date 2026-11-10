@@ -22,8 +22,8 @@ best effort and do not constitute a verified cleanup receipt.
 
 Stages: locked Rust tests and release build, CMake full build with utility tests and
 C++ ASan/UBSan, native utility suite. Rust and Cargo CXX are uninstrumented.
-No sanitizer controls or DB/world/zone smoke are claimed. Fresh test DB smoke and
-cross-language sanitizer coverage remain later increments after build prerequisites.
+Native controls and a fresh public-fixture smoke follow the build. Rust/CXX instrumentation remains out of scope.
+Set `ROOTLESS_SMOKE_FIXTURE` to the approved public runtime payload directory, with its sibling `runtime-bundle-manifest.json`.
 
 ## Observed run, 2026-11-09
 
@@ -67,3 +67,37 @@ Ordinary utility execution retains fatal ASan/UBSan options. This addition has
 not completed actual qualification. Attempt `run-LK4vFVPI` was interrupted during
 dependency rebuilding; it establishes no control or smoke result. DB/world/zone
 smoke remains unimplemented.
+
+## Increment evidence, 2026-11-09
+
+Current source: `d58d1fa4cb5ce656984d6ebaaeb78c8b70b06c85`.
+Run `run-2UBddwhh` retained under `~/.local/state/eqemu-rootless-proof`.
+Derived image `sha256:f0ebf5277b3917c48a8d1c4caef00023af1fd99dce64a28bda12385cab13af2f`.
+Rust 44 tests/release and native 427 steps passed. Original controls receipt:
+pass 0, UAF/OOB/UB/leak 1, expected diagnostics and source lines checked.
+Native utility finalized 95/95, zero failures. Smoke preparation first hit a Python
+archive API compatibility error, corrected to GNU tar against verified public inputs.
+
+The retained local diagnostic snapshot was resumed to investigate smoke without
+rebuilding dependencies. Its repeated leak control crashed with 139 without a report;
+that repetition is NOT a qualifying control run. The original control logs remain
+separate. The manual resume command continued to utility/smoke despite that control
+failure; it is diagnostic evidence, not an end-to-end passing runner receipt.
+Utility again finalized 95/95. Fresh MariaDB imports completed. `shared_memory`
+connected to the scratch DB, then LeakSanitizer reported 1424 bytes in three
+allocations through Database/SharedDatabase constructors and exited 1.
+World/zone readiness was not reached. Candidate source fixes are outside this
+Stack increment. No sanitizer suppression was added. Full smoke remains unqualified.
+`resume.log`, `resume-container.json`, and `resume-results/smoke.json` retain the
+failure and clean MariaDB exit 0. Owned containers were removed and daemon verified
+inactive. Images remain as diagnostic cache.
+
+Prior interrupted `run-LK4vFVPI` inspection/results were recovered and its exact
+container removed. Actual derived image was `sha256:28a874bae9aca52ab6c168039cc002fa24ee4689cf0a74d3fa032f5d507e09cb`;
+`08b482...` was its container ID. Recovered state was stopped, exit 255,
+OOMKilled false. This does not establish the reason for daemon shutdown.
+
+Repeat the full corrected runner:
+```
+ROOTLESS_SMOKE_FIXTURE="$HOME/.local/state/eqemu-vm-proof/runtime-qeynos2-inputs-20261025/payload" validation/rootless-candidate/run "$HOME/.local/state/eqemu-rootless-proof/source-proof" d58d1fa4cb5ce656984d6ebaaeb78c8b70b06c85 eqemulator/eqemu-server@sha256:b6f46ebc00f8da8f103197cf2252be8173317b85fbc42716c994ad33d5da39f7
+```
