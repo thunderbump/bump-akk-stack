@@ -10,6 +10,7 @@ from pathlib import Path
 import re
 import resource
 import selectors
+import shutil
 import signal
 import socket
 import sys
@@ -31,6 +32,11 @@ RULES = {'Map:FindBestZHeightAdjust': '1', 'Map:FixZWhenPathing': 'true',
 MAX_LOG = 4 * 1024 * 1024
 TIMER_ROWS = 256
 TIMER_BYTES = 65536
+SHARED_BYTES = 256 * 1024 * 1024
+SUPPORT_BYTES = 65536
+SUPPORT_MANIFEST_SHA = '69e8d20fc25e3a0bfe8793762e765a7423956521b0d23b373c9bb629af24c381'
+SUPPORT_FILES = {'plugins/check_handin.pl', 'plugins/globals.pl',
+                 'modules/items.lua', 'modules/string_ext.lua'}
 
 
 class Refusal(Exception):
@@ -136,12 +142,94 @@ def private_config(original, root, assets):
     server = config['server']
     server['auto_database_updates'] = 'false'
     # Replace the entire path collection, including arrays that override scalar paths.
-    server['directories'] = {**assets, 'quests': str(root/'quests'),
+    server['directories'] = {**assets, 'shared_memory':str(root/'shared'), 'quests': str(root/'quests'),
         'plugins': str(root/'plugins'), 'lua_modules': str(root/'modules'),
         'logs': str(root/'logs'), 'quest_paths': [str(root/'quests')],
         'plugin_paths': [str(root/'plugins')], 'lua_module_paths': [str(root/'modules')]}
     server['files'] = {'plugin.pl': str(root/'plugins/plugin.pl')}
     return config
+
+
+def runtime_inputs(c):
+    """Verify the finite deployed utility closure and immutable shared seeds."""
+    require(c['support_manifest_sha256'] == SUPPORT_MANIFEST_SHA, 'runtime support selection differs')
+    require(digest(HERE/'vendor/runtime-support-pins.json') == SUPPORT_MANIFEST_SHA, 'runtime support source pin differs')
+    source = Path(c['support_root'])
+    require(source.is_absolute() and source.is_dir(), 'runtime support root missing')
+    manifest = source/'MANIFEST.json'
+    require(manifest.is_file() and not manifest.is_symlink() and manifest.stat().st_size <= SUPPORT_BYTES, 'runtime support manifest missing')
+    require(digest(manifest) == c['support_manifest_sha256'], 'runtime support manifest differs')
+    entries = json.loads(manifest.read_text())['files']
+    require(len(entries) == 4 and {e['destination'] for e in entries} == SUPPORT_FILES, 'runtime support closure differs')
+    shared = c['shared_blobs']
+    require(set(shared) == {'items','spells'}, 'shared seed closure differs')
+    def check(path, entry, bound):
+        require(path.is_file() and not path.is_symlink(), 'runtime input missing')
+        require(type(entry['bytes']) is int and 0 < entry['bytes'] <= bound, 'runtime input size bound')
+        require(path.stat().st_size == entry['bytes'] and digest(path) == entry['sha256'], 'runtime input differs')
+    for entry in entries:
+        require(entry['name'] == Path(entry['destination']).name, 'runtime support name differs')
+        check(source/entry['name'], entry, SUPPORT_BYTES)
+    require(sum(e['bytes'] for e in entries) <= SUPPORT_BYTES, 'runtime support total bound')
+    for name, entry in shared.items():
+        check(Path(c['assets']['shared_memory'])/name, entry, SHARED_BYTES)
+    require(sum(e['bytes'] for e in shared.values()) <= SHARED_BYTES, 'shared seed total bound')
+    # Verify the source-defined compatibility marker in unchanged deployed data.
+    # This is neither native execution nor hand-in behavior qualification.
+    for name in ('items.lua','check_handin.pl'):
+        require(b'CheckHandin' in (source/name).read_bytes(), 'compatible runtime utility absent')
+    return entries
+
+
+def prepare_runtime(private, c, entries, record):
+    """Copy only pinned utilities and per-process RW shared files, before DB writes."""
+    shared = private/'shared'
+    record.update(support=[], shared={'directory':str(shared),'files':[],'locks':[],'removed':False})
+    total = sum(e['bytes'] for e in c['shared_blobs'].values())
+    require(shutil.disk_usage(private).free >= total + 64*1024*1024, 'private shared copy space')
+    shared.mkdir(mode=0o700)
+    def copy(source, target, entry, mode):
+        with source.open('rb') as src, target.open('xb') as dst:
+            shutil.copyfileobj(src,dst,1024*1024)
+            dst.flush()
+            os.fchmod(dst.fileno(),mode)
+            os.fsync(dst.fileno())
+        require(target.stat().st_size == entry['bytes'] and digest(target) == entry['sha256'] and digest(source) == entry['sha256'], 'runtime copy differs')
+    for entry in entries:
+        target = private/entry['destination']
+        copy(Path(c['support_root'])/entry['name'],target,entry,0o400)
+        record['support'].append({'file':entry['destination'],'bytes':entry['bytes'],'sha256':entry['sha256']})
+    for name, entry in c['shared_blobs'].items():
+        item={'name':name,'bytes':entry['bytes'],'sha256':entry['sha256'],'copied':False,'removed':False}
+        record['shared']['files'].append(item)
+        copy(Path(c['assets']['shared_memory'])/name,shared/name,entry,0o600)
+        st=(shared/name).stat();item.update(copied=True,identity=[st.st_dev,st.st_ino])
+    for name in ('items.lock','spells.lock'):
+        with (shared/name).open('xb') as stream:os.fchmod(stream.fileno(),0o600)
+        st=(shared/name).stat();record['shared']['locks'].append({'name':name,'identity':[st.st_dev,st.st_ino]})
+
+
+def release_shared_copy(record, c):
+    """Only after all started children are reaped; never remove inputs or logs."""
+    shared=record['shared'];directory=Path(shared['directory'])
+    if not directory.exists():
+        require(not shared['files'] and not shared['locks'], 'private shared directory disappeared')
+        shared['removed']=True
+        return
+    files=shared['files']+shared['locks']
+    require({f.name for f in directory.iterdir()} == {e['name'] for e in files}, 'unknown private shared file')
+    for item in files:
+        f=directory/item['name'];st=f.lstat()
+        require(not f.is_symlink() and f.is_file() and [st.st_dev,st.st_ino] == item.get('identity'), 'private shared identity differs')
+        require(st.st_size <= SHARED_BYTES, 'private shared size bound')
+        item['after_sha256']=digest(f)
+        if item['name'] in c['shared_blobs']:
+            require(item.get('copied') is True, 'private shared copy incomplete')
+            source=Path(c['assets']['shared_memory'])/item['name']
+            require(digest(source) == c['shared_blobs'][item['name']]['sha256'], 'shared source changed')
+    for item in files:
+        (directory/item['name']).unlink();item['removed']=True
+    directory.rmdir();shared['removed']=True
 
 
 def validate_contract(c):
@@ -236,6 +324,8 @@ class Store:
         rules = {r['rule_name']: r['rule_value'].lower() for r in rules}
         require(all(rules.get(k) == v for k, v in RULES.items()), 'effective rules do not match fixed probe')
         require(self.sql('SELECT ruleset_id FROM '+game+' WHERE ruleset_id=%s LIMIT 1', (self.contract['ruleset_id'],)), 'ruleset absent')
+        hotfix = self.rows('game','variables','varname=%s',('hotfix_name',))
+        require(len(hotfix) <= 1 and (not hotfix or hotfix[0]['value'] == ''), 'hotfix shared prefix unsupported')
         active = self.rows('game', 'variables', 'varname=%s', ('RuleSet',))
         # Native zone/main.cpp falls back to the named default when absent.
         require(len(active) <= 1 and (not active or active[0]['value'] == self.contract['ruleset_name']), 'active ruleset differs')
@@ -488,7 +578,7 @@ def main():
     receipt = {'passed':False, 'cleanup':False, 'children':{}, 'reload_gap':'no qualified targeted reload route',
         'native_housekeeping':{'scope':'unchanged native lifecycle: global expired NPC timers/quest globals and event-log default initialization; not fixture-confined',
                                'attribution':'before/after differences may include concurrent world activity',
-                               'before':None,'after':None}}
+                               'before':None,'after':None}, 'runtime_data':{}, 'shared_cleanup':False}
     store = None
     committed = False
     try:
@@ -508,6 +598,18 @@ def main():
             # Verify port availability now; operator retains exclusive reservation until cleanup.
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.bind(('0.0.0.0', item['port']))
+        inputs = runtime_inputs(c)
+        for zone, _, source, _ in selected_zones(c):
+            private = root/zone
+            private.mkdir(mode=0o700)
+            for name in ('quests','plugins','modules','logs','mods'):
+                (private/name).mkdir(mode=0o700)
+            target = private/'quests'/zone/('v'+str(c['zones'][zone]['version']))
+            target.mkdir(parents=True)
+            (target/'2011.pl').write_text(quest(HERE/'vendor'/source))
+            data = receipt['runtime_data'].setdefault(zone,{})
+            prepare_runtime(private,c,inputs,data)
+            save(private/'eqemu_config.json', private_config(config, private, c['assets']))
         store = Store(config, c)
         store.preflight()
         receipt['native_housekeeping']['before'] = store.manifest.get('respawn_timers_before')
@@ -517,15 +619,8 @@ def main():
         # Treat an ambiguous COMMIT response as potentially committed and compensate exactly.
         committed = True
         store.db.commit()
-        for zone, _, source, _ in selected_zones(c):
+        for zone, *_ in selected_zones(c):
             private = root/zone
-            private.mkdir(mode=0o700)
-            for name in ('quests','plugins','modules','logs','mods'):
-                (private/name).mkdir(mode=0o700)
-            target = private/'quests'/zone/('v'+str(c['zones'][zone]['version']))
-            target.mkdir(parents=True)
-            (target/'2011.pl').write_text(quest(HERE/'vendor'/source))
-            save(private/'eqemu_config.json', private_config(config, private, c['assets']))
             child = receipt['children'].setdefault(zone, {})
             text = run_child(args.zone_binary.absolute(), private, zone, c['zones'][zone], child, c['world_pid'], int(config['server']['world']['tcp']['port']))
             (root/(zone+'-evidence.log')).write_text(text)
@@ -562,7 +657,17 @@ def main():
                 except BaseException:
                     receipt['cleanup'] = False
                     receipt['close_error'] = 'connection close unavailable'
-        receipt['passed'] = receipt['passed'] and receipt['cleanup']
+        all_reaped = all(child.get('reaped') for child in receipt['children'].values())
+        receipt['shared_cleanup'] = all_reaped
+        for data in receipt['runtime_data'].values():
+            try:
+                require(all_reaped, 'unreaped child; shared copies retained')
+                if 'shared' in data:
+                    release_shared_copy(data,c)
+            except BaseException:
+                receipt['shared_cleanup'] = False
+                receipt['shared_cleanup_error'] = 'private copies retained; inspect runtime data receipt'
+        receipt['passed'] = receipt['passed'] and receipt['cleanup'] and receipt['shared_cleanup']
         save(root/'receipt.json', receipt)
     return 0 if receipt['passed'] else 1
 

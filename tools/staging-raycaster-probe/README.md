@@ -57,6 +57,12 @@ Prepare an owner-only contract JSON, outside version control. Required fields:
   "world_pid": 123,
   "ruleset_id": 0,
   "ruleset_name": "default",
+  "support_root": "/READ_ONLY/runtime-support",
+  "support_manifest_sha256": "69e8d20fc25e3a0bfe8793762e765a7423956521b0d23b373c9bb629af24c381",
+  "shared_blobs": {
+    "items": {"bytes": 156747856, "sha256": "REVIEWED_64_HEX_SHA256"},
+    "spells": {"bytes": 46352076, "sha256": "REVIEWED_64_HEX_SHA256"}
+  },
   "default_rule_rows_sha256": "REVIEWED_64_HEX_SHA256",
   "assets": {
     "maps": "/READ_ONLY/maps",
@@ -120,15 +126,42 @@ Private generated `eqemu_config.json` files contain credentials: keep the entire
 root owner-only and never publish those files. Publish only the scrubbed receipt,
 evidence logs and ownership manifest after review.
 
-Provide verified task-private copies or read-only mounts of actual maps, navigation
-assets, opcodes and shared-memory input blobs at the contract's absolute directories.
-The two task-private zero-byte shared/items.lock and shared/spells.lock files must
-be writable by the native UID because IPCMutex opens them O_RDWR. Original locks
-and input blobs remain untouched. All copied input files must remain read-only. The parent asserts and enforces those
-mounts; this helper checks directories exist but does not change mount permissions.
-All quest/plugin/module scalar paths AND override arrays are replaced. Each root
-has empty private plugins, modules, mods and logs, and ONLY
-`quests/ZONE/v<VERSION>/2011.pl`. No public/global quest fallback is installed.
+Provide verified read-only maps/navigation/opcodes and frozen shared seed files at
+the contract's absolute input directories. The actual native MemoryMappedFile
+consumer requires O_RDWR, same-size ftruncate and MAP_SHARED even for loading
+existing items/spells. It cannot consume the frozen shared seeds directly.
+
+The helper verifies every input before DB connection/bootstrap, then creates a
+fresh shared directory inside each private process root. It copies exactly items
+and spells, verifies initial size/hash and the source again, modes copies 0600,
+and creates private zero-byte items.lock/spells.lock files. The generated config
+always points to this private shared directory. Total seed bytes are capped at
+256MiB per process; two initial roots can use at most 512MiB plus bounded logs and
+receipts. Each copy requires 64MiB additional free-disk reserve. This is a byte
+budget, not an installed quota or a proven peak resource fit. Original shared
+files/locks and frozen seeds are never opened for writing or removed.
+
+Only after every started native child is confirmed reaped does cleanup verify the
+known copy inode identities, retain post-use hashes, unlink exactly those copies
+and locks, then remove the empty shared directory. Native changes to a private
+copy are recorded, not attributed to the raycaster. Incomplete/replaced/unknown
+files or cleanup faults are retained and force NONPASS; no recursive root/log
+removal occurs. Support modules, quests, private configs and evidence remain.
+
+The first native attempt exposed required CheckHandin compatibility utilities.
+Use only the four already-deployed files named and hashed in
+vendor/runtime-support-pins.json: plugins/check_handin.pl and plugins/globals.pl,
+plus modules/items.lua and modules/string_ext.lua. The globals file is a plugin
+utility, not a global NPC quest. The support manifest is fixed by source and must
+match the contract; all payload file hashes/sizes are verified. At most 64KiB of
+support data is accepted. No marker stubs, downloads, package installation or
+public/global quest fallback are used. These modules provide the compatibility
+closure; the collision fixture does not invoke or qualify item hand-in behavior.
+
+All quest/plugin/module scalar paths AND override arrays point only to each fresh
+private root. Plugins/modules contain only those four pinned utilities, mods and
+logs begin empty, and the only NPC quest is quests/ZONE/v<VERSION>/2011.pl. No
+public Rat quest, global_npc script or public plugin search path is installed.
 
 Before any insert, all explicit Map:FindBestZHeightAdjust=1,
 Map:FixZWhenPathing=true, Zone:UseZoneController=true, Bots:Enabled=false and

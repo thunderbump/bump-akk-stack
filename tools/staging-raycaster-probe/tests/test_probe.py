@@ -27,6 +27,7 @@ class ProbeTests(unittest.TestCase):
         self.assertTrue(callable(comparator.parse_route))
         pins = json.loads((HERE/'vendor/pins.json').read_text())
         self.assertEqual(pins['commit'], '6a037f008f9398df5967fa70ded0de32a9e83335')
+        self.assertEqual(p.digest(HERE/'vendor/runtime-support-pins.json'),p.SUPPORT_MANIFEST_SHA)
 
     def test_config_overrides_scalar_and_array_fallbacks(self):
         original = {'server': {'directories': {'quest_paths':['/public'], 'plugins':'/public'},
@@ -154,14 +155,14 @@ class ProbeTests(unittest.TestCase):
             config = Path(tmp)/'config.json'
             contract = Path(tmp)/'contract.json'
             config.write_text(json.dumps({'server':{'world':{'tcp':{'ip':'127.0.0.1'}}}}))
-            contract.write_text(json.dumps({'world_pid':1,'zones':{z[0]:{
-                'reference':str(HERE/'vendor/route.json'),'reference_sha256':p.ZONE_SHA,
+            contract.write_text(json.dumps({'world_pid':1,'assets':{'maps':'/maps'},'zones':{z[0]:{
+                'version':250+n,'reference':str(HERE/'vendor/route.json'),'reference_sha256':p.ZONE_SHA,
                 'reference_backend':'OFF','port':17901+n} for n,z in enumerate(p.ZONES)}}))
             store = MagicMock()
             store.manifest = {}
             store.bootstrap.side_effect = RuntimeError('sensitive database password')
             argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
-            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
                 self.assertEqual(p.main(),1)
             store.db.rollback.assert_called_once()
             store.db.commit.assert_not_called()
@@ -198,8 +199,8 @@ class ProbeTests(unittest.TestCase):
             config = Path(tmp)/'config.json'
             contract = Path(tmp)/'contract.json'
             config.write_text(json.dumps({'server':{'world':{'tcp':{'ip':'127.0.0.1'}}}}))
-            contract.write_text(json.dumps({'world_pid':1,'zones':{z[0]:{
-                'reference':str(HERE/'vendor/route.json'),'reference_sha256':p.ZONE_SHA,
+            contract.write_text(json.dumps({'world_pid':1,'assets':{'maps':'/maps'},'zones':{z[0]:{
+                'version':250+n,'reference':str(HERE/'vendor/route.json'),'reference_sha256':p.ZONE_SHA,
                 'reference_backend':'OFF','port':17901+n} for n,z in enumerate(p.ZONES)}}))
             store = MagicMock()
             store.manifest = {}
@@ -208,7 +209,7 @@ class ProbeTests(unittest.TestCase):
             store.db.close.side_effect = OSError('private close lost')
             store.cleanup.side_effect = OSError('private failed compensation')
             argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
-            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
                 self.assertEqual(p.main(),1)
             launch.assert_not_called()
             store.cleanup.assert_called_once()
@@ -382,7 +383,7 @@ class ProbeTests(unittest.TestCase):
                 args[4]['reaped']=True
                 return 'evidence'
             argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
-            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'Store',return_value=store), patch.object(p,'run_child',side_effect=completed) as launch, patch.object(p,'verify_evidence',return_value={}):
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child',side_effect=completed) as launch, patch.object(p,'verify_evidence',return_value={}):
                 self.assertEqual(p.main(),1)
             store.cleanup.assert_called_once()
             store.db.close.assert_called_once()
@@ -392,6 +393,67 @@ class ProbeTests(unittest.TestCase):
             self.assertFalse(receipt['passed'])
             self.assertIn('housekeeping_snapshot_error',receipt)
             self.assertNotIn('private',json.dumps(receipt))
+
+    def make_runtime_inputs(self, root, large=False):
+        # Harmless byte fixtures test pin/copy semantics only, not native plugins.
+        support=root/'support';support.mkdir()
+        entries=[]
+        for dest in sorted(p.SUPPORT_FILES):
+            name=Path(dest).name;data=b'# CheckHandin harmless unit fixture\n'
+            (support/name).write_bytes(data)
+            entries.append({'destination':dest,'name':name,'bytes':len(data),'sha256':p.hashlib.sha256(data).hexdigest()})
+        (support/'MANIFEST.json').write_text(json.dumps({'files':entries}))
+        (root/'vendor').mkdir()
+        (root/'vendor/runtime-support-pins.json').write_bytes((support/'MANIFEST.json').read_bytes())
+        seeds=root/'seeds';seeds.mkdir();blobs={}
+        for name in ('items','spells'):
+            data=(b'x'*(5*1024*1024) if large and name=='items' else b'original '+name.encode())
+            f=seeds/name;f.write_bytes(data);f.chmod(0o400)
+            blobs[name]={'bytes':len(data),'sha256':p.digest(f)}
+        return {'support_root':str(support),'support_manifest_sha256':p.digest(support/'MANIFEST.json'),
+                'shared_blobs':blobs,'assets':{'shared_memory':str(seeds)}}
+
+    def test_private_rw_shared_copy_matches_native_syscall_pattern(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);c=self.make_runtime_inputs(root,large=True)
+            with patch.object(p,'HERE',root), patch.object(p,'SUPPORT_MANIFEST_SHA',c['support_manifest_sha256']):
+                entries=p.runtime_inputs(c)
+            private=root/'private';private.mkdir()
+            for name in ('plugins','modules'):(private/name).mkdir()
+            record={};p.prepare_runtime(private,c,entries,record)
+            self.assertEqual({x['file'] for x in record['support']},p.SUPPORT_FILES)
+            self.assertTrue(all((private/dest).is_file() for dest in p.SUPPORT_FILES))
+            # Same O_RDWR/ftruncate/MAP_SHARED pattern as MemoryMappedFile(existing),
+            # under the unchanged native 4MiB output-file limit. No Server binary.
+            script='import os,resource,mmap,sys;resource.setrlimit(resource.RLIMIT_FSIZE,(4194304,4194304));f=os.open(sys.argv[1],os.O_RDWR);n=os.fstat(f).st_size;os.ftruncate(f,n);m=mmap.mmap(f,n,access=mmap.ACCESS_WRITE);m.close();os.close(f)'
+            subprocess.run([sys.executable,'-I','-c',script,str(private/'shared/items')],check=True,timeout=5)
+            p.release_shared_copy(record,c)
+            self.assertFalse((private/'shared').exists())
+            self.assertTrue(record['shared']['removed'])
+            for name,spec in c['shared_blobs'].items():self.assertEqual(p.digest(Path(c['assets']['shared_memory'])/name),spec['sha256'])
+            self.assertTrue((private/'plugins/check_handin.pl').exists())
+
+    def test_changed_runtime_utility_refuses_before_db_or_native(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);c=self.make_runtime_inputs(root)
+            (Path(c['support_root'])/'items.lua').write_text('unapproved replacement')
+            with patch.object(p,'Store',side_effect=AssertionError('DB must not open')), patch.object(p,'run_child',side_effect=AssertionError('native must not start')):
+                with patch.object(p,'HERE',root), patch.object(p,'SUPPORT_MANIFEST_SHA',c['support_manifest_sha256']):
+                    with self.assertRaises(p.Refusal):p.runtime_inputs(c)
+
+    def test_replaced_private_blob_is_retained_not_deleted(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);c=self.make_runtime_inputs(root)
+            with patch.object(p,'HERE',root), patch.object(p,'SUPPORT_MANIFEST_SHA',c['support_manifest_sha256']):
+                entries=p.runtime_inputs(c)
+            private=root/'private';private.mkdir()
+            for name in ('plugins','modules'):(private/name).mkdir()
+            record={};p.prepare_runtime(private,c,entries,record)
+            f=private/'shared/items';replacement=private/'replacement';replacement.write_bytes(b'changed owner')
+            os.replace(replacement,f)
+            with self.assertRaises(p.Refusal):p.release_shared_copy(record,c)
+            self.assertTrue(f.exists())
+            self.assertFalse(record['shared']['removed'])
 
     def test_identifier_rejects_sql(self):
         for value in ('a;b','`bad`','x.y',''):
