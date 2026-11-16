@@ -126,7 +126,7 @@ class ProbeTests(unittest.TestCase):
             root = Path(tmp)
             (root/'quests/qeynos2/v250').mkdir(parents=True)
             child = root/'child.py'
-            child.write_text('import signal,time,os,sys\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint("secret native boot text",flush=True)\nprint(f"Loaded Navmesh V[2] file [{Path.cwd()}/maps/nav/qeynos2.nav]",flush=True)\nos.write(fd,b"SERVER_COLLISION_QUERIES_DONE\\nSERVER_COLLISION_ROUTE_DONE\\n")\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nos.write(fd,b"MAP_SERVER_PROBE_STOPPED\\n")\ntime.sleep(20)\n')
+            child.write_text('import signal,time,os,sys\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint("secret native boot text",flush=True)\nprint(f"Loaded Navmesh [V2] file [{Path.cwd()}/maps/nav/qeynos2.nav]",flush=True)\nos.write(fd,b"SERVER_COLLISION_QUERIES_DONE\\nSERVER_COLLISION_ROUTE_DONE\\n")\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nos.write(fd,b"MAP_SERVER_PROBE_STOPPED\\n")\ntime.sleep(20)\n')
             real_popen = subprocess.Popen
             def launch(*args, **kwargs):
                 return real_popen([sys.executable,str(child),str(kwargs['pass_fds'][0])], **kwargs)
@@ -558,10 +558,23 @@ class NavLayoutTests(unittest.TestCase):
                     self.assertEqual(p.digest(Path(selected['qeynos2']['source'])),pins['qeynos2']['sha256'])
 
     def test_loaded_marker_requires_exact_effective_path_and_one_success(self):
-        root=Path('/private/qeynos2');marker=b'Loaded Navmesh V[2] file [/private/qeynos2/maps/nav/qeynos2.nav]\n'
+        root=Path('/private/qeynos2');marker=b'Loaded Navmesh [V2] file [/private/qeynos2/maps/nav/qeynos2.nav]\n'
         self.assertTrue(p.native_nav_load(marker,root,'qeynos2')['observed'])
-        for data in (b'',marker.replace(b'/private',b'/external'),marker+marker,marker.replace(b'V[2]',b'V[0]')):
+        for data in (b'',marker.replace(b'/private',b'/external'),marker+marker,marker.replace(b'[V2]',b'[V0]')):
             self.assertFalse(p.native_nav_load(data,root,'qeynos2')['observed'])
+
+    def test_actual_retained_native_marker_grammar_and_negative_records(self):
+        # Exact harmless log line from the consumed fifth attempt, without rewriting it.
+        root=Path('/home/eqemu/server/.raycaster-soak-20261115/runs/nav-layout-probe-v1/qeynos2')
+        actual=b'  Zone |    Info    | Load Loaded Navmesh [V2] file [/home/eqemu/server/.raycaster-soak-20261115/runs/nav-layout-probe-v1/qeynos2/maps/nav/qeynos2.nav] \n'
+        self.assertTrue(p.native_nav_load(actual,root,'qeynos2')['observed'])
+        for bad in (actual.replace(b'/qeynos2/maps',b'/other/maps'),
+                    actual.replace(b'[V2]',b'V[2]'),actual.replace(b'[V2]',b'[V0]'),
+                    actual.replace(b'[V2]',b'[V-2]'),actual.replace(b'[V2]',b'[V02]'),
+                    actual.replace(b'[V2]',b'[V10000]'),actual[:-1],
+                    actual.replace(b'.nav]',b'.nav'),actual.replace(b'.nav] ',b'.nav] partial'),
+                    actual+actual,actual+actual.replace(b'[V2]',b'V[2]')):
+            with self.subTest(bad=bad):self.assertFalse(p.native_nav_load(bad,root,'qeynos2')['observed'])
 
 
 class SeparateCaptureTests(unittest.TestCase):
@@ -618,7 +631,7 @@ libc.fflush(None)
     def run_fixture(self,root,receipt,body):
         (root/'quests/qeynos2/v250').mkdir(parents=True)
         child=root/'child.py'
-        child.write_text('import os,sys,time,signal\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint(f"Loaded Navmesh V[2] file [{Path.cwd()}/maps/nav/qeynos2.nav]",flush=True)\n'+body+
+        child.write_text('import os,sys,time,signal\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint(f"Loaded Navmesh [V2] file [{Path.cwd()}/maps/nav/qeynos2.nav]",flush=True)\n'+body+
             '\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nos.write(fd,b"MAP_SERVER_PROBE_STOPPED\\n")\ntime.sleep(20)\n')
         real=subprocess.Popen
         def launch(*args,**kwargs):return real([sys.executable,str(child),str(kwargs['pass_fds'][0])],**kwargs)

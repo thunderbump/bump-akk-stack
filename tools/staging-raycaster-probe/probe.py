@@ -264,10 +264,11 @@ def prepare_nav(private, zone, source, data):
 def native_nav_load(native, private, zone):
     """Existing native LogInfo success, bound to this private effective path."""
     path = str(private/'maps/nav'/(zone+'.nav'))
-    marker = rb'Loaded Navmesh V\[([0-9]{1,4})\] file \['+re.escape(path.encode())+rb'\]'
+    marker = rb'Loaded Navmesh \[V([1-9][0-9]{0,3})\] file \['+re.escape(path.encode())+rb'\][ \t]*\n'
     matches = re.findall(marker,native)
-    observed = len(matches) == 1 and int(matches[0]) > 0
-    return {'effective_path':path,'observed':observed,'marker_count':len(matches),
+    count = native.count(b'Loaded Navmesh')
+    observed = count == 1 and len(matches) == 1
+    return {'effective_path':path,'observed':observed,'marker_count':count,
             'version':int(matches[0]) if observed else None}
 
 

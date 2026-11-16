@@ -355,9 +355,20 @@ The nav copies remain with failed and successful run evidence; shared-memory
 copy cleanup does not delete them. Unknown or changed copies invalidate the run.
 
 Future native acceptance additionally requires exactly one existing native
-`Loaded Navmesh V[...] file [<effective path>]` success record for that child.
+`Loaded Navmesh [V<positive-version>] file [<effective path>]` success record for that child.
 This records native load evidence independently of the input hash. Missing,
 wrong-path or duplicate records refuse acceptance, including a silent missing-file
 fallback. Filesystem and synthetic marker controls establish preparation only,
 not a native loaded mesh, route parity, clean shutdown or soak qualification.
 The aggregate 4 MiB capture and all existing lifecycle/resource limits are unchanged.
+
+
+The marker gate matches the actual rendered native line, `Loaded Navmesh [V2]
+file [<exact effective path>]`, rather than the source format template `V[{}]`.
+It requires exactly one `Loaded Navmesh` occurrence, a positive version without
+leading zeros, the exact escaped effective path, a closing bracket and LF.
+Wrong paths, malformed or partial versions/lines, extra trailing text and duplicate
+occurrences fail. This changes only the fixed marker grammar. It does not
+normalize logs, repair frames or relax the query/route comparator. The consumed
+fifth attempt remains NONPASS even though its untouched Q2 streams compare equal
+and its native child exited0. PoK was skipped by that attempt's marker gate.
