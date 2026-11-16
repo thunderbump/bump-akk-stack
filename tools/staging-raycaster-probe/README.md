@@ -252,7 +252,8 @@ cleanup. A pre-spawn failure is explicitly distinguished from an unreaped child.
 Persistence, readback, EOF or close failure cannot pass. The comparator first
 checks both streams independently for complete LF framing, encoding, fixed
 record kinds/field sets and completion markers. Mixed or misplaced records are
-refused, never split/repaired/skipped. It then concatenates native followed by
+refused, never split/repaired/skipped. Records are split only on LF; any CR
+inside an evidence record, including CRLF, is rejected. It then concatenates native followed by
 quest text for the unchanged fixed comparator, preserving each stream's order
 without claiming event order across streams. No extra merged raw copy is saved.
 

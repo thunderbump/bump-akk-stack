@@ -504,6 +504,18 @@ libc.fflush(None)
             with self.subTest(native=native,quest=quest_bytes),self.assertRaises(p.Refusal):
                 p.capture_text(native,quest_bytes)
 
+    def test_bare_cr_and_crlf_are_not_evidence_record_boundaries(self):
+        native=b'SERVER_COLLISION_NATIVE caller=GetGroundZ entity=2 backend=ON kind=FindBestZ from=0,0,0 to=0,0,0 result=0 remaining=4095\n'
+        query=b'SERVER_COLLISION_QUERY id=start time=1 npc=2011 entity=2 from=0,0,0 size=6 origin=0,0,0 adjusted=0,0,1 eyes=0,0,1 to=0,0,0 target_size=6 target_eyes=0,0,1 ground=0 los=1\n'
+        self.assertEqual(p.capture_text(native,query+self.MARKERS),(native+query+self.MARKERS).decode())
+        for separator in (b'\r',b'\r\n'):
+            cases=[(native.replace(b'\n',separator,1)+native,query+self.MARKERS),
+                   (native,query.replace(b'\n',separator,1)+self.MARKERS),
+                   (b'boot\n',self.MARKERS.replace(b'\n',separator,1))]
+            for native_bytes,quest_bytes in cases:
+                with self.subTest(separator=separator,native=native_bytes),self.assertRaises(p.Refusal):
+                    p.capture_text(native_bytes,quest_bytes)
+
     def run_fixture(self,root,receipt,body):
         (root/'quests/qeynos2/v250').mkdir(parents=True)
         child=root/'child.py'

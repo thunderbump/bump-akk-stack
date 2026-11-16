@@ -554,8 +554,9 @@ def capture_text(native, quest_bytes):
             text = bytes(data).decode('utf-8' if kind == 'native' else 'ascii')
         except UnicodeError:
             raise Refusal(kind+' capture encoding invalid')
-        for line in data.splitlines():
+        for line in data.split(b'\n')[:-1]:
             if kind == 'quest' or b'SERVER_COLLISION_' in line or b'MAP_SERVER_PROBE_STOPPED' in line:
+                require(b'\r' not in line,'CR inside evidence record')
                 tokens = line.split()
                 require(tokens and tokens[0] in fields and b'\x00' not in line,'invalid capture record')
                 require((tokens[0] == b'SERVER_COLLISION_NATIVE') == (kind == 'native'),'record on wrong stream')
@@ -567,7 +568,7 @@ def capture_text(native, quest_bytes):
                 require(line.count(b'SERVER_COLLISION_') == 1 and line.startswith(b'SERVER_COLLISION_'), 'mixed collision framing')
         texts.append(text)
     for marker in (b'SERVER_COLLISION_QUERIES_DONE',b'SERVER_COLLISION_ROUTE_DONE',b'MAP_SERVER_PROBE_STOPPED'):
-        require(bytes(quest_bytes).splitlines().count(marker) == 1,'missing or duplicate quest completion')
+        require(bytes(quest_bytes).split(b'\n').count(marker) == 1,'missing or duplicate quest completion')
     # Both already end in LF. This orders streams, not events across streams.
     return texts[0]+texts[1]
 
