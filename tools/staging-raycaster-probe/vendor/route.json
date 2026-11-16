@@ -1,0 +1,27 @@
+{
+  "provenance": "Actual OFF-native-v1 AdjustRoute nodes from preserved C++ baseline, not DB heights",
+  "npc": 2011,
+  "size": 6,
+  "speed": 1.25,
+  "points": [
+    [
+      263.037598,
+      214.493774,
+      7.09708166
+    ],
+    [
+      262.437592,
+      281.693787,
+      13.8611202
+    ],
+    [
+      264.23761,
+      283.493774,
+      14.1285706
+    ]
+  ],
+  "query_numeric_tolerance": 0,
+  "route_node_numeric_tolerance": 0,
+  "pose_ground_tolerance": 0.05,
+  "final_xy_tolerance": 0.5
+}

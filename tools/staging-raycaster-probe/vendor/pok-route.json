@@ -1,0 +1,27 @@
+{
+  "provenance": "Retained public PoK grid 3 entries 41,42,43; pok-inventory/pok-grid.tsv before Rust",
+  "npc": 2011,
+  "size": 6,
+  "speed": 1.25,
+  "points": [
+    [
+      313.068,
+      -560.554,
+      -155.671
+    ],
+    [
+      340.242,
+      -561.633,
+      -142.084
+    ],
+    [
+      426.197,
+      -560.964,
+      -116.248
+    ]
+  ],
+  "query_numeric_tolerance": 0,
+  "route_node_numeric_tolerance": 0,
+  "pose_ground_tolerance": 0.05,
+  "final_xy_tolerance": 0.5
+}
