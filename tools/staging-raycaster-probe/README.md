@@ -107,8 +107,11 @@ Private generated `eqemu_config.json` files contain credentials: keep the entire
 root owner-only and never publish those files. Publish only the scrubbed receipt,
 evidence logs and ownership manifest after review.
 
-Mount existing actual maps, navigation assets, opcodes and shared memory read-only
-at the contract's absolute directories. The parent asserts and enforces those
+Provide verified task-private copies or read-only mounts of actual maps, navigation
+assets, opcodes and shared-memory input blobs at the contract's absolute directories.
+The two task-private zero-byte shared/items.lock and shared/spells.lock files must
+be writable by the native UID because IPCMutex opens them O_RDWR. Original locks
+and input blobs remain untouched. All copied input files must remain read-only. The parent asserts and enforces those
 mounts; this helper checks directories exist but does not change mount permissions.
 All quest/plugin/module scalar paths AND override arrays are replaced. Each root
 has empty private plugins, modules, mods and logs, and ONLY
@@ -163,8 +166,12 @@ The private ownership manifest is fsynced before COMMIT. After children are reap
 cleanup checks player/dynamic state again, captures only the known instance-scoped
 persistent rows, and deletes those exact row values. Fixture cleanup includes an
 explicit exact `instance_list` deletion because Server DeleteInstance omits it.
-Every conditional deletion requires one matching unchanged row and one affected
-row. A conflict rolls cleanup back and leaves an operator-visible failure, never
+Every conditional deletion locks by the schema-pinned integer primary or unique
+identity, compares the complete returned row to the retained canonical snapshot,
+then deletes by that identity under the same transaction lock. The sole text key,
+spawn-condition zone, uses explicit binary comparison. FLOAT coordinates are never
+sent back as equality predicates; case/space-insensitive collation cannot establish
+ownership. Each delete requires exactly one affected row. A conflict rolls cleanup back and leaves an operator-visible failure, never
 an unqualified delete. No public row is restored from a snapshot or overwritten.
 
 If the helper/container is forcibly lost, use the manifest and receipt under the

@@ -46,7 +46,7 @@ def digest(path):
 
 
 def encoded(value):
-    return json.dumps(value, sort_keys=True, default=str, separators=(',', ':'))
+    return json.dumps(value, sort_keys=True, default=str, allow_nan=False, separators=(',', ':'))
 
 
 def save(path, value):
@@ -298,11 +298,27 @@ class Store:
                 'heading':0,'respawntime':600,'variance':0,'pathgrid':0,'_condition':0}, ('id=%s',(item['spawn'],)))
 
     def delete_exact(self, role, table, row):
-        where = ' AND '.join(identifier(c)+' <=> %s' for c in row)
-        current = self.rows(role, table, where, tuple(row.values()))
-        require(len(current) == 1, 'owned row changed or missing; cleanup refused')
+        # These keys are fixed by the complete schema hashes. No FLOAT predicate
+        # or text collation is allowed to establish ownership. The SELECT lock
+        # spans the exact canonical comparison and DELETE in this transaction.
+        keys = {
+            'game.instance_list':('id',), 'game.respawn_times':('id','instance_id'),
+            'game.spawn_condition_values':('id','instance_id','zone'),
+            'game.spawn2_disabled':('id',), 'game.data_buckets':('id',),
+            'game.zone_state_spawns':('id',), 'content.spawn2':('id',),
+            'content.spawngroup':('id',), 'content.spawnentry':('spawngroupID','npcID')}
+        columns = keys.get(role+'.'+table)
+        require(columns is not None, 'unknown cleanup identity')
+        require(all(type(row.get(c)) in (int,str) for c in columns), 'invalid cleanup identity')
+        parts = [identifier(c)+' <=> BINARY %s' if isinstance(row[c],str)
+                 else identifier(c)+' <=> %s' for c in columns]
+        # Explicit BINARY on the column too, avoiding case/space-folding collation.
+        parts = [('BINARY '+part) if isinstance(row[c],str) else part for c,part in zip(columns,parts)]
+        where, args = ' AND '.join(parts), tuple(row[c] for c in columns)
+        current = self.rows(role, table, where, args)
+        require(len(current) == 1 and encoded(current[0]) == encoded(row), 'owned row changed or missing; cleanup refused')
         with self.db.cursor() as cursor:
-            cursor.execute('DELETE FROM '+self.table(role,table)+' WHERE '+where+' LIMIT 1', tuple(row.values()))
+            cursor.execute('DELETE FROM '+self.table(role,table)+' WHERE '+where+' LIMIT 1', args)
             require(cursor.rowcount == 1, 'conditional delete did not remove exactly one row')
 
     def cleanup(self):

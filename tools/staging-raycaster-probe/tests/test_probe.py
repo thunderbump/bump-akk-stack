@@ -293,6 +293,33 @@ class ProbeTests(unittest.TestCase):
                     self.assertEqual(store.manifest['zone_rules']['poknowledge']['effective_fixed'],p.RULES)
                 self.assertFalse(any('INSERT' in call.args[0] for call in store.sql.call_args_list))
 
+    def test_float_ownership_uses_locked_integer_identity(self):
+        store = object.__new__(p.Store)
+        store.names = {'content':'peq'}
+        row = {'id':123,'x':263.037598,'y':214.493774,'name':'Private'}
+        # Model the documented FLOAT-to-DOUBLE predicate mismatch. The returned
+        # row is unchanged; only a predicate containing coordinates is unreliable.
+        store.rows = MagicMock(side_effect=lambda role,table,where,args: [] if '`x`' in where else [dict(row)])
+        store.db = MagicMock()
+        store.db.cursor.return_value.__enter__.return_value.rowcount = 1
+        store.delete_exact('content','spawn2',row)
+        sql,args = store.db.cursor.return_value.__enter__.return_value.execute.call_args.args
+        self.assertNotIn('`x`',sql)
+        self.assertEqual(args,(123,))
+
+    def test_collation_equivalent_changed_text_is_not_owned(self):
+        store = object.__new__(p.Store)
+        store.names = {'content':'peq'}
+        store.db = MagicMock()
+        store.db.cursor.return_value.__enter__.return_value.rowcount = 1
+        original = {'id':123,'name':'Private'}
+        for changed in ('PRIVATE','Private '):
+            with self.subTest(changed=changed):
+                store.rows = MagicMock(return_value=[{'id':123,'name':changed}])
+                with self.assertRaises(p.Refusal):
+                    store.delete_exact('content','spawngroup',original)
+                store.db.cursor.assert_not_called()
+
     def test_identifier_rejects_sql(self):
         for value in ('a;b','`bad`','x.y',''):
             with self.assertRaises(p.Refusal):
