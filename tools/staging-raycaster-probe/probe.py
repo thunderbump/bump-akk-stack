@@ -37,6 +37,9 @@ SUPPORT_BYTES = 65536
 SUPPORT_MANIFEST_SHA = '69e8d20fc25e3a0bfe8793762e765a7423956521b0d23b373c9bb629af24c381'
 SUPPORT_FILES = {'plugins/check_handin.pl', 'plugins/globals.pl',
                  'modules/items.lua', 'modules/string_ext.lua'}
+# On unconfirmed reap, do not explicitly close/collect live-child streams.
+# Keep their owners reachable until helper exit, which is always NONPASS.
+_UNREAPED_IO = []
 
 
 class Refusal(Exception):
@@ -121,8 +124,9 @@ def selected_zones(contract):
     return tuple(z for z in ZONES if selected is None or z[0] == selected)
 
 
-def quest(source):
-    """Keep fixed calls; duplicate OS stdout without altering Perl's tied handles."""
+def quest(source, output_fd):
+    """Duplicate only our internally created, inherited quest-pipe descriptor."""
+    require(type(output_fd) is int and output_fd >= 3, 'invalid private quest descriptor')
     text = source.read_text().replace('quest::debug(', 'probe_emit(')
     text = text.replace('"/runtime/stop-map-validation"', '"stop-map-validation"')
     text = text.replace('sub EVENT_SPAWN { quest::settimer("server_collision", 1); }', '''sub EVENT_SPAWN {
@@ -134,8 +138,8 @@ def quest(source):
     quest::processmobswhilezoneempty(1);
     quest::settimer("server_collision", 1);
 }''')
-    return r'''# A real dup, not >&=1: destroying this lexical handle must not close fd 1.
-open(my $probe_output, '>&', 1) or die 'private probe output open';
+    return r'''# This is a dup of the task-owned pipe, never global STDOUT/STDERR.
+open(my $probe_output, '>&', PRIVATE_FD) or die 'private probe output open';
 binmode($probe_output, ':raw') or die 'private probe output mode';
 my $probe_output_failed = 0;
 sub probe_emit {
@@ -153,7 +157,7 @@ sub probe_emit {
         die 'private probe output write';
     }
 }
-''' + text
+'''.replace('PRIVATE_FD', str(output_fd)) + text
 
 
 def private_config(original, root, assets):
@@ -495,91 +499,245 @@ def world_connected(world, zone, port):
                    and peer[2] == row[1] for peer in rows) for row in rows)
 
 
+def child_wait_snapshot(pid, start_ticks):
+    """Advisory bounded reads of this child only, without ptrace or permission changes."""
+    def read(path, bound):
+        with Path(path).open('rb') as stream:
+            raw = stream.read(bound+1)
+        require(len(raw) <= bound, 'passive proc bound')
+        return raw.decode('ascii')
+    def identity():
+        return int(read(Path('/proc',str(pid),'stat'),8192).rsplit(')',1)[1].split()[19])
+    def state(root):
+        status = read(root/'status',4096)
+        fields = {k:v.strip() for k,v in (line.split(':',1) for line in status.splitlines())
+                  if k in ('State','Threads','VmRSS','voluntary_ctxt_switches','nonvoluntary_ctxt_switches')}
+        try:
+            fields['wchan'] = read(root/'wchan',128).strip()
+        except (OSError, ValueError):
+            fields['wchan'] = None
+            fields['wchan_unavailable'] = True
+        return fields
+    try:
+        if start_ticks is None or identity() != start_ticks:
+            return {'unavailable':'child start identity unavailable or changed'}
+        root = Path('/proc',str(pid))
+        result = {'start_ticks':start_ticks,'main':state(root),'threads':[],'thread_limit':16}
+        for index, entry in enumerate((root/'task').iterdir()):
+            if index == 16:
+                result['threads_truncated'] = True
+                break
+            try:
+                result['threads'].append({'tid':int(entry.name),**state(entry)})
+            except (OSError, ValueError):
+                result['threads'].append({'tid':int(entry.name),'unavailable':True})
+        require(identity() == start_ticks, 'child identity changed during observation')
+        return result
+    except (OSError, ValueError, IndexError, Refusal):
+        return {'unavailable':'passive proc read unavailable'}
+
+
+def capture_text(native, quest_bytes):
+    """Validate both complete streams independently; never repair mixed records."""
+    texts = []
+    fields = {
+        b'SERVER_COLLISION_NATIVE':set('caller entity backend kind from to result remaining'.split()),
+        b'SERVER_COLLISION_QUERY':set('id time npc entity from size origin adjusted eyes to target_size target_eyes ground los'.split()),
+        b'SERVER_COLLISION_FLOOR':set('id xyz ground'.split()),
+        b'SERVER_COLLISION_REQUEST':set('caller to'.split()),
+        b'SERVER_COLLISION_POSE':set('tick xyz ground moving'.split()),
+        b'SERVER_COLLISION_QUERIES_DONE':set(),b'SERVER_COLLISION_ROUTE_DONE':set(),b'MAP_SERVER_PROBE_STOPPED':set()}
+    for kind, data in (('native',native),('quest',quest_bytes)):
+        data = bytes(data)
+        require(data and data.endswith(b'\n'), kind+' capture incomplete')
+        try:
+            text = bytes(data).decode('utf-8' if kind == 'native' else 'ascii')
+        except UnicodeError:
+            raise Refusal(kind+' capture encoding invalid')
+        for line in data.splitlines():
+            if kind == 'quest' or b'SERVER_COLLISION_' in line or b'MAP_SERVER_PROBE_STOPPED' in line:
+                tokens = line.split()
+                require(tokens and tokens[0] in fields and b'\x00' not in line,'invalid capture record')
+                require((tokens[0] == b'SERVER_COLLISION_NATIVE') == (kind == 'native'),'record on wrong stream')
+                pairs = [token.split(b'=',1) for token in tokens[1:]]
+                require(all(len(pair) == 2 and pair[1] for pair in pairs),'invalid record fields')
+                keys = [pair[0].decode('ascii') for pair in pairs]
+                require(len(keys) == len(set(keys)) and set(keys) == fields[tokens[0]],'record field set differs')
+            if b'SERVER_COLLISION_' in line:
+                require(line.count(b'SERVER_COLLISION_') == 1 and line.startswith(b'SERVER_COLLISION_'), 'mixed collision framing')
+        texts.append(text)
+    for marker in (b'SERVER_COLLISION_QUERIES_DONE',b'SERVER_COLLISION_ROUTE_DONE',b'MAP_SERVER_PROBE_STOPPED'):
+        require(bytes(quest_bytes).splitlines().count(marker) == 1,'missing or duplicate quest completion')
+    # Both already end in LF. This orders streams, not events across streams.
+    return texts[0]+texts[1]
+
+
 def run_child(binary, root, zone, item, receipt, world_pid=None, world_port=None):
-    """Guard immediately after spawn; independent cleanup stages always reach reap."""
-    env = {'PATH': '/usr/bin:/bin', 'HOME': str(root),
-           'EQEMU_COLLISION_OBSERVE': 'server-collision-npc-2011'}
-    chunks = bytearray()
-    selector = None
+    """Two owned streams share one budget; independent cleanup stages always reap."""
+    env = {'PATH':'/usr/bin:/bin','HOME':str(root),
+           'EQEMU_COLLISION_OBSERVE':'server-collision-npc-2011'}
+    chunks = {'native':bytearray(),'quest':bytearray()}
+    observed = {'native':0,'quest':0}
+    eof = {'native':False,'quest':False}
+    selector, process, quest_stream = None, None, None
+    write_fd = None
     cleanup_errors = []
     started = time.monotonic()
-    def child_limits():
-        resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-        resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_LOG, MAX_LOG))
+    receipt.update(started=False,reaped=None,phases={},passive_observations=[],
+                   capture={'complete':False,'budget':MAX_LOG,'overflow':False})
+    def mark(name):
+        receipt['phases'].setdefault(name,time.monotonic()-started)
     def cleanup_stage(name, action):
         try:
             return action()
         except BaseException:
             cleanup_errors.append(name)
             return None
+    def poll():
+        code = process.poll()
+        if code is not None:
+            mark('exit_first_observed')
+        return code
+    def observe(label):
+        receipt['passive_observations'].append({'phase':label,'seconds':time.monotonic()-started,
+            'facts':child_wait_snapshot(process.pid,receipt.get('start_ticks'))})
+    def child_limits():
+        resource.setrlimit(resource.RLIMIT_CORE,(0,0))
+        resource.setrlimit(resource.RLIMIT_FSIZE,(MAX_LOG,MAX_LOG))
     def drain(wait):
         if selector is None or not selector.get_map():
             time.sleep(wait)
             return
         for key, _ in selector.select(wait):
-            data = os.read(key.fd, 65536)
+            data = os.read(key.fd,65536)
+            kind = key.data
             if not data:
                 selector.unregister(key.fileobj)
-            space = MAX_LOG-len(chunks)
-            chunks.extend(data[:space])
-            require(len(data) <= space, 'native output overflow')
-    def await_exit(seconds):
-        until = time.monotonic()+seconds
-        while process.poll() is None and time.monotonic() < until:
-            drain(.1)
-    def send(sig, key):
-        if process.poll() is None:
+                eof[kind] = True
+            observed[kind] += len(data)
+            space = MAX_LOG-sum(len(value) for value in chunks.values())
+            chunks[kind].extend(data[:space])
+            if len(data) > space:
+                receipt['capture']['overflow'] = True
+            require(len(data) <= space,'combined output overflow')
+        if b'MAP_SERVER_PROBE_STOPPED\n' in chunks['quest']:
+            mark('stop_ack_first_observed')
+    def await_exit(until):
+        while poll() is None and time.monotonic() < until:
+            drain(min(.1,max(0,until-time.monotonic())))
+    def send(sig,key):
+        if poll() is None:
             try:
-                os.killpg(process.pid, sig)
+                os.killpg(process.pid,sig)
                 receipt[key] = True
+                mark(key)
             except ProcessLookupError:
                 pass
-    process = subprocess.Popen([str(binary), zone+':'+str(item['port']), 'NONE', str(item['instance'])],
-        cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, preexec_fn=child_limits)
+    def stop_file():
+        mark('stop_file_attempt')
+        (root/'stop-map-validation').touch()
+        mark('stop_file_created')
+    def retain(kind):
+        # Raw files are private and may contain native console secrets. Never print them.
+        name = kind+'-capture.bin'
+        payload = bytes(chunks[kind])
+        with (root/name).open('xb') as stream:
+            os.fchmod(stream.fileno(),0o600)
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        require((root/name).read_bytes() == payload,'raw capture readback differs')
+        receipt['capture'][kind] = {'file':name,'bytes':len(payload),
+            'sha256':hashlib.sha256(payload).hexdigest(),'eof':eof[kind],'observed_bytes':observed[kind]}
     try:
-        receipt.update(pid=process.pid, argv_zone=zone, port=item['port'], instance=item['instance'], term_sent=False, kill_sent=False, reaped=False)
-        selector = selectors.DefaultSelector()
-        selector.register(process.stdout, selectors.EVENT_READ)
-        require(digest(Path('/proc')/str(process.pid)/'exe') == ZONE_SHA, 'executed zone differs')
-        complete = False
-        while time.monotonic()-started < 120:
-            drain(.1)
-            require(process.poll() is None, 'private zone exited early')
-            if world_pid is not None:
-                receipt['world_connected'] = receipt.get('world_connected', False) or world_connected(world_pid, process.pid, world_port)
-            if b'SERVER_COLLISION_ROUTE_DONE' in chunks:
-                require(receipt.get('world_connected') or world_pid is None, 'world connection not proved')
-                complete = True
-                break
-        require(complete, 'private zone deadline')
-    finally:
-        cleanup_stage('stop_file', lambda: (root/'stop-map-validation').touch())
-        cleanup_stage('quiesce_wait', lambda: await_exit(3))
-        cleanup_stage('term', lambda: send(signal.SIGTERM, 'term_sent'))
-        cleanup_stage('term_wait', lambda: await_exit(5))
-        cleanup_stage('kill', lambda: send(signal.SIGKILL, 'kill_sent'))
-        # wait is independent of stop-file, selector, pipe and signal failures.
-        code = cleanup_stage('reap', lambda: process.wait(timeout=5))
-        receipt['exit'] = code
-        receipt['reaped'] = code is not None
-        def final_drain():
-            until = time.monotonic()+2
-            while selector is not None and selector.get_map() and time.monotonic() < until:
+        read_fd, write_fd = os.pipe2(os.O_CLOEXEC)
+        quest_stream = os.fdopen(read_fd,'rb',buffering=0)
+        # The descriptor comes only from this pipe, not a CLI/contract selector.
+        target = root/'quests'/zone/('v'+str(item['version']))/'2011.pl'
+        source = HERE/'vendor'/next(z[2] for z in ZONES if z[0] == zone)
+        with target.open('x') as stream:
+            stream.write(quest(source,write_fd))
+        process = subprocess.Popen([str(binary),zone+':'+str(item['port']),'NONE',str(item['instance'])],
+            cwd=root,env=env,stdout=subprocess.PIPE,stderr=subprocess.STDOUT,start_new_session=True,
+            pass_fds=(write_fd,),preexec_fn=child_limits)
+        try:
+            receipt.update(started=True,pid=process.pid,argv_zone=zone,port=item['port'],instance=item['instance'],
+                           term_sent=False,kill_sent=False,reaped=False,quest_descriptor=write_fd)
+            os.close(write_fd)
+            write_fd = None
+            try:
+                with Path('/proc',str(process.pid),'stat').open() as stream:
+                    receipt['start_ticks'] = int(stream.read(8192).rsplit(')',1)[1].split()[19])
+            except (OSError,ValueError,IndexError):
+                receipt['start_ticks'] = None
+            selector = selectors.DefaultSelector()
+            selector.register(process.stdout,selectors.EVENT_READ,'native')
+            selector.register(quest_stream,selectors.EVENT_READ,'quest')
+            require(digest(Path('/proc')/str(process.pid)/'exe') == ZONE_SHA,'executed zone differs')
+            complete = False
+            while time.monotonic()-started < 120:
                 drain(.1)
-            receipt['pipe_eof'] = selector is not None and not selector.get_map()
-        cleanup_stage('final_pipe_drain', final_drain)
-        if selector is not None:
-            cleanup_stage('selector_close', selector.close)
-        cleanup_stage('pipe_close', process.stdout.close)
-        receipt['quiesced'] = b'MAP_SERVER_PROBE_STOPPED' in chunks
-        receipt['seconds'] = time.monotonic()-started
-        receipt['evidence'] = '\n'.join(line for line in chunks.decode(errors='replace').splitlines() if line.startswith('SERVER_COLLISION_'))
+                require(poll() is None,'private zone exited early')
+                if world_pid is not None:
+                    receipt['world_connected'] = receipt.get('world_connected',False) or world_connected(world_pid,process.pid,world_port)
+                if b'SERVER_COLLISION_ROUTE_DONE\n' in chunks['quest']:
+                    require(receipt.get('world_connected') or world_pid is None,'world connection not proved')
+                    complete = True
+                    break
+            require(complete,'private zone deadline')
+        finally:
+            # Passive reads consume these existing windows; they add no extra wait.
+            until = time.monotonic()+3
+            cleanup_stage('stop_file',stop_file)
+            cleanup_stage('observe_stop',lambda:observe('stop_file'))
+            cleanup_stage('quiesce_wait',lambda:await_exit(until))
+            until = time.monotonic()+5
+            cleanup_stage('term',lambda:send(signal.SIGTERM,'term_sent'))
+            cleanup_stage('observe_term',lambda:observe('after_term'))
+            cleanup_stage('term_wait',lambda:await_exit(until))
+            until = time.monotonic()+5
+            cleanup_stage('observe_before_kill',lambda:observe('before_kill'))
+            cleanup_stage('kill',lambda:send(signal.SIGKILL,'kill_sent'))
+            code = cleanup_stage('reap',lambda:process.wait(timeout=max(.001,until-time.monotonic())))
+            receipt['exit'] = code
+            receipt['reaped'] = code is not None
+            if code is not None:
+                mark('exit_first_observed')
+                mark('reaped')
+            def final_drain():
+                until = time.monotonic()+2
+                while selector is not None and selector.get_map() and time.monotonic() < until:
+                    drain(.1)
+            cleanup_stage('final_pipe_drain',final_drain)
+            receipt['pipe_eof'] = eof['native'] and eof['quest']
+            receipt['quiesced'] = b'MAP_SERVER_PROBE_STOPPED\n' in chunks['quest']
+            receipt['seconds'] = time.monotonic()-started
+            # Final capture and closure require confirmed reap; errors never yield PASS.
+            if receipt['reaped']:
+                cleanup_stage('retain_native',lambda:retain('native'))
+                cleanup_stage('retain_quest',lambda:retain('quest'))
+            else:
+                cleanup_errors.append('capture_unconfirmed_reap')
+            receipt['capture']['complete'] = receipt['reaped'] and all(eof.values()) and not cleanup_errors and not receipt['capture']['overflow']
+    finally:
+        if process is None or receipt.get('reaped'):
+            if write_fd is not None:
+                cleanup_stage('writer_close',lambda:os.close(write_fd))
+            if selector is not None:
+                cleanup_stage('selector_close',selector.close)
+            if quest_stream is not None:
+                cleanup_stage('quest_pipe_close',quest_stream.close)
+            if process is not None:
+                cleanup_stage('native_pipe_close',process.stdout.close)
+        else:
+            _UNREAPED_IO.append((process,selector,quest_stream,write_fd))
+            receipt['capture']['close_deferred_unconfirmed_reap'] = True
         if cleanup_errors:
             receipt['cleanup_errors'] = cleanup_errors
-    require(not cleanup_errors, 'private child cleanup fault')
-    require(receipt['quiesced'] and receipt['exit'] == 0 and receipt['pipe_eof'], 'private shutdown not clean')
-    return receipt['evidence']+'\n'
-
+            receipt['capture']['complete'] = False
+    require(not cleanup_errors,'private child cleanup/capture fault')
+    require(receipt['quiesced'] and receipt['exit'] == 0 and receipt['pipe_eof'],'private shutdown not clean')
+    return capture_text(chunks['native'],chunks['quest'])
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -625,7 +783,6 @@ def main():
                 (private/name).mkdir(mode=0o700)
             target = private/'quests'/zone/('v'+str(c['zones'][zone]['version']))
             target.mkdir(parents=True)
-            (target/'2011.pl').write_text(quest(HERE/'vendor'/source))
             data = receipt['runtime_data'].setdefault(zone,{})
             prepare_runtime(private,c,inputs,data)
             save(private/'eqemu_config.json', private_config(config, private, c['assets']))
@@ -642,7 +799,6 @@ def main():
             private = root/zone
             child = receipt['children'].setdefault(zone, {})
             text = run_child(args.zone_binary.absolute(), private, zone, c['zones'][zone], child, c['world_pid'], int(config['server']['world']['tcp']['port']))
-            (root/(zone+'-evidence.log')).write_text(text)
             receipt[zone] = verify_evidence(text, references[zone], zone, comparator)
         receipt['passed'] = True
     except BaseException as error:
@@ -652,7 +808,7 @@ def main():
         if store:
             try:
                 if committed:
-                    require(all(child.get('reaped') for child in receipt['children'].values()), 'unreaped child; DB cleanup refused')
+                    require(all(child.get('started') is False or child.get('reaped') is True for child in receipt['children'].values()), 'unreaped child; DB cleanup refused')
                     store.cleanup()
                 else:
                     store.db.rollback()
@@ -676,7 +832,7 @@ def main():
                 except BaseException:
                     receipt['cleanup'] = False
                     receipt['close_error'] = 'connection close unavailable'
-        all_reaped = all(child.get('reaped') for child in receipt['children'].values())
+        all_reaped = all(child.get('started') is False or child.get('reaped') is True for child in receipt['children'].values())
         receipt['shared_cleanup'] = all_reaped
         for data in receipt['runtime_data'].values():
             try:

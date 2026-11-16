@@ -44,7 +44,7 @@ class ProbeTests(unittest.TestCase):
 
     def test_private_quests_keep_fixed_calls_and_runtime_overrides(self):
         for name in ('2011.pl','pok-2011.pl'):
-            text = p.quest(HERE/'vendor'/name)
+            text = p.quest(HERE/'vendor'/name,9)
             self.assertNotIn('quest::debug', text)
             self.assertNotIn('/runtime/', text)
             self.assertIn('probe_emit', text)
@@ -120,22 +120,25 @@ class ProbeTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 comparator.parse_route(text+base.format(**values),'ON',json.loads((HERE/'vendor/route.json').read_text()))
 
-    def test_real_harmless_child_stop_reap_and_redaction(self):
+    def test_real_harmless_child_stop_reap_and_private_raw_retention(self):
         # This harmless Python fixture exercises native-child lifecycle handling.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
+            (root/'quests/qeynos2/v250').mkdir(parents=True)
             child = root/'child.py'
-            child.write_text('import signal,time\nfrom pathlib import Path\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint("secret native boot text",flush=True)\nprint("SERVER_COLLISION_ROUTE_DONE",flush=True)\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nprint("MAP_SERVER_PROBE_STOPPED",flush=True)\ntime.sleep(20)\n')
+            child.write_text('import signal,time,os,sys\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint("secret native boot text",flush=True)\nos.write(fd,b"SERVER_COLLISION_QUERIES_DONE\\nSERVER_COLLISION_ROUTE_DONE\\n")\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nos.write(fd,b"MAP_SERVER_PROBE_STOPPED\\n")\ntime.sleep(20)\n')
             real_popen = subprocess.Popen
             def launch(*args, **kwargs):
-                return real_popen([sys.executable,str(child)], **kwargs)
+                return real_popen([sys.executable,str(child),str(kwargs['pass_fds'][0])], **kwargs)
             receipt = {}
             with patch.object(p.subprocess,'Popen',side_effect=launch), patch.object(p,'digest',return_value=p.ZONE_SHA):
-                text = p.run_child(Path('/unused'),root,'qeynos2',{'port':12345,'instance':42},receipt)
+                text = p.run_child(Path('/unused'),root,'qeynos2',{'port':12345,'instance':42,'version':250},receipt)
             self.assertEqual(receipt['exit'],0)
             self.assertTrue(receipt['reaped'])
             self.assertTrue(receipt['quiesced'])
-            self.assertNotIn('secret',text)
+            self.assertIn('secret',text)
+            self.assertIn(b'secret',(root/'native-capture.bin').read_bytes())
+            self.assertTrue(receipt['capture']['complete'])
             self.assertNotIn('secret',json.dumps(receipt))
             self.assertLess(receipt['seconds'],10)
 
@@ -224,12 +227,13 @@ class ProbeTests(unittest.TestCase):
         for fault in ('register','touch'):
             with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
+                (root/'quests/qeynos2/v250').mkdir(parents=True)
                 child = root/'child.py'
-                child.write_text('import time\nprint("SERVER_COLLISION_ROUTE_DONE",flush=True)\ntime.sleep(60)\n')
+                child.write_text('import time,os,sys\nos.write(int(sys.argv[1]),b"SERVER_COLLISION_ROUTE_DONE\\n")\ntime.sleep(60)\n')
                 real_popen = subprocess.Popen
                 children = []
                 def launch(*args, **kwargs):
-                    proc = real_popen([sys.executable,str(child)], **kwargs)
+                    proc = real_popen([sys.executable,str(child),str(kwargs['pass_fds'][0])], **kwargs)
                     children.append(proc)
                     return proc
                 receipt = {}
@@ -237,7 +241,7 @@ class ProbeTests(unittest.TestCase):
                 try:
                     with patch.object(p.subprocess,'Popen',side_effect=launch), patch.object(p,'digest',return_value=p.ZONE_SHA), context:
                         with self.assertRaises((p.Refusal,OSError)):
-                            p.run_child(Path('/unused'),root,'qeynos2',{'port':12345,'instance':42},receipt)
+                            p.run_child(Path('/unused'),root,'qeynos2',{'port':12345,'instance':42,'version':250},receipt)
                     self.assertIsNotNone(children[0].poll(), 'child leaked')
                     self.assertTrue(receipt.get('reaped'), 'child not reaped')
                 finally:
@@ -461,8 +465,106 @@ class ProbeTests(unittest.TestCase):
                 p.identifier(value)
 
 
+class SeparateCaptureTests(unittest.TestCase):
+    MARKERS=b'SERVER_COLLISION_QUERIES_DONE\nSERVER_COLLISION_ROUTE_DONE\nMAP_SERVER_PROBE_STOPPED\n'
+
+    def test_real_stdio_partial_flush_mixes_old_stream_but_not_private_pipe(self):
+        # Deliberately force a partial stdio record. This is a harmless mechanism
+        # control, not proof of the lost native run's exact libc flush boundary.
+        program=r'''
+import ctypes,os,sys
+libc=ctypes.CDLL(None)
+libc.printf(b'SERVER_COLLISION_NATIVE caller=GetGroundZ entity=2 backend=ON kind=FindBestZ from=26')
+libc.fflush(None)
+os.write(int(sys.argv[1]),b'SERVER_COLLISION_POSE tick=1 xyz=0,0,0 ground=0 moving=0\n')
+libc.printf(b'3.5,0,0 to=0,0,0 result=0 remaining=4095\n')
+libc.fflush(None)
+'''
+        old=subprocess.run([sys.executable,'-I','-c',program,'1'],capture_output=True,check=True,timeout=5).stdout
+        self.assertIn(b'from=26SERVER_COLLISION_POSE',old)
+        with self.assertRaises(p.Refusal):p.capture_text(old,self.MARKERS)
+        read_fd,write_fd=os.pipe()
+        try:
+            new=subprocess.run([sys.executable,'-I','-c',program,str(write_fd)],
+                pass_fds=(write_fd,),capture_output=True,check=True,timeout=5).stdout
+        finally:os.close(write_fd)
+        try:private=os.read(read_fd,4096)
+        finally:os.close(read_fd)
+        self.assertIn(b'from=263.5,0,0',new)
+        self.assertNotIn(b'POSE',new)
+        self.assertTrue(private.startswith(b'SERVER_COLLISION_POSE'))
+        self.assertEqual(p.capture_text(new,private+self.MARKERS),(new+private+self.MARKERS).decode())
+
+    def test_incomplete_duplicate_unknown_and_cross_stream_records_refuse(self):
+        cases=[(b'boot',self.MARKERS),(b'boot\n',self.MARKERS[:-1]),
+               (b'boot\n',self.MARKERS+b'SERVER_COLLISION_ROUTE_DONE\n'),
+               (b'boot\n',self.MARKERS+b'SERVER_COLLISION_UNKNOWN x=1\n'),
+               (self.MARKERS,b'boot\n'),(b'boot\n',self.MARKERS+b'SERVER_COLLISION_POSE tick=1\n')]
+        for native,quest_bytes in cases:
+            with self.subTest(native=native,quest=quest_bytes),self.assertRaises(p.Refusal):
+                p.capture_text(native,quest_bytes)
+
+    def run_fixture(self,root,receipt,body):
+        (root/'quests/qeynos2/v250').mkdir(parents=True)
+        child=root/'child.py'
+        child.write_text('import os,sys,time,signal\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\n'+body+
+            '\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nos.write(fd,b"MAP_SERVER_PROBE_STOPPED\\n")\ntime.sleep(20)\n')
+        real=subprocess.Popen
+        def launch(*args,**kwargs):return real([sys.executable,str(child),str(kwargs['pass_fds'][0])],**kwargs)
+        with patch.object(p.subprocess,'Popen',side_effect=launch),patch.object(p,'digest',return_value=p.ZONE_SHA):
+            return p.run_child(Path('/unused'),root,'qeynos2',{'version':250,'port':12345,'instance':42},receipt)
+
+    def test_combined_overflow_eof_and_final_capture_faults_never_pass(self):
+        normal='print("boot",flush=True)\nos.write(fd,b"SERVER_COLLISION_QUERIES_DONE\\nSERVER_COLLISION_ROUTE_DONE\\n")'
+        for fault in ('overflow','eof','fsync'):
+            with self.subTest(fault=fault),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);receipt={}
+                if fault=='overflow':
+                    body='os.write(1,b"n"*300+b"\\n")\nos.write(fd,b"q"*300+b"\\nSERVER_COLLISION_ROUTE_DONE\\n")'
+                    context=patch.object(p,'MAX_LOG',512)
+                elif fault=='eof':
+                    body=normal;context=patch.object(p.selectors.EpollSelector,'unregister',side_effect=OSError('EOF control'))
+                else:
+                    body=normal;context=patch.object(p.os,'fsync',side_effect=OSError('fsync control'))
+                with context,self.assertRaises(p.Refusal):self.run_fixture(root,receipt,body)
+                self.assertTrue(receipt['reaped'])
+                self.assertFalse(receipt['capture']['complete'])
+                files=[root/'native-capture.bin',root/'quest-capture.bin']
+                self.assertTrue(all(f.is_file() for f in files))
+                self.assertLessEqual(sum(f.stat().st_size for f in files),512 if fault=='overflow' else p.MAX_LOG)
+                if fault=='overflow':self.assertTrue(receipt['capture']['overflow'])
+
+    def test_passive_unavailability_and_monotonic_phases_are_independent(self):
+        with patch.object(Path,'open',side_effect=PermissionError('not permitted')):
+            self.assertIn('unavailable',p.child_wait_snapshot(os.getpid(),1))
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);receipt={}
+            with patch.object(p,'child_wait_snapshot',return_value={'unavailable':'permission control'}):
+                self.run_fixture(root,receipt,'print("boot",flush=True)\nos.write(fd,b"SERVER_COLLISION_QUERIES_DONE\\nSERVER_COLLISION_ROUTE_DONE\\n")')
+            phases=receipt['phases']
+            names=['stop_file_attempt','stop_file_created','stop_ack_first_observed','term_sent','exit_first_observed','reaped']
+            values=[phases[n] for n in names]
+            self.assertEqual(values,sorted(values))
+            self.assertEqual(len(receipt['passive_observations']),3)
+            self.assertTrue(all('unavailable' in x['facts'] for x in receipt['passive_observations']))
+            self.assertTrue(receipt['capture']['complete'])
+            self.assertLess(receipt['seconds'],10)
+
+    def test_spawn_failure_is_distinct_from_an_unreaped_child(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);receipt={}
+            before=len(os.listdir('/proc/self/fd'))
+            with patch.object(subprocess,'Popen',side_effect=OSError('spawn control')),self.assertRaises(OSError):
+                self.run_fixture(root,receipt,'')
+            self.assertFalse(receipt['started'])
+            self.assertIsNone(receipt['reaped'])
+            self.assertFalse(receipt['capture']['complete'])
+            self.assertEqual(len(os.listdir('/proc/self/fd')),before)
+            self.assertFalse((root/'native-capture.bin').exists())
+
+
 class TiedPerlOutputTests(unittest.TestCase):
-    """Real Perl I/O, with fake NPC methods only. No Server or DB execution."""
+    """Real Perl I/O on an inherited private pipe; fake NPCs are not native coverage."""
     TIES = r'''
 package Capture;
 our @seen;
@@ -472,12 +574,32 @@ package main;
 tie *STDOUT,'Capture';tie *STDERR,'Capture';
 '''
 
-    def perl(self, code, cwd=None, stdout=subprocess.PIPE):
-        return subprocess.run(['/usr/bin/perl','-'], input=code.encode(),
-                              stdout=stdout, stderr=subprocess.PIPE, cwd=cwd, timeout=5)
+    def perl(self, name, tail, cwd=None, prefix='', mocks='', broken=False):
+        read_fd,write_fd=os.pipe()
+        if broken:os.close(read_fd)
+        code=prefix+self.TIES+mocks+"eval <<'PRIVATE_QUEST';\n"+p.quest(HERE/'vendor'/name,write_fd)+"\nPRIVATE_QUEST\ndie 'quest load' if $@;\n"+tail
+        # Close/error controls that need lexical access run inside the same eval.
+        if '$probe_output' in tail:
+            code=prefix+self.TIES+mocks+p.quest(HERE/'vendor'/name,write_fd)+tail
+        code=code.replace('PRIVATE_FD',str(write_fd))
+        try:
+            result=subprocess.run(['/usr/bin/perl','-'],input=code.encode(),stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,cwd=cwd,pass_fds=(write_fd,),timeout=5)
+        finally:
+            os.close(write_fd)
+        raw=bytearray()
+        if not broken:
+            try:
+                while True:
+                    data=os.read(read_fd,65536)
+                    if not data:break
+                    raw.extend(data)
+                    self.assertLessEqual(len(raw),p.MAX_LOG)
+            finally:os.close(read_fd)
+        return result,bytes(raw)
 
     def test_both_generated_quests_emit_complete_records_with_tied_stdout(self):
-        mocks = r'''
+        mocks=r'''
 package FakeNPC;
 sub new { bless {x=>0,y=>0,z=>0},shift }
 sub GMMove { my $s=shift;@{$s}{qw(x y z)}=@_[0..2] }
@@ -492,63 +614,55 @@ package main;
 our $npc=FakeNPC->new;our $timer='server_collision';
 '''
         for name in ('2011.pl','pok-2011.pl'):
-            with self.subTest(quest=name), tempfile.TemporaryDirectory() as tmp:
-                tail = r'''
+            with self.subTest(quest=name),tempfile.TemporaryDirectory() as tmp:
+                tail=r'''
 EVENT_SPAWN();EVENT_TIMER();EVENT_TIMER();EVENT_TIMER();EVENT_TIMER();
 open(my $stop,'>','stop-map-validation') or die 'stop control';close($stop);
 EVENT_TIMER();die 'global ties removed' unless tied(*STDOUT) && tied(*STDERR);
 '''
-                # Return from file-style evaluation before invoking later events.
-                loaded = "eval <<'PRIVATE_QUEST';\n"+p.quest(HERE/'vendor'/name)+"\nPRIVATE_QUEST\ndie 'quest load' if $@;\n"
-                result = self.perl(self.TIES+mocks+loaded+tail,cwd=tmp)
+                result,raw=self.perl(name,tail,cwd=tmp,mocks=mocks)
                 self.assertEqual(result.returncode,0,result.stderr)
-                lines = result.stdout.decode().splitlines()
+                self.assertEqual(result.stdout,b'')
+                lines=raw.decode().splitlines()
                 self.assertEqual(sum(s.startswith('SERVER_COLLISION_QUERY ') for s in lines),3)
                 self.assertEqual(sum(s.startswith('SERVER_COLLISION_FLOOR ') for s in lines),3)
-                self.assertEqual(lines.count('SERVER_COLLISION_QUERIES_DONE'),1)
-                self.assertEqual(lines.count('SERVER_COLLISION_ROUTE_DONE'),1)
-                self.assertEqual(lines.count('MAP_SERVER_PROBE_STOPPED'),1)
+                for marker in ('SERVER_COLLISION_QUERIES_DONE','SERVER_COLLISION_ROUTE_DONE','MAP_SERVER_PROBE_STOPPED'):
+                    self.assertEqual(lines.count(marker),1)
 
-    def test_duplicate_close_leaves_original_fd_and_ties_usable(self):
-        tail = r'''
+    def test_duplicate_close_preserves_inherited_fd_stdout_and_ties(self):
+        tail=r'''
 probe_emit('PRIVATE_VISIBLE');close($probe_output) or die 'private close';
-open(my $still,'>&',1) or die 'original descriptor closed';
-syswrite($still,"ORIGINAL_STILL_OPEN\n")==20 or die 'original write';
+open(my $still,'>&',PRIVATE_FD) or die 'inherited descriptor closed';
+syswrite($still,"ORIGINAL_STILL_OPEN\n")==20 or die 'inherited write';
+open(my $native,'>&',1) or die 'stdout closed';
+syswrite($native,"NATIVE_STILL_OPEN\n")==18 or die 'native write';
 print STDOUT "TIED_HIDDEN\n";
 die 'tie changed' unless tied(*STDOUT) && tied(*STDERR) && $Capture::seen[-1] eq "TIED_HIDDEN\n";
 '''
-        result=self.perl(self.TIES+p.quest(HERE/'vendor/2011.pl')+tail)
+        result,raw=self.perl('2011.pl',tail)
         self.assertEqual(result.returncode,0,result.stderr)
-        self.assertEqual(result.stdout,b'PRIVATE_VISIBLE\nORIGINAL_STILL_OPEN\n')
+        self.assertEqual(raw,b'PRIVATE_VISIBLE\nORIGINAL_STILL_OPEN\n')
+        self.assertEqual(result.stdout,b'NATIVE_STILL_OPEN\n')
 
     def test_closed_output_and_oversize_are_sticky_failures(self):
-        for fault in ('close($probe_output);', "eval { probe_emit('x' x 4096); };die 'overflow accepted' unless $@;"):
+        for fault in ('close($probe_output);',"eval { probe_emit('x' x 4096); };die 'overflow accepted' unless $@;"):
             tail=fault+r'''
 eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'write accepted' unless $@;
-open($probe_output,'>&',1) or die 'reopen control';
+open($probe_output,'>&',PRIVATE_FD) or die 'reopen control';
 eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'failure not sticky' unless $@;
 '''
-            result=self.perl(self.TIES+p.quest(HERE/'vendor/2011.pl')+tail)
+            result,raw=self.perl('2011.pl',tail)
             self.assertEqual(result.returncode,0,result.stderr)
-            self.assertEqual(result.stdout,b'')
+            self.assertEqual(raw,b'')
 
     def test_open_short_write_and_broken_pipe_refuse(self):
-        text=p.quest(HERE/'vendor/2011.pl')
-        result=self.perl('use POSIX ();POSIX::close(1);'+self.TIES+text)
+        result,_=self.perl('2011.pl','',prefix='use POSIX ();POSIX::close(PRIVATE_FD);')
         self.assertNotEqual(result.returncode,0)
-        result=self.perl('BEGIN { *CORE::GLOBAL::syswrite = sub { return 0; }; }'+self.TIES+text+r'''
-eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'short write accepted' unless $@;
-''')
+        tail=r"eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'write accepted' unless $@;"
+        result,raw=self.perl('2011.pl',tail,prefix='BEGIN { *CORE::GLOBAL::syswrite = sub { return 0; }; }')
         self.assertEqual(result.returncode,0,result.stderr)
-        self.assertEqual(result.stdout,b'')
-        read_fd,write_fd=os.pipe()
-        os.close(read_fd)
-        try:
-            result=self.perl(self.TIES+text+r'''
-eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'broken pipe accepted' unless $@;
-''',stdout=write_fd)
-        finally:
-            os.close(write_fd)
+        self.assertEqual(raw,b'')
+        result,_=self.perl('2011.pl',tail,broken=True)
         self.assertEqual(result.returncode,0,result.stderr)
 
 

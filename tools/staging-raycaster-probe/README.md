@@ -217,23 +217,56 @@ Each route gets at most 120 seconds, then a 3-second stop-file interval, up to
 5 seconds after TERM, KILL if needed, up to 5 seconds to reap, and a bounded final
 pipe drain. Output is capped at 4 MiB per child. Child core dumps are disabled and each native
 log file has a 4 MiB RLIMIT_FSIZE cap; parent must bound the private root disk
-allocation as part of installation. The generated private quest duplicates fixed
-OS descriptor 1 using Perl `open(my $probe_output, '>&', 1)`. It does not alias
-the descriptor with `>&=1`, untie global STDOUT/STDERR, or use their tied logging
-path. Closing the lexical duplicate leaves original descriptor 1 usable. The
+allocation as part of installation. The generated private quest duplicates one
+task-owned inherited pipe descriptor using Perl `open(my $probe_output, '>&', N)`.
+`N` is internally allocated by this helper, embedded in that generated quest and
+passed only to that child. There is no descriptor/path selector in the CLI,
+contract or environment. Native stdout/stderr remain on the original pipe;
+quest records never share libc's buffered stdout. The emitter does not alias
+with `>&=`, untie global STDOUT/STDERR, or use their tied logging path.
+Closing the lexical duplicate leaves both its inherited descriptor and stdout usable. The
 lexical handle remains in scope across that quest's events. Fixed ASCII records
 use unbuffered `syswrite`, so there is no deferred flush. Open/mode errors fail
 quest loading; oversized records, failed/short writes and broken pipes latch a
 failure that rejects subsequent completion markers. SIGPIPE is ignored only
 within that write so its error can be checked. Each record is at most 4096 bytes;
-the existing combined child pipe and 4 MiB capture budget remain unchanged. No
-public DB logging change or separate output channel is needed. The harmless
+the two streams share the existing aggregate 4 MiB capture budget, not 4 MiB each.
+On overflow, only that bounded prefix is retained with observed-byte counts and
+an explicit overflow/incomplete result; it never passes. No public DB logging
+change occurs. The harmless
 tied-Perl controls exercise both generated quests, descriptor close ownership and
 error paths; they do not qualify native collision behavior or shutdown. The
 lifecycle guard begins immediately after Popen. Stop-file, pipe, signaling and
 selector faults are recorded independently and do not suppress kill/reap attempts.
 Every started child has PID,
 exit, elapsed time, stop acknowledgement, TERM/KILL and reap results recorded.
+The parent's unused quest writer is closed after spawn so EOF can be observed.
+After confirmed child reaping, both reader streams are drained and retained as
+exclusive private `native-capture.bin` and `quest-capture.bin`, with exact byte
+counts, SHA256, observed-byte counts and EOF/completeness metadata. The files may
+contain sensitive native console output and must not be published or copied
+into chat. No lossy decode/prefix filter is used for raw retention. Final capture
+and reader closure occur after reaping; an unconfirmed reap retains owners until
+helper exit, records deferred closure and cannot qualify complete capture or DB
+cleanup. A pre-spawn failure is explicitly distinguished from an unreaped child.
+Persistence, readback, EOF or close failure cannot pass. The comparator first
+checks both streams independently for complete LF framing, encoding, fixed
+record kinds/field sets and completion markers. Mixed or misplaced records are
+refused, never split/repaired/skipped. It then concatenates native followed by
+quest text for the unchanged fixed comparator, preserving each stream's order
+without claiming event order across streams. No extra merged raw copy is saved.
+
+Shutdown metadata records monotonic offsets for stop-file attempt/creation,
+first observed stop acknowledgement, TERM/KILL when sent, first observed exit
+and confirmed reap. These are observation times, not actual kernel chronology.
+At stop, after TERM and before KILL, the helper makes bounded passive reads of
+only its child's `/proc` status/wchan and at most 16 thread wait states. Start
+ticks are checked before and after; permission errors, disappearance, overlong
+input or identity mismatch are explicitly unavailable. Each read is capped at
+4096 status/8192 stat/128 wchan bytes. Missing/truncated observations cannot prove
+no wait or identify a root cause. No ptrace, stacks, permission/capability change
+or gameplay control is used. Observations consume the existing 3s/5s/5s shutdown
+windows; they do not add a wait or relax strict exit0/quiescence/cleanup gates.
 Collision success and clean shutdown are both required. A failed initial zone
 stops the sequence. No automatic retry or active hourly scheduler is installed.
 
