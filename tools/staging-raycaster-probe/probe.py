@@ -486,7 +486,7 @@ def main():
         raise Refusal('operator terminated probe')
     signal.signal(signal.SIGTERM, terminate)
     receipt = {'passed':False, 'cleanup':False, 'children':{}, 'reload_gap':'no qualified targeted reload route',
-        'native_housekeeping':{'scope':'ordinary global expired NPC respawn timers, not fixture-confined',
+        'native_housekeeping':{'scope':'unchanged native lifecycle: global expired NPC timers/quest globals and event-log default initialization; not fixture-confined',
                                'attribution':'before/after differences may include concurrent world activity',
                                'before':None,'after':None}}
     store = None

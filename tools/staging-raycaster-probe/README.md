@@ -12,9 +12,14 @@ speed 1.25, and process mobs while empty. Two GMMove calls place the fixed-query
 and route fixtures; only ordinary MoveTo(...,0,1) moves the route. No membership is
 created. Helper-managed writes are confined to owned fixture rows. Player/inventory, public
 spawn definitions, actor checkpoints, quests and rules are protected. Native zone
-startup additionally runs ordinary global expired-NPC-respawn-timer cleanup. Parent
-accepted that finite housekeeping limit for this staging test; it is not strict
-confinement of every native DB write. No stale timer is restored and no shared
+startup additionally runs ordinary global expired-NPC-respawn-timer and expired
+quest-global cleanup, plus event-log setting initialization. Parent accepted these
+unchanged production lifecycle calls for this staging test; it is not strict
+confinement of every native DB write. Event-log initialization loads configured
+settings, adds missing implemented entries and removes deprecated/unimplemented
+entries; it does not generally reset configured active settings. The automatic
+database-update flag does not disable these lifecycle calls. Expired quest values
+are not exported; parent retains aggregate expiry counts only. No stale timer is restored and no shared
 AUTO_INCREMENT counter is rewound.
 
 ## Parent preparation
@@ -145,7 +150,10 @@ UNIX timestamps. Each snapshot is at most 256 rows and 65536 encoded bytes. A ro
 or byte overflow refuses the probe or invalidates its result; no clipping or
 sampling. Native startup can delete globally expired rows. Concurrent world
 activity can also change them, so a difference is not process attribution. Neither
-timer snapshots nor fixture manifests authorize restoring stale public timers.
+timer snapshots nor fixture manifests authorize restoring stale public timers or
+expired quest globals. The fixed acknowledgment field names the timer exception;
+its documented parent scope also includes the unchanged lifecycle calls above.
+It is not permission for arbitrary queries or changes to active player state.
 
 Select unused content ID holes below current AUTO_INCREMENT counters where
 possible, and prove group IDs have no existing spawn2/spawnentry references. Parent
