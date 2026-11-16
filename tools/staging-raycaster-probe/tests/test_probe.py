@@ -372,14 +372,17 @@ class ProbeTests(unittest.TestCase):
             config = Path(tmp)/'config.json'
             contract = Path(tmp)/'contract.json'
             config.write_text(json.dumps({'server':{'world':{'tcp':{'ip':'127.0.0.1','port':9001}}}}))
-            contract.write_text(json.dumps({'world_pid':1,'zones':{z[0]:{
+            contract.write_text(json.dumps({'world_pid':1,'assets':{'maps':'/maps'},'zones':{z[0]:{
                 'version':250+n,'reference':str(HERE/'vendor/route.json'),'reference_sha256':p.ZONE_SHA,
                 'reference_backend':'OFF','port':17901+n} for n,z in enumerate(p.ZONES)}}))
             store = MagicMock()
             store.manifest = {'respawn_timers_before':{'captured_unix':1,'rows':[]}}
             store.timer_snapshot.side_effect = OSError('private timer failure')
+            def completed(*args,**kwargs):
+                args[4]['reaped']=True
+                return 'evidence'
             argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
-            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'Store',return_value=store), patch.object(p,'run_child',return_value='evidence') as launch, patch.object(p,'verify_evidence',return_value={}):
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'Store',return_value=store), patch.object(p,'run_child',side_effect=completed) as launch, patch.object(p,'verify_evidence',return_value={}):
                 self.assertEqual(p.main(),1)
             store.cleanup.assert_called_once()
             store.db.close.assert_called_once()
