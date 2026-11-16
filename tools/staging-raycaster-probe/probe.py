@@ -22,6 +22,9 @@ ZONE_SHA = '825751d410c661c76b24f97e8e8e28ab495cdbb14116b48e115ffd8181a8490b'
 WORLD_SHA = '1a922b6a7b56e052d27e4a841a9e1a02b67779c472860e54897d15eab0b70dec'
 ZONES = (('qeynos2', 2, '2011.pl', 'route.json'),
          ('poknowledge', 202, 'pok-2011.pl', 'pok-route.json'))
+NAV_INPUTS = {
+    'qeynos2':{'bytes':232993,'sha256':'9e528179eb619005301d6d34566471a8e264c1282235c624382cfaecdc973a08'},
+    'poknowledge':{'bytes':1210906,'sha256':'edf48789922d0de8a7b30ee47b8fe023c89c07cebd014f399dd6202ee7752b24'}}
 STATE = ('respawn_times', 'spawn_condition_values', 'spawn2_disabled',
          'data_buckets', 'zone_state_spawns')
 PROTECTED = {'instance_list_player': 'id', 'character_corpses': 'instance_id',
@@ -202,6 +205,70 @@ def runtime_inputs(c):
     for name in ('items.lua','check_handin.pl'):
         require(b'CheckHandin' in (source/name).read_bytes(), 'compatible runtime utility absent')
     return entries
+
+
+def nav_inputs(c):
+    """Only the selected fixed navmeshes, verified before private prep or SQL."""
+    result = {}
+    for zone, *_ in selected_zones(c):
+        source = Path(c['assets']['maps'])/'nav'/(zone+'.nav')
+        pin = NAV_INPUTS[zone]
+        require(not source.parent.is_symlink() and not source.parent.parent.is_symlink(), 'nav input directory aliased')
+        require(source.is_file() and not source.is_symlink(), 'nav input missing or aliased')
+        require(not source.stat().st_mode & 0o222, 'mutable nav input refused')
+        require(source.stat().st_size == pin['bytes'] and digest(source) == pin['sha256'], 'nav input differs')
+        result[zone] = {'source':str(source),**pin}
+    return result
+
+
+def verify_nav_copy(private, zone, record=None):
+    """Match the native ServerPath lookup, not the configured maps directory."""
+    path = private/'maps/nav'/(zone+'.nav')
+    require(not (private/'maps').is_symlink() and not path.parent.is_symlink(), 'nav copy path aliased')
+    require(path.is_file() and not path.is_symlink(), 'effective nav missing or aliased')
+    st = path.stat()
+    require(st.st_uid == os.geteuid() and st.st_mode & 0o777 == 0o400 and st.st_nlink == 1, 'mutable or unowned nav copy')
+    require(os.access(path,os.R_OK), 'effective nav unreadable')
+    pin = NAV_INPUTS[zone]
+    require(st.st_size == pin['bytes'] and digest(path) == pin['sha256'], 'effective nav differs')
+    identity = [st.st_dev,st.st_ino]
+    if record is not None:
+        require(record['effective_path'] == str(path) and record['identity'] == identity, 'effective nav identity differs')
+    return {'effective_path':str(path),'bytes':st.st_size,'sha256':pin['sha256'],
+            'identity':identity,'mode':'0400','readable':True,'retained':True}
+
+
+def prepare_nav(private, zone, source, data):
+    """Fresh private read-only copy; never chmod or link the approved source."""
+    maps = private/'maps'
+    maps.mkdir(mode=0o700)
+    nav = maps/'nav'
+    nav.mkdir(mode=0o700)
+    path = nav/(zone+'.nav')
+    original = Path(source['source'])
+    require(original.name == zone+'.nav' and original.parent.name == 'nav' and
+            {k:source[k] for k in ('bytes','sha256')} == NAV_INPUTS[zone], 'nav source mapping differs')
+    require(original.is_file() and not original.is_symlink() and not original.parent.is_symlink() and not original.parent.parent.is_symlink(), 'nav source aliased')
+    require(not original.stat().st_mode & 0o222 and original.stat().st_size == source['bytes'] and digest(original) == source['sha256'], 'nav source changed before copy')
+    with original.open('rb') as src, path.open('xb') as dst:
+        shutil.copyfileobj(src,dst,1024*1024)
+        dst.flush()
+        os.fchmod(dst.fileno(),0o400)
+        os.fsync(dst.fileno())
+    require(digest(original) == source['sha256'], 'nav source changed during copy')
+    data['nav'] = {'source':str(original),**verify_nav_copy(private,zone)}
+    nav.chmod(0o500)
+    maps.chmod(0o500)
+
+
+def native_nav_load(native, private, zone):
+    """Existing native LogInfo success, bound to this private effective path."""
+    path = str(private/'maps/nav'/(zone+'.nav'))
+    marker = rb'Loaded Navmesh V\[([0-9]{1,4})\] file \['+re.escape(path.encode())+rb'\]'
+    matches = re.findall(marker,native)
+    observed = len(matches) == 1 and int(matches[0]) > 0
+    return {'effective_path':path,'observed':observed,'marker_count':len(matches),
+            'version':int(matches[0]) if observed else None}
 
 
 def prepare_runtime(private, c, entries, record):
@@ -712,6 +779,7 @@ def run_child(binary, root, zone, item, receipt, world_pid=None, world_port=None
             cleanup_stage('final_pipe_drain',final_drain)
             receipt['pipe_eof'] = eof['native'] and eof['quest']
             receipt['quiesced'] = b'MAP_SERVER_PROBE_STOPPED\n' in chunks['quest']
+            receipt['navmesh_load'] = native_nav_load(chunks['native'],root,zone)
             receipt['seconds'] = time.monotonic()-started
             # Final capture and closure require confirmed reap; errors never yield PASS.
             if receipt['reaped']:
@@ -738,6 +806,7 @@ def run_child(binary, root, zone, item, receipt, world_pid=None, world_port=None
             receipt['capture']['complete'] = False
     require(not cleanup_errors,'private child cleanup/capture fault')
     require(receipt['quiesced'] and receipt['exit'] == 0 and receipt['pipe_eof'],'private shutdown not clean')
+    require(receipt['navmesh_load']['observed'],'native navmesh load not observed')
     return capture_text(chunks['native'],chunks['quest'])
 
 def main():
@@ -777,6 +846,7 @@ def main():
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as sock:
                 sock.bind(('0.0.0.0', item['port']))
         inputs = runtime_inputs(c)
+        navigation = nav_inputs(c)
         for zone, _, source, _ in selected_zones(c):
             private = root/zone
             private.mkdir(mode=0o700)
@@ -785,8 +855,11 @@ def main():
             target = private/'quests'/zone/('v'+str(c['zones'][zone]['version']))
             target.mkdir(parents=True)
             data = receipt['runtime_data'].setdefault(zone,{})
+            prepare_nav(private,zone,navigation[zone],data)
             prepare_runtime(private,c,inputs,data)
             save(private/'eqemu_config.json', private_config(config, private, c['assets']))
+        for zone, data in receipt['runtime_data'].items():
+            verify_nav_copy(root/zone,zone,data['nav'])
         store = Store(config, c)
         store.preflight()
         receipt['native_housekeeping']['before'] = store.manifest.get('respawn_timers_before')
@@ -798,6 +871,7 @@ def main():
         store.db.commit()
         for zone, *_ in selected_zones(c):
             private = root/zone
+            verify_nav_copy(private,zone,receipt['runtime_data'][zone]['nav'])
             child = receipt['children'].setdefault(zone, {})
             text = run_child(args.zone_binary.absolute(), private, zone, c['zones'][zone], child, c['world_pid'], int(config['server']['world']['tcp']['port']))
             receipt[zone] = verify_evidence(text, references[zone], zone, comparator)
@@ -835,7 +909,7 @@ def main():
                     receipt['close_error'] = 'connection close unavailable'
         all_reaped = all(child.get('started') is False or child.get('reaped') is True for child in receipt['children'].values())
         receipt['shared_cleanup'] = all_reaped
-        for data in receipt['runtime_data'].values():
+        for zone, data in receipt['runtime_data'].items():
             try:
                 require(all_reaped, 'unreaped child; shared copies retained')
                 if 'shared' in data:
@@ -843,6 +917,13 @@ def main():
             except BaseException:
                 receipt['shared_cleanup'] = False
                 receipt['shared_cleanup_error'] = 'private copies retained; inspect runtime data receipt'
+            if 'nav' in data:
+                try:
+                    verify_nav_copy(root/zone,zone,data['nav'])
+                    data['nav']['post_hash_equal'] = True
+                except BaseException:
+                    receipt['passed'] = False
+                    receipt['nav_input_error'] = 'retained effective nav verification failed'
         receipt['passed'] = receipt['passed'] and receipt['cleanup'] and receipt['shared_cleanup']
         save(root/'receipt.json', receipt)
     return 0 if receipt['passed'] else 1

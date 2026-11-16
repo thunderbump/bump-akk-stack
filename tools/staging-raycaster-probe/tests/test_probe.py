@@ -126,7 +126,7 @@ class ProbeTests(unittest.TestCase):
             root = Path(tmp)
             (root/'quests/qeynos2/v250').mkdir(parents=True)
             child = root/'child.py'
-            child.write_text('import signal,time,os,sys\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint("secret native boot text",flush=True)\nos.write(fd,b"SERVER_COLLISION_QUERIES_DONE\\nSERVER_COLLISION_ROUTE_DONE\\n")\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nos.write(fd,b"MAP_SERVER_PROBE_STOPPED\\n")\ntime.sleep(20)\n')
+            child.write_text('import signal,time,os,sys\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint("secret native boot text",flush=True)\nprint(f"Loaded Navmesh V[2] file [{Path.cwd()}/maps/nav/qeynos2.nav]",flush=True)\nos.write(fd,b"SERVER_COLLISION_QUERIES_DONE\\nSERVER_COLLISION_ROUTE_DONE\\n")\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nos.write(fd,b"MAP_SERVER_PROBE_STOPPED\\n")\ntime.sleep(20)\n')
             real_popen = subprocess.Popen
             def launch(*args, **kwargs):
                 return real_popen([sys.executable,str(child),str(kwargs['pass_fds'][0])], **kwargs)
@@ -165,7 +165,7 @@ class ProbeTests(unittest.TestCase):
             store.manifest = {}
             store.bootstrap.side_effect = RuntimeError('sensitive database password')
             argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
-            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'nav_inputs',return_value={z[0]:None for z in p.ZONES}), patch.object(p,'prepare_nav',side_effect=lambda private,zone,source,data:data.update(nav={})), patch.object(p,'verify_nav_copy'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
                 self.assertEqual(p.main(),1)
             store.db.rollback.assert_called_once()
             store.db.commit.assert_not_called()
@@ -212,7 +212,7 @@ class ProbeTests(unittest.TestCase):
             store.db.close.side_effect = OSError('private close lost')
             store.cleanup.side_effect = OSError('private failed compensation')
             argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
-            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'nav_inputs',return_value={z[0]:None for z in p.ZONES}), patch.object(p,'prepare_nav',side_effect=lambda private,zone,source,data:data.update(nav={})), patch.object(p,'verify_nav_copy'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
                 self.assertEqual(p.main(),1)
             launch.assert_not_called()
             store.cleanup.assert_called_once()
@@ -387,7 +387,7 @@ class ProbeTests(unittest.TestCase):
                 args[4]['reaped']=True
                 return 'evidence'
             argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
-            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child',side_effect=completed) as launch, patch.object(p,'verify_evidence',return_value={}):
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'runtime_inputs',return_value=[]), patch.object(p,'prepare_runtime'), patch.object(p,'nav_inputs',return_value={z[0]:None for z in p.ZONES}), patch.object(p,'prepare_nav',side_effect=lambda private,zone,source,data:data.update(nav={})), patch.object(p,'verify_nav_copy'), patch.object(p,'Store',return_value=store), patch.object(p,'run_child',side_effect=completed) as launch, patch.object(p,'verify_evidence',return_value={}):
                 self.assertEqual(p.main(),1)
             store.cleanup.assert_called_once()
             store.db.close.assert_called_once()
@@ -465,6 +465,105 @@ class ProbeTests(unittest.TestCase):
                 p.identifier(value)
 
 
+class NavLayoutTests(unittest.TestCase):
+    def inputs(self,root):
+        maps=root/'approved-maps';nav=maps/'nav';nav.mkdir(parents=True)
+        pins={}
+        for zone,*_ in p.ZONES:
+            raw=('synthetic layout control '+zone).encode()
+            path=nav/(zone+'.nav');path.write_bytes(raw);path.chmod(0o400)
+            pins[zone]={'bytes':len(raw),'sha256':p.digest(path)}
+        nav.chmod(0o500)
+        return {'assets':{'maps':str(maps)},'zones':{z[0]:{} for z in p.ZONES}},pins
+
+    def test_effective_native_nav_paths_exist_before_store_constructor(self):
+        # Run the actual main preparation seam; no DB connection or native launch.
+        with tempfile.TemporaryDirectory() as tmp:
+            base=Path(tmp);contract,pins=self.inputs(base);run=base/'run';seen=[]
+            fake=base/'not-an-executable';fake.write_bytes(b'no execution')
+            config=base/'config.json';config.write_text(json.dumps({'server':{'world':{'tcp':{'ip':'127.0.0.1'}}}}))
+            contract['world_pid']=os.getpid()
+            for n,(zone,*_) in enumerate(p.ZONES):
+                ref=HERE/'vendor/route.json'
+                contract['zones'][zone]={'version':250+n,'reference':str(ref),'reference_sha256':p.digest(ref),'reference_backend':'OFF','port':0}
+            cp=base/'contract.json';cp.write_text(json.dumps(contract))
+            def no_database(*args):
+                for zone in contract['zones']:
+                    effective=run/zone/'maps/nav'/(zone+'.nav')
+                    self.assertTrue(effective.is_file())
+                    self.assertEqual(p.digest(effective),pins[zone]['sha256'])
+                    self.assertEqual(effective.stat().st_mode&0o222,0)
+                    self.assertEqual([f.name for f in effective.parent.iterdir()],[zone+'.nav'])
+                    seen.append(zone)
+                raise p.Refusal('test boundary before DB')
+            argv=['probe','--config',str(config),'--contract',str(cp),'--root',str(run),'--zone-binary',str(fake)]
+            with patch.object(p,'NAV_INPUTS',pins,create=True),patch.object(p,'ZONE_SHA',p.digest(fake)),patch.object(p,'WORLD_SHA',p.digest(Path('/proc',str(os.getpid()),'exe'))),patch.object(sys,'argv',argv),patch.object(p,'validate_contract'),patch.object(p,'runtime_inputs',return_value=[]),patch.object(p,'prepare_runtime'),patch.object(p,'Store',side_effect=no_database),patch.object(p,'run_child',side_effect=AssertionError('no native')):
+                self.assertEqual(p.main(),1)
+            self.assertEqual(set(seen),set(contract['zones']))
+
+    def test_only_selected_mesh_is_copied_and_retained(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);c,pins=self.inputs(root);c['only_zone']='qeynos2'
+            with patch.object(p,'NAV_INPUTS',pins):
+                selected=p.nav_inputs(c);self.assertEqual(list(selected),['qeynos2'])
+                private=root/'private';private.mkdir();record={}
+                p.prepare_nav(private,'qeynos2',selected['qeynos2'],record)
+                self.assertEqual([x.name for x in (private/'maps/nav').iterdir()],['qeynos2.nav'])
+                p.verify_nav_copy(private,'qeynos2',record['nav'])
+                source=Path(selected['qeynos2']['source'])
+                self.assertEqual(source.stat().st_mode&0o777,0o400)
+                self.assertTrue(record['nav']['retained'])
+
+    def test_source_hash_mode_alias_and_mapping_refuse(self):
+        for fault in ('missing','hash','writable','alias','mapping'):
+            with self.subTest(fault=fault),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);c,pins=self.inputs(root);source=Path(c['assets']['maps'])/'nav/qeynos2.nav'
+                with patch.object(p,'NAV_INPUTS',pins):
+                    selected=p.nav_inputs(c)
+                    if fault=='missing':
+                        source.parent.chmod(0o700);source.unlink()
+                    elif fault=='hash':
+                        source.chmod(0o600);source.write_bytes(b'wrong');source.chmod(0o400)
+                    elif fault=='writable':source.chmod(0o600)
+                    elif fault=='alias':
+                        source.parent.chmod(0o700);source.rename(source.with_suffix('.original'));source.symlink_to(source.with_suffix('.original'))
+                    if fault=='mapping':
+                        selected['qeynos2']['source']=selected['poknowledge']['source']
+                        private=root/'private';private.mkdir()
+                        with self.assertRaises(p.Refusal):p.prepare_nav(private,'qeynos2',selected['qeynos2'],{})
+                    else:
+                        with self.assertRaises(p.Refusal):p.nav_inputs(c)
+                        private=root/'private';private.mkdir()
+                        with self.assertRaises(p.Refusal):p.prepare_nav(private,'qeynos2',selected['qeynos2'],{})
+
+    def test_effective_path_alias_mutability_replacement_and_tamper_refuse(self):
+        for fault in ('path','writable','replace','hash'):
+            with self.subTest(fault=fault),tempfile.TemporaryDirectory() as tmp:
+                root=Path(tmp);c,pins=self.inputs(root);private=root/'private';private.mkdir()
+                with patch.object(p,'NAV_INPUTS',pins):
+                    selected=p.nav_inputs(c);record={}
+                    if fault=='path':
+                        (private/'maps').symlink_to(c['assets']['maps'])
+                        with self.assertRaises(FileExistsError):p.prepare_nav(private,'qeynos2',selected['qeynos2'],record)
+                        continue
+                    p.prepare_nav(private,'qeynos2',selected['qeynos2'],record)
+                    path=private/'maps/nav/qeynos2.nav'
+                    if fault=='writable':path.chmod(0o600)
+                    elif fault=='hash':
+                        path.chmod(0o600);path.write_bytes(b'wrong');path.chmod(0o400)
+                    else:
+                        path.parent.chmod(0o700);old=path.with_suffix('.old');path.rename(old)
+                        path.write_bytes(old.read_bytes());path.chmod(0o400)
+                    with self.assertRaises(p.Refusal):p.verify_nav_copy(private,'qeynos2',record['nav'])
+                    self.assertEqual(p.digest(Path(selected['qeynos2']['source'])),pins['qeynos2']['sha256'])
+
+    def test_loaded_marker_requires_exact_effective_path_and_one_success(self):
+        root=Path('/private/qeynos2');marker=b'Loaded Navmesh V[2] file [/private/qeynos2/maps/nav/qeynos2.nav]\n'
+        self.assertTrue(p.native_nav_load(marker,root,'qeynos2')['observed'])
+        for data in (b'',marker.replace(b'/private',b'/external'),marker+marker,marker.replace(b'V[2]',b'V[0]')):
+            self.assertFalse(p.native_nav_load(data,root,'qeynos2')['observed'])
+
+
 class SeparateCaptureTests(unittest.TestCase):
     MARKERS=b'SERVER_COLLISION_QUERIES_DONE\nSERVER_COLLISION_ROUTE_DONE\nMAP_SERVER_PROBE_STOPPED\n'
 
@@ -519,7 +618,7 @@ libc.fflush(None)
     def run_fixture(self,root,receipt,body):
         (root/'quests/qeynos2/v250').mkdir(parents=True)
         child=root/'child.py'
-        child.write_text('import os,sys,time,signal\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\n'+body+
+        child.write_text('import os,sys,time,signal\nfrom pathlib import Path\nfd=int(sys.argv[1])\nsignal.signal(signal.SIGTERM,lambda *_:exit(0))\nprint(f"Loaded Navmesh V[2] file [{Path.cwd()}/maps/nav/qeynos2.nav]",flush=True)\n'+body+
             '\nwhile not Path("stop-map-validation").exists():time.sleep(.01)\nos.write(fd,b"MAP_SERVER_PROBE_STOPPED\\n")\ntime.sleep(20)\n')
         real=subprocess.Popen
         def launch(*args,**kwargs):return real([sys.executable,str(child),str(kwargs['pass_fds'][0])],**kwargs)

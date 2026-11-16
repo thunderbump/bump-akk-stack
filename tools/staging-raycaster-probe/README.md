@@ -331,3 +331,33 @@ DB test, this helper performs no reset/import/global edits or global reload.
 python3 -m unittest discover -s tools/staging-raycaster-probe/tests -v
 python3 -m py_compile tools/staging-raycaster-probe/probe.py tools/staging-raycaster-probe/vendor/evidence.py
 ```
+
+
+### Private native navigation lookup
+
+The pinned Server loader uses `ServerPath/maps/nav/<zone>.nav`, independently of
+`directories.maps`. Before opening the fixture database, this helper verifies the
+selected approved nav inputs and copies only each zone's mesh into that zone's
+private config root. Qeynos2 is 232,993 bytes, SHA256
+`9e528179eb619005301d6d34566471a8e264c1282235c624382cfaecdc973a08`.
+PoKnowledge is 1,210,906 bytes, SHA256
+`edf48789922d0de8a7b30ee47b8fe023c89c07cebd014f399dd6202ee7752b24`.
+Both zones together add 1,443,899 bytes. The existing contract's maps operand and
+zone selection remain unchanged. No public map, quest, rule, route or reference
+is changed.
+
+Copies are exclusive regular files, mode 0400, owned by the helper user with one
+link, below fresh private directories. Source inputs must already be readonly;
+the helper never chmods them. Size/hash/mapping are checked before copying and
+again on the effective copies before SQL and each launch. The receipt binds each
+copy's effective path, inode/device, size and hash, and verifies it after cleanup.
+The nav copies remain with failed and successful run evidence; shared-memory
+copy cleanup does not delete them. Unknown or changed copies invalidate the run.
+
+Future native acceptance additionally requires exactly one existing native
+`Loaded Navmesh V[...] file [<effective path>]` success record for that child.
+This records native load evidence independently of the input hash. Missing,
+wrong-path or duplicate records refuse acceptance, including a silent missing-file
+fallback. Filesystem and synthetic marker controls establish preparation only,
+not a native loaded mesh, route parity, clean shutdown or soak qualification.
+The aggregate 4 MiB capture and all existing lifecycle/resource limits are unchanged.
