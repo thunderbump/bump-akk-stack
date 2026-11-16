@@ -203,6 +203,8 @@ class ProbeTests(unittest.TestCase):
             store = MagicMock()
             store.manifest = {}
             store.db.commit.side_effect = OSError('private DB connection lost')
+            store.db.rollback.side_effect = OSError('private rollback also lost')
+            store.db.close.side_effect = OSError('private close lost')
             store.cleanup.side_effect = OSError('private failed compensation')
             argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
             with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
@@ -215,6 +217,44 @@ class ProbeTests(unittest.TestCase):
             self.assertFalse(receipt['cleanup'])
             self.assertIn('cleanup_error',receipt)
             self.assertNotIn('private',json.dumps(receipt))
+
+    def test_postspawn_faults_always_reap_real_harmless_child(self):
+        for fault in ('register','touch'):
+            with self.subTest(fault=fault), tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                child = root/'child.py'
+                child.write_text('import time\nprint("SERVER_COLLISION_ROUTE_DONE",flush=True)\ntime.sleep(60)\n')
+                real_popen = subprocess.Popen
+                children = []
+                def launch(*args, **kwargs):
+                    proc = real_popen([sys.executable,str(child)], **kwargs)
+                    children.append(proc)
+                    return proc
+                receipt = {}
+                context = patch.object(p.selectors.EpollSelector,'register',side_effect=OSError('register')) if fault=='register' else patch.object(Path,'touch',side_effect=OSError('touch'))
+                try:
+                    with patch.object(p.subprocess,'Popen',side_effect=launch), patch.object(p,'digest',return_value=p.ZONE_SHA), context:
+                        with self.assertRaises((p.Refusal,OSError)):
+                            p.run_child(Path('/unused'),root,'qeynos2',{'port':12345,'instance':42},receipt)
+                    self.assertIsNotNone(children[0].poll(), 'child leaked')
+                    self.assertTrue(receipt.get('reaped'), 'child not reaped')
+                finally:
+                    for proc in children:
+                        if proc.poll() is None:
+                            proc.kill()
+                        proc.wait(timeout=3)
+
+    def test_native_auth_rejects_initial_and_switch_plugins(self):
+        driver = p.load_driver()
+        connection_class = getattr(p,'native_connection_class',lambda d:d.connections.Connection)(driver)
+        conn = object.__new__(connection_class)
+        conn._closed = True
+        for name in ('caching_sha2_password','sha256_password','client_ed25519'):
+            conn._auth_plugin_name = name
+            with patch.object(driver.connections.Connection,'_request_authentication',return_value=None), self.assertRaises(p.Refusal):
+                conn._request_authentication()
+            with patch.object(driver.connections.Connection,'_process_auth',return_value=None), self.assertRaises(p.Refusal):
+                conn._process_auth(name.encode(),None)
 
     def test_identifier_rejects_sql(self):
         for value in ('a;b','`bad`','x.y',''):

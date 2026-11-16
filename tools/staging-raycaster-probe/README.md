@@ -18,7 +18,9 @@ Run only inside the existing staging container, where the existing world TCP
 endpoint is 127.0.0.1. Python 3.11+ must already be present. The helper verifies and imports the task-local
 PyMySQL 1.1.2 wheel by exact SHA256 and explicit path. It installs nothing and
 requires no default dependencies for the existing mysql_native_password account.
-Other authentication requiring optional cryptography/PyNaCl refuses; no package is
+Initial and switched authentication must be mysql_native_password. The helper blocks
+optional cryptography/PyNaCl import during fresh driver loading and refuses an
+already-imported optional module. Other authentication refuses; no package is
 downloaded at runtime. `vendor/pymysql-provenance.json` records official PyPI URL,
 metadata, wheel/member hashes, license and authentication limits. Do not run as part of host tests.
 
@@ -141,7 +143,9 @@ Each route gets at most 120 seconds, then a 3-second stop-file interval, up to
 pipe drain. Output is capped at 4 MiB per child. Child core dumps are disabled and each native
 log file has a 4 MiB RLIMIT_FSIZE cap; parent must bound the private root disk
 allocation as part of installation. Quest evidence prints directly to
-stdout; no global Quest Debug setting is required. Every started child has PID,
+stdout; no global Quest Debug setting is required. The lifecycle guard begins immediately after Popen. Stop-file, pipe, signaling and
+selector faults are recorded independently and do not suppress kill/reap attempts.
+Every started child has PID,
 exit, elapsed time, stop acknowledgement, TERM/KILL and reap results recorded.
 Collision success and clean shutdown are both required. A failed initial zone
 stops the sequence. No automatic retry or active hourly scheduler is installed.
@@ -162,7 +166,9 @@ only exactly matching created rows and reviewed instance-scoped persistent rows 
 one transaction. Do not call broad DeleteInstance, delete by NPC type, delete public
 spawns, or retry automatically. Short instance expiry is 600 seconds and is not a
 substitute for confirmed content-row cleanup. An ambiguous COMMIT response requires
-operator inspection if exact compensation cannot be proved.
+operator inspection if exact compensation cannot be proved. Rollback and close
+failures are guarded independently so the failure receipt remains reachable even
+on a dead connection; no ambiguous database outcome is called cleanup success.
 
 ## Monitor and remaining qualification
 

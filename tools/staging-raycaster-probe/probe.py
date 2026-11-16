@@ -77,13 +77,33 @@ def load_driver():
     wheel = HERE/'vendor/pymysql-1.1.2-py3-none-any.whl'
     require(wheel.is_file() and not wheel.is_symlink(), 'driver wheel missing')
     require(digest(wheel) == 'e6b1d89711dd51f8f74b1631fe08f039e7d76cf67a42a323d3178f0f25762ed9', 'driver wheel differs')
+    require(not any(n == 'cryptography' or n.startswith('cryptography.') or n == 'nacl' or n.startswith('nacl.') for n in sys.modules), 'ambient optional authentication module refused')
+    # The wheel opportunistically imports cryptography. Block that optional import
+    # in this fresh helper process, then remove only our temporary sentinels.
     sys.path.insert(0, str(wheel))
+    sys.modules['cryptography'] = None
+    sys.modules['nacl'] = None
     try:
         import pymysql
         require(pymysql.__file__.startswith(str(wheel)+'/'), 'driver origin differs')
         return pymysql
     finally:
         sys.path.remove(str(wheel))
+        del sys.modules['cryptography']
+        del sys.modules['nacl']
+
+
+def native_connection_class(driver):
+    """Refuse alternate authentication before the pinned driver can dispatch it."""
+    class NativeConnection(driver.connections.Connection):
+        def _request_authentication(self):
+            require(self._auth_plugin_name == 'mysql_native_password', 'unsupported authentication refused')
+            return super()._request_authentication()
+
+        def _process_auth(self, plugin_name, auth_packet):
+            require(plugin_name == b'mysql_native_password', 'unsupported authentication refused')
+            return super()._process_auth(plugin_name, auth_packet)
+    return NativeConnection
 
 
 def selected_zones(contract):
@@ -158,7 +178,7 @@ class Store:
         self.names = {'game': a['db'], 'content': b['db']}
         for name in self.names.values():
             identifier(name)
-        self.db = pymysql.connect(host=a['host'], port=int(a.get('port', 3306)),
+        self.db = native_connection_class(pymysql)(host=a['host'], port=int(a.get('port', 3306)),
             user=a['username'], password=a['password'], database=a['db'],
             autocommit=False, connect_timeout=5, read_timeout=5, write_timeout=5,
             cursorclass=pymysql.cursors.DictCursor)
@@ -320,21 +340,26 @@ def world_connected(world, zone, port):
 
 
 def run_child(binary, root, zone, item, receipt, world_pid=None, world_port=None):
-    """Drain a bounded pipe, stop, TERM/KILL the owned process group, always reap."""
+    """Guard immediately after spawn; independent cleanup stages always reach reap."""
     env = {'PATH': '/usr/bin:/bin', 'HOME': str(root),
            'EQEMU_COLLISION_OBSERVE': 'server-collision-npc-2011'}
     chunks = bytearray()
+    selector = None
+    cleanup_errors = []
+    started = time.monotonic()
     def child_limits():
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
         resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_LOG, MAX_LOG))
-    process = subprocess.Popen([str(binary), zone+':'+str(item['port']), 'NONE', str(item['instance'])],
-        cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, preexec_fn=child_limits)
-    receipt.update(pid=process.pid, argv_zone=zone, port=item['port'], instance=item['instance'], term_sent=False, kill_sent=False, reaped=False)
-    selector = selectors.DefaultSelector()
-    selector.register(process.stdout, selectors.EVENT_READ)
-    started = time.monotonic()
-    complete = False
+    def cleanup_stage(name, action):
+        try:
+            return action()
+        except BaseException:
+            cleanup_errors.append(name)
+            return None
     def drain(wait):
+        if selector is None or not selector.get_map():
+            time.sleep(wait)
+            return
         for key, _ in selector.select(wait):
             data = os.read(key.fd, 65536)
             if not data:
@@ -342,8 +367,25 @@ def run_child(binary, root, zone, item, receipt, world_pid=None, world_port=None
             space = MAX_LOG-len(chunks)
             chunks.extend(data[:space])
             require(len(data) <= space, 'native output overflow')
+    def await_exit(seconds):
+        until = time.monotonic()+seconds
+        while process.poll() is None and time.monotonic() < until:
+            drain(.1)
+    def send(sig, key):
+        if process.poll() is None:
+            try:
+                os.killpg(process.pid, sig)
+                receipt[key] = True
+            except ProcessLookupError:
+                pass
+    process = subprocess.Popen([str(binary), zone+':'+str(item['port']), 'NONE', str(item['instance'])],
+        cwd=root, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=True, preexec_fn=child_limits)
     try:
+        receipt.update(pid=process.pid, argv_zone=zone, port=item['port'], instance=item['instance'], term_sent=False, kill_sent=False, reaped=False)
+        selector = selectors.DefaultSelector()
+        selector.register(process.stdout, selectors.EVENT_READ)
         require(digest(Path('/proc')/str(process.pid)/'exe') == ZONE_SHA, 'executed zone differs')
+        complete = False
         while time.monotonic()-started < 120:
             drain(.1)
             require(process.poll() is None, 'private zone exited early')
@@ -355,45 +397,32 @@ def run_child(binary, root, zone, item, receipt, world_pid=None, world_port=None
                 break
         require(complete, 'private zone deadline')
     finally:
-        (root/'stop-map-validation').touch()
-        stop = time.monotonic()+3
-        try:
-            while time.monotonic() < stop and process.poll() is None:
-                drain(.1)
-        except Refusal:
-            pass
-        receipt['quiesced'] = b'MAP_SERVER_PROBE_STOPPED' in chunks
-        if process.poll() is None:
-            os.killpg(process.pid, signal.SIGTERM)
-            receipt['term_sent'] = True
-        stop = time.monotonic()+5
-        try:
-            while time.monotonic() < stop and process.poll() is None:
-                drain(.1)
-        except Refusal:
-            pass
-        if process.poll() is None:
-            os.killpg(process.pid, signal.SIGKILL)
-            receipt['kill_sent'] = True
-        receipt['exit'] = process.wait(timeout=5)
-        receipt['reaped'] = True
-        receipt['seconds'] = time.monotonic()-started
-        # Drain final flushed native records, never retain raw native logs (may contain secrets).
-        try:
+        cleanup_stage('stop_file', lambda: (root/'stop-map-validation').touch())
+        cleanup_stage('quiesce_wait', lambda: await_exit(3))
+        cleanup_stage('term', lambda: send(signal.SIGTERM, 'term_sent'))
+        cleanup_stage('term_wait', lambda: await_exit(5))
+        cleanup_stage('kill', lambda: send(signal.SIGKILL, 'kill_sent'))
+        # wait is independent of stop-file, selector, pipe and signal failures.
+        code = cleanup_stage('reap', lambda: process.wait(timeout=5))
+        receipt['exit'] = code
+        receipt['reaped'] = code is not None
+        def final_drain():
             until = time.monotonic()+2
-            while selector.get_map() and time.monotonic() < until:
+            while selector is not None and selector.get_map() and time.monotonic() < until:
                 drain(.1)
-            receipt['pipe_eof'] = not selector.get_map()
-        finally:
-            selector.close()
-            process.stdout.close()
-            receipt['seconds'] = time.monotonic()-started
-            receipt['evidence'] = '\n'.join(line for line in chunks.decode(errors='replace').splitlines() if line.startswith('SERVER_COLLISION_'))
-    text = chunks.decode(errors='strict')
-    # Only fixed known evidence prefixes survive into artifacts.
-    lines = [line[line.index('SERVER_COLLISION_'):] for line in text.splitlines() if line.startswith('SERVER_COLLISION_')]
+            receipt['pipe_eof'] = selector is not None and not selector.get_map()
+        cleanup_stage('final_pipe_drain', final_drain)
+        if selector is not None:
+            cleanup_stage('selector_close', selector.close)
+        cleanup_stage('pipe_close', process.stdout.close)
+        receipt['quiesced'] = b'MAP_SERVER_PROBE_STOPPED' in chunks
+        receipt['seconds'] = time.monotonic()-started
+        receipt['evidence'] = '\n'.join(line for line in chunks.decode(errors='replace').splitlines() if line.startswith('SERVER_COLLISION_'))
+        if cleanup_errors:
+            receipt['cleanup_errors'] = cleanup_errors
+    require(not cleanup_errors, 'private child cleanup fault')
     require(receipt['quiesced'] and receipt['exit'] == 0 and receipt['pipe_eof'], 'private shutdown not clean')
-    return '\n'.join(lines)+'\n'
+    return receipt['evidence']+'\n'
 
 
 def main():
@@ -464,10 +493,17 @@ def main():
                     store.db.rollback()
                 receipt['cleanup'] = True
             except BaseException:
-                store.db.rollback()
                 receipt['cleanup_error'] = 'conditional cleanup failed; operator must inspect ownership manifest'
+                try:
+                    store.db.rollback()
+                except BaseException:
+                    receipt['rollback_error'] = 'rollback unavailable'
             finally:
-                store.db.close()
+                try:
+                    store.db.close()
+                except BaseException:
+                    receipt['cleanup'] = False
+                    receipt['close_error'] = 'connection close unavailable'
         receipt['passed'] = receipt['passed'] and receipt['cleanup']
         save(root/'receipt.json', receipt)
     return 0 if receipt['passed'] else 1
