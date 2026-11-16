@@ -12,6 +12,7 @@ import resource
 import selectors
 import signal
 import socket
+import sys
 import subprocess
 import time
 
@@ -71,6 +72,27 @@ def load_comparator():
     return module
 
 
+def load_driver():
+    """Import only the reviewed task-local wheel; never install a package."""
+    wheel = HERE/'vendor/pymysql-1.1.2-py3-none-any.whl'
+    require(wheel.is_file() and not wheel.is_symlink(), 'driver wheel missing')
+    require(digest(wheel) == 'e6b1d89711dd51f8f74b1631fe08f039e7d76cf67a42a323d3178f0f25762ed9', 'driver wheel differs')
+    sys.path.insert(0, str(wheel))
+    try:
+        import pymysql
+        require(pymysql.__file__.startswith(str(wheel)+'/'), 'driver origin differs')
+        return pymysql
+    finally:
+        sys.path.remove(str(wheel))
+
+
+def selected_zones(contract):
+    """One fixed zone per hourly window; initial qualification may select both."""
+    selected = contract.get('only_zone')
+    require(selected is None or selected in {z[0] for z in ZONES}, 'unknown selected zone')
+    return tuple(z for z in ZONES if selected is None or z[0] == selected)
+
+
 def quest(source):
     """Keep pinned inputs/call order; send evidence directly to bounded stdout."""
     text = source.read_text().replace('quest::debug(', 'probe_emit(')
@@ -101,6 +123,7 @@ def private_config(original, root, assets):
 
 
 def validate_contract(c):
+    selected_zones(c)
     require(c['monitor_window'] == 'exclusive-between-public-samples', 'monitor exclusion missing')
     require(c['read_only_assets'] is True, 'read-only asset mount contract missing')
     require(c['operator_exclusive_reservations'] is True, 'operator reservation ownership missing')
@@ -127,7 +150,7 @@ def validate_contract(c):
 class Store:
     """Single transaction spans gameplay and content DBs on one reviewed server."""
     def __init__(self, config, contract):
-        import pymysql  # Runtime dependency only; harmless tests need no DB driver.
+        pymysql = load_driver()
         a = config['server']['database']
         b = config['server'].get('content_database') or a
         require(all(a.get(k) == b.get(k) for k in ('host', 'port', 'username', 'password')),
@@ -188,7 +211,7 @@ class Store:
         sets = self.rows('game', 'rule_sets', 'ruleset_id=%s', (self.contract['ruleset_id'],))
         require(len(sets) == 1 and sets[0]['name'] == self.contract['ruleset_name'], 'ruleset ID/name mismatch')
         # No inherited defaults or per-zone rulesets: require reviewed explicit effective values.
-        for zone, zid, *_ in ZONES:
+        for zone, zid, *_ in selected_zones(self.contract):
             item = self.contract['zones'][zone]
             require(item['instance'] <= int(rules.get('Instances:ReservedInstances', '0')), 'instance outside reserved range')
             zrows = self.rows('content', 'zone', 'zoneidnumber=%s AND (version=%s OR version=0)', (zid, item['version']))
@@ -225,7 +248,7 @@ class Store:
                              'sha256': hashlib.sha256(encoded(rows[0]).encode()).hexdigest()})
 
     def bootstrap(self):
-        for zone, zid, _, route in ZONES:
+        for zone, zid, _, route in selected_zones(self.contract):
             item = self.contract['zones'][zone]
             now = int(time.time())
             self.insert('game', 'instance_list', {'id':item['instance'], 'zone':zid,
@@ -249,7 +272,7 @@ class Store:
 
     def cleanup(self):
         # Called only after owned children were reaped. Preserve player state on conflict.
-        for zone, *_ in ZONES:
+        for zone, *_ in selected_zones(self.contract):
             item = self.contract['zones'][zone]
             self.protected_empty(item['instance'])
             for table in STATE:
@@ -398,7 +421,7 @@ def main():
         config = json.loads(args.config.read_text())
         require(config['server']['world']['tcp']['ip'] == '127.0.0.1', 'world TCP must be loopback')
         references = {}
-        for zone, *_ in ZONES:
+        for zone, *_ in selected_zones(c):
             item = c['zones'][zone]
             require(digest(item['reference']) == item['reference_sha256'], 'reference digest differs')
             require(Path(item['reference']).stat().st_size <= MAX_LOG, 'reference too large')
@@ -414,7 +437,7 @@ def main():
         # Treat an ambiguous COMMIT response as potentially committed and compensate exactly.
         committed = True
         store.db.commit()
-        for zone, _, source, _ in ZONES:
+        for zone, _, source, _ in selected_zones(c):
             private = root/zone
             private.mkdir(mode=0o700)
             for name in ('quests','plugins','modules','logs','mods'):

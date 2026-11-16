@@ -1,0 +1,133 @@
+{
+  "version": "1.1.2",
+  "url": "https://files.pythonhosted.org/packages/7c/4c/ad33b92b9864cbde84f259d5df035a6447f91891f5be77788e2a3892bce3/pymysql-1.1.2-py3-none-any.whl",
+  "metadata_url": "https://pypi.org/pypi/PyMySQL/1.1.2/json",
+  "bytes": 45300,
+  "sha256": "e6b1d89711dd51f8f74b1631fe08f039e7d76cf67a42a323d3178f0f25762ed9",
+  "requires_python": ">=3.8",
+  "requires_dist": [
+    "cryptography; extra == \"rsa\"",
+    "PyNaCl>=1.4.0; extra == \"ed25519\""
+  ],
+  "extras_selected": [],
+  "auth_limit": "mysql_native_password; other auth requiring optional cryptography/PyNaCl refuses rather than installing",
+  "license": "MIT",
+  "files": [
+    {
+      "name": "pymysql/__init__.py",
+      "bytes": 4262,
+      "sha256": "d2c50e6ac4e3c7db6bcb6fb86663daa201b43d56abeefdfb1c192ad5e7f5c4b5"
+    },
+    {
+      "name": "pymysql/_auth.py",
+      "bytes": 7638,
+      "sha256": "edb2059c9ee526b14484a2c49c71a8d7e87b139727641db6d75284d6f6ad0404"
+    },
+    {
+      "name": "pymysql/charset.py",
+      "bytes": 10258,
+      "sha256": "6381a0303c67d18cfef7d370b2d7c22de09fa1115dc32c16a07ae7e469ef8219"
+    },
+    {
+      "name": "pymysql/connections.py",
+      "bytes": 53908,
+      "sha256": "06cf0f1b651a732405e21ac9ecdebc99da627e6eede40b74bd31ef6451d91bc9"
+    },
+    {
+      "name": "pymysql/converters.py",
+      "bytes": 9523,
+      "sha256": "f0997ed4ad4db7e64a0226a10495783284af3b53be3d9b6ef027d01bd1037ed9"
+    },
+    {
+      "name": "pymysql/cursors.py",
+      "bytes": 16535,
+      "sha256": "6b8f891d83f5e3c931fbda95351cfcbd3b658a51a52836e4fd0b45956a61e4be"
+    },
+    {
+      "name": "pymysql/err.py",
+      "bytes": 4178,
+      "sha256": "c0b7b469fe8098aeb3edfabf32761f818b1ce8b9d4b8c8fb1258873d92aab810"
+    },
+    {
+      "name": "pymysql/optionfile.py",
+      "bytes": 651,
+      "sha256": "790a33e9ce37caf987b69e4c23d4c1d863d176882038b7a6714580064b1fbad9"
+    },
+    {
+      "name": "pymysql/protocol.py",
+      "bytes": 11812,
+      "sha256": "683f8f18f45873091223a649a095995512a7f47fc0d1fef429f3c3bbae6dab4a"
+    },
+    {
+      "name": "pymysql/times.py",
+      "bytes": 360,
+      "sha256": "fea5e00da630b079edbe920a48a5e9d6bad8220b6ae99f692f22e73b65cda0bd"
+    },
+    {
+      "name": "pymysql/constants/CLIENT.py",
+      "bytes": 878,
+      "sha256": "492bcc14f6424d5314d5459ae333ab7e160c0dd476c06da64b41391b32610ec8"
+    },
+    {
+      "name": "pymysql/constants/COMMAND.py",
+      "bytes": 679,
+      "sha256": "4c621301470d5a5ab61b0836c2fe542b6ca47537782d84e4fc470924e0a91887"
+    },
+    {
+      "name": "pymysql/constants/CR.py",
+      "bytes": 2320,
+      "sha256": "424df915644cc511dde926bd0822004cc87b8de811df19cb76b75a0424f47534"
+    },
+    {
+      "name": "pymysql/constants/ER.py",
+      "bytes": 12357,
+      "sha256": "9f0a97febd28e2698de02c66ecd551c89393568bffe466e5e697867baa33e5f9"
+    },
+    {
+      "name": "pymysql/constants/FIELD_TYPE.py",
+      "bytes": 370,
+      "sha256": "cad1738009c699bf61bddb019672baf2a759bff6ba8d81485d3e954806fad33f"
+    },
+    {
+      "name": "pymysql/constants/FLAG.py",
+      "bytes": 214,
+      "sha256": "172f8fac22e7508edfc7fa395b2a589d403358033413d779c8bf1f15154a7df6"
+    },
+    {
+      "name": "pymysql/constants/SERVER_STATUS.py",
+      "bytes": 333,
+      "sha256": "9b6f08ab92460850962e169f13bdfe88ebf0ffd8031aa9f2b56dcd907a5bba00"
+    },
+    {
+      "name": "pymysql/constants/__init__.py",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "pymysql-1.1.2.dist-info/licenses/LICENSE",
+      "bytes": 1070,
+      "sha256": "314120dc65f0800f738a4b31400c76ee14decd1fbe77ce9c3540a421b86ea7b6"
+    },
+    {
+      "name": "pymysql-1.1.2.dist-info/METADATA",
+      "bytes": 4298,
+      "sha256": "b726e3b4484349f6c0cd84b9020efe5fb98082592f06b39c109316d68eff0ea8"
+    },
+    {
+      "name": "pymysql-1.1.2.dist-info/WHEEL",
+      "bytes": 91,
+      "sha256": "ff309ddcdd65ebd02bc724dbf2bcc4a0ff53a5b61792a44548d383e4ebb19d3b"
+    },
+    {
+      "name": "pymysql-1.1.2.dist-info/top_level.txt",
+      "bytes": 8,
+      "sha256": "20a955f9fe28f74b0e76731de8706fa349769ea7c938653393065e684106b918"
+    },
+    {
+      "name": "pymysql-1.1.2.dist-info/RECORD",
+      "bytes": 1819,
+      "sha256": "4c8ddaced75fffa912a2a92f2e259f31bf516f57bc417cd41f421a06cdbda7d3"
+    }
+  ],
+  "authenticity": "TLS official PyPI metadata and distribution hash, no publisher signature claimed"
+}

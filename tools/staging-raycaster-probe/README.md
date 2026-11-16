@@ -4,7 +4,7 @@ Implementation for central-z9g4. Parent Stack owns review, installation, reserva
 monitor exclusion, deployment, credentials, live execution, and recovery. No live run
 has qualified this helper. Host tests run only Python and mocks.
 
-This is one fixed recipe: Qeynos2, then PoKnowledge, each in a fresh private root,
+This is one fixed recipe: Qeynos2 and PoKnowledge, each in a fresh private root,
 reserved nonzero instance and unused UDP port. It reuses NPC type 2011 without
 changing that row. It inserts exactly one owned spawn2, spawngroup, spawnentry and
 instance_list row per zone. Runtime quests set size 6, faction 0, aggro/assist 0,
@@ -15,8 +15,12 @@ created. Public instance zero, quests, actors, rules and spawn rows are untouche
 ## Parent preparation
 
 Run only inside the existing staging container, where the existing world TCP
-endpoint is 127.0.0.1. Install Python 3.11+ and PyMySQL through the parent's reviewed
-container procedure. This helper installs nothing. Do not run as part of host tests.
+endpoint is 127.0.0.1. Python 3.11+ must already be present. The helper verifies and imports the task-local
+PyMySQL 1.1.2 wheel by exact SHA256 and explicit path. It installs nothing and
+requires no default dependencies for the existing mysql_native_password account.
+Other authentication requiring optional cryptography/PyNaCl refuses; no package is
+downloaded at runtime. `vendor/pymysql-provenance.json` records official PyPI URL,
+metadata, wheel/member hashes, license and authentication limits. Do not run as part of host tests.
 
 Parent must hold exclusive ownership of both reserved instance IDs, versions, spawn
 IDs, group IDs and UDP ports throughout this invocation and cleanup. Select distinct
@@ -171,6 +175,10 @@ preflight/cleanup overhead. If the window is too short, skip the probe and repor
 it; do not suppress/skip a due public sample and claim continuous monitor coverage.
 A parent-approved classification contract that identifies public PIDs separately
 could replace that scheduling constraint, but this PR does not edit the monitor.
+For hourly work, `only_zone` must select `qeynos2` or `poknowledge` in the contract.
+Run each in a separate five-minute window immediately after a completed public
+sample, with at least 200 seconds remaining. Initial qualification may omit
+`only_zone` to run both before the clock starts. No timer is installed here.
 Hourly probes remain optional until the initial gate and window are qualified.
 
 One finite Server gap remains: the existing map reload route queues all zones;

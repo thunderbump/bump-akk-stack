@@ -170,6 +170,52 @@ class ProbeTests(unittest.TestCase):
             self.assertTrue(receipt['cleanup'])
             self.assertNotIn('sensitive',json.dumps(receipt))
 
+    def test_pinned_driver_import_and_corrupt_wheel_refusal(self):
+        driver = p.load_driver()
+        self.assertTrue(driver.__file__.startswith(str(HERE/'vendor/pymysql-1.1.2-py3-none-any.whl')+'/'))
+        self.assertTrue(callable(driver.connect))
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root/'vendor').mkdir()
+            (root/'vendor/pymysql-1.1.2-py3-none-any.whl').write_bytes(b'unapproved')
+            with patch.object(p,'HERE',root), self.assertRaises(p.Refusal):
+                p.load_driver()
+
+    def test_one_zone_window_never_bootstraps_other_zone(self):
+        store = object.__new__(p.Store)
+        store.contract = {'only_zone':'qeynos2', 'zones':{'qeynos2':{'instance':42,'version':240,'spawn':100,'group':200}}}
+        store.insert = MagicMock()
+        store.bootstrap()
+        self.assertEqual(len(store.insert.call_args_list),4)
+        self.assertEqual(p.selected_zones(store.contract), (p.ZONES[0],))
+        with self.assertRaises(p.Refusal):
+            p.selected_zones({'only_zone':'public'})
+
+    def test_ambiguous_commit_attempts_exact_cleanup_never_launches(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)/'run'
+            config = Path(tmp)/'config.json'
+            contract = Path(tmp)/'contract.json'
+            config.write_text(json.dumps({'server':{'world':{'tcp':{'ip':'127.0.0.1'}}}}))
+            contract.write_text(json.dumps({'world_pid':1,'zones':{z[0]:{
+                'reference':str(HERE/'vendor/route.json'),'reference_sha256':p.ZONE_SHA,
+                'reference_backend':'OFF','port':17901+n} for n,z in enumerate(p.ZONES)}}))
+            store = MagicMock()
+            store.manifest = {}
+            store.db.commit.side_effect = OSError('private DB connection lost')
+            store.cleanup.side_effect = OSError('private failed compensation')
+            argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'Store',return_value=store), patch.object(p,'run_child') as launch:
+                self.assertEqual(p.main(),1)
+            launch.assert_not_called()
+            store.cleanup.assert_called_once()
+            store.db.close.assert_called_once()
+            receipt = json.loads((root/'receipt.json').read_text())
+            self.assertFalse(receipt['passed'])
+            self.assertFalse(receipt['cleanup'])
+            self.assertIn('cleanup_error',receipt)
+            self.assertNotIn('private',json.dumps(receipt))
+
     def test_identifier_rejects_sql(self):
         for value in ('a;b','`bad`','x.y',''):
             with self.assertRaises(p.Refusal):
