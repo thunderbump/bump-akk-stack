@@ -1,0 +1,43 @@
+{
+  "dependency_edges": [
+    "plugins/check_handin.pl -> plugins/globals.pl plugin::val/var -> native NPC/Client methods",
+    "modules/items.lua -> modules/string_ext.lua string.findi -> native NPC/ItemInst methods"
+  ],
+  "files": [
+    {
+      "bytes": 2697,
+      "destination": "plugins/check_handin.pl",
+      "name": "check_handin.pl",
+      "sha256": "40af18d64fe1d6d95650b45a5f2fb54675675958aa74e45b48e6d12508416851",
+      "source": "/home/eqemu/server/plugins/check_handin.pl"
+    },
+    {
+      "bytes": 9984,
+      "destination": "plugins/globals.pl",
+      "name": "globals.pl",
+      "sha256": "90f8a8032c734eb8f010fdb3f27a91698236fbf5152c1547f565519c199cfc29",
+      "source": "/home/eqemu/server/plugins/globals.pl"
+    },
+    {
+      "bytes": 5237,
+      "destination": "modules/items.lua",
+      "name": "items.lua",
+      "sha256": "7bfcd2948fa69535a070333840e86875c4eb0755a047e77302ca336e7fce1f9a",
+      "source": "/home/eqemu/server/lua_modules/items.lua"
+    },
+    {
+      "bytes": 1012,
+      "destination": "modules/string_ext.lua",
+      "name": "string_ext.lua",
+      "sha256": "76da71e5faaf109beaa2d109598c3254eeb56e7c07e0b25da22754048c94a660",
+      "source": "/home/eqemu/server/lua_modules/string_ext.lua"
+    }
+  ],
+  "fixture_limit": "hand-in behavior is not invoked or qualified by collision probes",
+  "license": "existing deployed runtime files, retained privately as task data; no new public distribution",
+  "load_time": "function definitions and string utility registration only; no use/require/BEGIN/IO/DB/network statements in this four-file selection",
+  "publisher_commit": "not established; authority is exact deployed bytes, no upstream download/version claim",
+  "runtime_image": "567ab88c5e9fb6632b0b3d8fd94d71083deb72aa1d7896af510d48ff256e2090",
+  "scope": "already-deployed compatible utility modules only; no public NPC/global quest scripts",
+  "source_release": "raycaster-6a037f008-ON"
+}
