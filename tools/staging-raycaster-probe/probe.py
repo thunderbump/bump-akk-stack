@@ -211,9 +211,15 @@ class Store:
                 require(hashlib.sha256(ddl.encode()).hexdigest() == expected[key], 'unknown schema: '+key)
                 require('ENGINE=InnoDB' in ddl, 'nontransactional table refused')
                 self.manifest['schemas'][key] = {'ddl': ddl, 'sha256': expected[key]}
+        # Unrelated schema constraints are not fixture effects. Check both ends
+        # of every FK and every trigger touching a table this helper may mutate.
+        affected = {'game':('instance_list',*STATE),
+                    'content':('spawn2','spawngroup','spawnentry')}
         for db in set(self.names.values()):
-            require(not self.sql('SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=%s', (db,)), 'foreign-key side effects refused')
-            require(not self.sql('SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=%s', (db,)), 'DB triggers refused')
+            names = sorted({t for r,ts in affected.items() if self.names[r] == db for t in ts})
+            slots = ','.join(['%s']*len(names))
+            require(not self.sql('SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=%s AND (TABLE_NAME IN ('+slots+') OR REFERENCED_TABLE_NAME IN ('+slots+'))', (db,*names,*names)), 'fixture foreign-key side effects refused')
+            require(not self.sql('SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=%s AND EVENT_OBJECT_TABLE IN ('+slots+')', (db,*names)), 'fixture DB triggers refused')
         self.db.rollback()
 
     def preflight(self):

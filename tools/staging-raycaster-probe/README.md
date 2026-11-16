@@ -30,8 +30,9 @@ instance IDs inside the server's `Instances:ReservedInstances` range, versions 1
 unused for each zone, and distinct unused ports. A named SQL lock excludes other
 copies of this helper; it does not reserve resources against unrelated operators.
 The parent must coordinate those operators. InnoDB SERIALIZABLE row/range locks
-protect checks/inserts until commit. Nontransactional tables, triggers, and foreign
-keys are refused. No fixture data is imported and no database is reset.
+protect checks/inserts until commit. Nontransactional fixture tables, triggers on mutated tables, and foreign
+keys referencing or originating from any mutated table are refused. Unrelated
+constraints on player-only tables are retained and never changed. No fixture data is imported and no database is reset.
 
 Prepare an owner-only contract JSON, outside version control. Required fields:
 
