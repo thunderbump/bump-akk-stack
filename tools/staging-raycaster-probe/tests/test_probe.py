@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sqlite3
 import sys
 import tempfile
 import unittest
@@ -319,6 +320,34 @@ class ProbeTests(unittest.TestCase):
                 with self.assertRaises(p.Refusal):
                     store.delete_exact('content','spawngroup',original)
                 store.db.cursor.assert_not_called()
+
+    def test_cross_database_incoming_fk_refuses_before_writes(self):
+        # Execute the actual predicate against harmless metadata-shaped rows.
+        # The source schema is game.audit; its target is content.spawn2.
+        db = sqlite3.connect(':memory:')
+        db.execute('CREATE TABLE fks(CONSTRAINT_NAME TEXT,CONSTRAINT_SCHEMA TEXT,UNIQUE_CONSTRAINT_SCHEMA TEXT,TABLE_NAME TEXT,REFERENCED_TABLE_NAME TEXT)')
+        db.execute("INSERT INTO fks VALUES('external','game','content','audit','spawn2')")
+        store = object.__new__(p.Store)
+        store.names = {'game':'game','content':'content'}
+        store.db = MagicMock()
+        store.manifest = {'schemas':{}}
+        ddl = 'CREATE TABLE example(id INT) ENGINE=InnoDB'
+        tables = {'game':('instance_list',*p.STATE,*p.PROTECTED,'rule_values','rule_sets','variables'),
+                  'content':('spawn2','spawngroup','spawnentry','npc_types','zone')}
+        sha = p.hashlib.sha256(ddl.encode()).hexdigest()
+        store.contract = {'schemas':{r+'.'+t:sha for r,ts in tables.items() for t in ts}}
+        def sql(query,args=()):
+            if query.startswith('SHOW CREATE TABLE'):return [{'Table':'example','Create Table':ddl}]
+            if 'REFERENTIAL_CONSTRAINTS' in query:
+                query=query.replace('information_schema.REFERENTIAL_CONSTRAINTS','fks').replace('%s','?')
+                return db.execute(query,args).fetchall()
+            return []
+        store.sql = MagicMock(side_effect=sql)
+        try:
+            with self.assertRaises(p.Refusal):store.schema()
+            store.db.rollback.assert_not_called()
+        finally:
+            db.close()
 
     def test_identifier_rejects_sql(self):
         for value in ('a;b','`bad`','x.y',''):

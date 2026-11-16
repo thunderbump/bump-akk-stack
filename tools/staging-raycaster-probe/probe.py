@@ -218,7 +218,7 @@ class Store:
         for db in set(self.names.values()):
             names = sorted({t for r,ts in affected.items() if self.names[r] == db for t in ts})
             slots = ','.join(['%s']*len(names))
-            require(not self.sql('SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE CONSTRAINT_SCHEMA=%s AND (TABLE_NAME IN ('+slots+') OR REFERENCED_TABLE_NAME IN ('+slots+'))', (db,*names,*names)), 'fixture foreign-key side effects refused')
+            require(not self.sql('SELECT CONSTRAINT_NAME FROM information_schema.REFERENTIAL_CONSTRAINTS WHERE (CONSTRAINT_SCHEMA=%s AND TABLE_NAME IN ('+slots+')) OR (UNIQUE_CONSTRAINT_SCHEMA=%s AND REFERENCED_TABLE_NAME IN ('+slots+'))', (db,*names,db,*names)), 'fixture foreign-key side effects refused')
             require(not self.sql('SELECT TRIGGER_NAME FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA=%s AND EVENT_OBJECT_TABLE IN ('+slots+')', (db,*names)), 'fixture DB triggers refused')
         self.db.rollback()
 
