@@ -498,7 +498,9 @@ EVENT_SPAWN();EVENT_TIMER();EVENT_TIMER();EVENT_TIMER();EVENT_TIMER();
 open(my $stop,'>','stop-map-validation') or die 'stop control';close($stop);
 EVENT_TIMER();die 'global ties removed' unless tied(*STDOUT) && tied(*STDERR);
 '''
-                result = self.perl(self.TIES+mocks+p.quest(HERE/'vendor'/name)+tail,cwd=tmp)
+                # Return from file-style evaluation before invoking later events.
+                loaded = "eval <<'PRIVATE_QUEST';\n"+p.quest(HERE/'vendor'/name)+"\nPRIVATE_QUEST\ndie 'quest load' if $@;\n"
+                result = self.perl(self.TIES+mocks+loaded+tail,cwd=tmp)
                 self.assertEqual(result.returncode,0,result.stderr)
                 lines = result.stdout.decode().splitlines()
                 self.assertEqual(sum(s.startswith('SERVER_COLLISION_QUERY ') for s in lines),3)
