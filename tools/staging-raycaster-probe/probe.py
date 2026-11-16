@@ -122,7 +122,7 @@ def selected_zones(contract):
 
 
 def quest(source):
-    """Keep pinned inputs/call order; send evidence directly to bounded stdout."""
+    """Keep fixed calls; duplicate OS stdout without altering Perl's tied handles."""
     text = source.read_text().replace('quest::debug(', 'probe_emit(')
     text = text.replace('"/runtime/stop-map-validation"', '"stop-map-validation"')
     text = text.replace('sub EVENT_SPAWN { quest::settimer("server_collision", 1); }', '''sub EVENT_SPAWN {
@@ -134,7 +134,26 @@ def quest(source):
     quest::processmobswhilezoneempty(1);
     quest::settimer("server_collision", 1);
 }''')
-    return '$|=1;\nsub probe_emit { print STDOUT $_[0]."\\n"; }\n' + text
+    return r'''# A real dup, not >&=1: destroying this lexical handle must not close fd 1.
+open(my $probe_output, '>&', 1) or die 'private probe output open';
+binmode($probe_output, ':raw') or die 'private probe output mode';
+my $probe_output_failed = 0;
+sub probe_emit {
+    die 'private probe output failed' if $probe_output_failed;
+    my $line = $_[0]."\n";
+    # Each fixed ASCII record fits PIPE_BUF. syswrite has no buffered flush.
+    if (length($line) > 4096) {
+        $probe_output_failed = 1;
+        die 'private probe output record bound';
+    }
+    local $SIG{PIPE} = 'IGNORE';
+    my $written = syswrite($probe_output, $line);
+    unless (defined($written) && $written == length($line)) {
+        $probe_output_failed = 1;
+        die 'private probe output write';
+    }
+}
+''' + text
 
 
 def private_config(original, root, assets):

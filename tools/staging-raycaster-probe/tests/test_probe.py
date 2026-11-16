@@ -47,7 +47,7 @@ class ProbeTests(unittest.TestCase):
             text = p.quest(HERE/'vendor'/name)
             self.assertNotIn('quest::debug', text)
             self.assertNotIn('/runtime/', text)
-            self.assertIn('print STDOUT', text)
+            self.assertIn('probe_emit', text)
             self.assertIn('$npc->ChangeSize(6)', text)
             self.assertIn('$npc->SetNPCFactionID(0)', text)
             self.assertIn('quest::processmobswhilezoneempty(1)', text)
@@ -121,7 +121,7 @@ class ProbeTests(unittest.TestCase):
                 comparator.parse_route(text+base.format(**values),'ON',json.loads((HERE/'vendor/route.json').read_text()))
 
     def test_real_harmless_child_stop_reap_and_redaction(self):
-        # This Python fixture is the only process launched by this suite.
+        # This harmless Python fixture exercises native-child lifecycle handling.
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             child = root/'child.py'
@@ -459,6 +459,95 @@ class ProbeTests(unittest.TestCase):
         for value in ('a;b','`bad`','x.y',''):
             with self.assertRaises(p.Refusal):
                 p.identifier(value)
+
+
+class TiedPerlOutputTests(unittest.TestCase):
+    """Real Perl I/O, with fake NPC methods only. No Server or DB execution."""
+    TIES = r'''
+package Capture;
+our @seen;
+sub TIEHANDLE { bless {},shift }
+sub PRINT { my $self=shift;push @seen,join('',@_);1 }
+package main;
+tie *STDOUT,'Capture';tie *STDERR,'Capture';
+'''
+
+    def perl(self, code, cwd=None, stdout=subprocess.PIPE):
+        return subprocess.run(['/usr/bin/perl','-'], input=code.encode(),
+                              stdout=stdout, stderr=subprocess.PIPE, cwd=cwd, timeout=5)
+
+    def test_both_generated_quests_emit_complete_records_with_tied_stdout(self):
+        mocks = r'''
+package FakeNPC;
+sub new { bless {x=>0,y=>0,z=>0},shift }
+sub GMMove { my $s=shift;@{$s}{qw(x y z)}=@_[0..2] }
+sub MoveTo { my $s=shift;$s->GMMove(@_) }
+sub GetX { $_[0]->{x} } sub GetY { $_[0]->{y} } sub GetZ { $_[0]->{z} }
+sub GetSize { 6 } sub GetNPCTypeID { 2011 } sub GetID { 2 }
+sub FindGroundZ { 0 } sub CheckLoSToLoc { 1 } sub IsMoving { 0 }
+our $AUTOLOAD;sub AUTOLOAD { } sub DESTROY { }
+package quest;
+sub settimer { } sub stoptimer { } sub processmobswhilezoneempty { }
+package main;
+our $npc=FakeNPC->new;our $timer='server_collision';
+'''
+        for name in ('2011.pl','pok-2011.pl'):
+            with self.subTest(quest=name), tempfile.TemporaryDirectory() as tmp:
+                tail = r'''
+EVENT_SPAWN();EVENT_TIMER();EVENT_TIMER();EVENT_TIMER();EVENT_TIMER();
+open(my $stop,'>','stop-map-validation') or die 'stop control';close($stop);
+EVENT_TIMER();die 'global ties removed' unless tied(*STDOUT) && tied(*STDERR);
+'''
+                result = self.perl(self.TIES+mocks+p.quest(HERE/'vendor'/name)+tail,cwd=tmp)
+                self.assertEqual(result.returncode,0,result.stderr)
+                lines = result.stdout.decode().splitlines()
+                self.assertEqual(sum(s.startswith('SERVER_COLLISION_QUERY ') for s in lines),3)
+                self.assertEqual(sum(s.startswith('SERVER_COLLISION_FLOOR ') for s in lines),3)
+                self.assertEqual(lines.count('SERVER_COLLISION_QUERIES_DONE'),1)
+                self.assertEqual(lines.count('SERVER_COLLISION_ROUTE_DONE'),1)
+                self.assertEqual(lines.count('MAP_SERVER_PROBE_STOPPED'),1)
+
+    def test_duplicate_close_leaves_original_fd_and_ties_usable(self):
+        tail = r'''
+probe_emit('PRIVATE_VISIBLE');close($probe_output) or die 'private close';
+open(my $still,'>&',1) or die 'original descriptor closed';
+syswrite($still,"ORIGINAL_STILL_OPEN\n")==20 or die 'original write';
+print STDOUT "TIED_HIDDEN\n";
+die 'tie changed' unless tied(*STDOUT) && tied(*STDERR) && $Capture::seen[-1] eq "TIED_HIDDEN\n";
+'''
+        result=self.perl(self.TIES+p.quest(HERE/'vendor/2011.pl')+tail)
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout,b'PRIVATE_VISIBLE\nORIGINAL_STILL_OPEN\n')
+
+    def test_closed_output_and_oversize_are_sticky_failures(self):
+        for fault in ('close($probe_output);', "eval { probe_emit('x' x 4096); };die 'overflow accepted' unless $@;"):
+            tail=fault+r'''
+eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'write accepted' unless $@;
+open($probe_output,'>&',1) or die 'reopen control';
+eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'failure not sticky' unless $@;
+'''
+            result=self.perl(self.TIES+p.quest(HERE/'vendor/2011.pl')+tail)
+            self.assertEqual(result.returncode,0,result.stderr)
+            self.assertEqual(result.stdout,b'')
+
+    def test_open_short_write_and_broken_pipe_refuse(self):
+        text=p.quest(HERE/'vendor/2011.pl')
+        result=self.perl('use POSIX ();POSIX::close(1);'+self.TIES+text)
+        self.assertNotEqual(result.returncode,0)
+        result=self.perl('BEGIN { *CORE::GLOBAL::syswrite = sub { return 0; }; }'+self.TIES+text+r'''
+eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'short write accepted' unless $@;
+''')
+        self.assertEqual(result.returncode,0,result.stderr)
+        self.assertEqual(result.stdout,b'')
+        read_fd,write_fd=os.pipe()
+        os.close(read_fd)
+        try:
+            result=self.perl(self.TIES+text+r'''
+eval { probe_emit('SERVER_COLLISION_ROUTE_DONE'); };die 'broken pipe accepted' unless $@;
+''',stdout=write_fd)
+        finally:
+            os.close(write_fd)
+        self.assertEqual(result.returncode,0,result.stderr)
 
 
 if __name__ == '__main__':

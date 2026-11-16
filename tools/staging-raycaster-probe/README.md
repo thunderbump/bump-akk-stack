@@ -217,8 +217,20 @@ Each route gets at most 120 seconds, then a 3-second stop-file interval, up to
 5 seconds after TERM, KILL if needed, up to 5 seconds to reap, and a bounded final
 pipe drain. Output is capped at 4 MiB per child. Child core dumps are disabled and each native
 log file has a 4 MiB RLIMIT_FSIZE cap; parent must bound the private root disk
-allocation as part of installation. Quest evidence prints directly to
-stdout; no global Quest Debug setting is required. The lifecycle guard begins immediately after Popen. Stop-file, pipe, signaling and
+allocation as part of installation. The generated private quest duplicates fixed
+OS descriptor 1 using Perl `open(my $probe_output, '>&', 1)`. It does not alias
+the descriptor with `>&=1`, untie global STDOUT/STDERR, or use their tied logging
+path. Closing the lexical duplicate leaves original descriptor 1 usable. The
+lexical handle remains in scope across that quest's events. Fixed ASCII records
+use unbuffered `syswrite`, so there is no deferred flush. Open/mode errors fail
+quest loading; oversized records, failed/short writes and broken pipes latch a
+failure that rejects subsequent completion markers. SIGPIPE is ignored only
+within that write so its error can be checked. Each record is at most 4096 bytes;
+the existing combined child pipe and 4 MiB capture budget remain unchanged. No
+public DB logging change or separate output channel is needed. The harmless
+tied-Perl controls exercise both generated quests, descriptor close ownership and
+error paths; they do not qualify native collision behavior or shutdown. The
+lifecycle guard begins immediately after Popen. Stop-file, pipe, signaling and
 selector faults are recorded independently and do not suppress kill/reap attempts.
 Every started child has PID,
 exit, elapsed time, stop acknowledgement, TERM/KILL and reap results recorded.
