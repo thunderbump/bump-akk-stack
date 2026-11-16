@@ -262,18 +262,20 @@ class ProbeTests(unittest.TestCase):
         zone_rules = [{'rule_name':'Map:FindBestZHeightAdjust','rule_value':'1'}]
         def sha(rows):
             return p.hashlib.sha256(p.encoded(rows).encode()).hexdigest()
-        for bad in (False,True):
+        for bad in (False,True,"event","other_zone_event"):
             with self.subTest(override_mismatch=bad):
                 selected = copy.deepcopy(zone_rules)
-                if bad:
+                if bad is True:
                     selected[0]['rule_value'] = '20'
                 store = object.__new__(p.Store)
                 store.names = {'game':'game','content':'content'}
                 store.contract = {'ruleset_id':1,'ruleset_name':'default','default_rule_rows_sha256':sha(defaults),
                   'zones':{z[0]:{'instance':90+n,'version':250+n,'spawn':1000+n,'group':1000+n,'ruleset_id':1+n,
                       'rule_rows_sha256':sha(defaults if n==0 else selected)} for n,z in enumerate(p.ZONES)}}
+                if bad=='other_zone_event':store.contract['only_zone']='qeynos2'
                 store.manifest = {'originals':{}}
                 store.schema = MagicMock()
+                store.timer_snapshot = MagicMock(return_value={'captured_unix':1,'rows':[]})
                 def sql(query,args=()):
                     if 'GET_LOCK' in query:return [{'locked':1}]
                     if 'SELECT rule_name,rule_value' in query:
@@ -284,6 +286,7 @@ class ProbeTests(unittest.TestCase):
                     if table=='rule_sets':return [{'ruleset_id':1,'name':'default'}]
                     if table=='zone':return [{'zoneidnumber':args[0],'ruleset':1 if args[0]==2 else 2}]
                     if table=='npc_types':return [{'id':2011}]
+                    if table=='spawn_events' and (bad=='event' or (bad=='other_zone_event' and args==('poknowledge',))):return [{'id':7}]
                     return []
                 store.sql = MagicMock(side_effect=sql)
                 store.rows = MagicMock(side_effect=rows)
@@ -332,7 +335,7 @@ class ProbeTests(unittest.TestCase):
         store.db = MagicMock()
         store.manifest = {'schemas':{}}
         ddl = 'CREATE TABLE example(id INT) ENGINE=InnoDB'
-        tables = {'game':('instance_list',*p.STATE,*p.PROTECTED,'rule_values','rule_sets','variables'),
+        tables = {'game':('instance_list',*p.STATE,*p.PROTECTED,'rule_values','rule_sets','variables','spawn_events'),
                   'content':('spawn2','spawngroup','spawnentry','npc_types','zone')}
         sha = p.hashlib.sha256(ddl.encode()).hexdigest()
         store.contract = {'schemas':{r+'.'+t:sha for r,ts in tables.items() for t in ts}}
@@ -348,6 +351,44 @@ class ProbeTests(unittest.TestCase):
             store.db.rollback.assert_not_called()
         finally:
             db.close()
+
+    def test_timer_snapshot_never_clips_rows_or_bytes(self):
+        store = object.__new__(p.Store)
+        store.names = {'game':'peq'}
+        for rows,ok in (([{'id':1,'instance_id':0,'expire_at':1}],True),
+                        ([{'id':n} for n in range(p.TIMER_ROWS+1)],False),
+                        ([{'id':1,'payload':'x'*(p.TIMER_BYTES+1)}],False)):
+            store.sql = MagicMock(side_effect=[[{'captured_unix':123}],rows])
+            if ok:
+                snap=store.timer_snapshot()
+                self.assertEqual(snap,{'captured_unix':123,'rows':rows})
+            else:
+                with self.assertRaises(p.Refusal):store.timer_snapshot()
+            self.assertIn('LIMIT '+str(p.TIMER_ROWS+1),store.sql.call_args_list[1].args[0])
+
+    def test_timer_after_failure_invalidates_pass_without_losing_cleanup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)/'run'
+            config = Path(tmp)/'config.json'
+            contract = Path(tmp)/'contract.json'
+            config.write_text(json.dumps({'server':{'world':{'tcp':{'ip':'127.0.0.1','port':9001}}}}))
+            contract.write_text(json.dumps({'world_pid':1,'zones':{z[0]:{
+                'version':250+n,'reference':str(HERE/'vendor/route.json'),'reference_sha256':p.ZONE_SHA,
+                'reference_backend':'OFF','port':17901+n} for n,z in enumerate(p.ZONES)}}))
+            store = MagicMock()
+            store.manifest = {'respawn_timers_before':{'captured_unix':1,'rows':[]}}
+            store.timer_snapshot.side_effect = OSError('private timer failure')
+            argv = ['probe','--config',str(config),'--contract',str(contract),'--root',str(root),'--zone-binary','/unused']
+            with patch.object(sys,'argv',argv), patch.object(p,'validate_contract'), patch.object(p,'load_comparator'), patch.object(p,'digest',side_effect=[p.ZONE_SHA,p.WORLD_SHA,p.ZONE_SHA,p.ZONE_SHA]), patch.object(p,'Store',return_value=store), patch.object(p,'run_child',return_value='evidence') as launch, patch.object(p,'verify_evidence',return_value={}):
+                self.assertEqual(p.main(),1)
+            store.cleanup.assert_called_once()
+            store.db.close.assert_called_once()
+            self.assertEqual(launch.call_count,2)
+            receipt=json.loads((root/'receipt.json').read_text())
+            self.assertTrue(receipt['cleanup'])
+            self.assertFalse(receipt['passed'])
+            self.assertIn('housekeeping_snapshot_error',receipt)
+            self.assertNotIn('private',json.dumps(receipt))
 
     def test_identifier_rejects_sql(self):
         for value in ('a;b','`bad`','x.y',''):

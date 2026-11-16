@@ -29,6 +29,8 @@ RULES = {'Map:FindBestZHeightAdjust': '1', 'Map:FixZWhenPathing': 'true',
          'Zone:UseZoneController': 'true', 'Bots:Enabled': 'false',
          'Zone:StateSavingOnShutdown': 'false'}
 MAX_LOG = 4 * 1024 * 1024
+TIMER_ROWS = 256
+TIMER_BYTES = 65536
 
 
 class Refusal(Exception):
@@ -144,6 +146,7 @@ def private_config(original, root, assets):
 
 def validate_contract(c):
     selected_zones(c)
+    require(c.get('allow_native_expired_timer_housekeeping') is True, 'native housekeeping scope not accepted')
     require(c['monitor_window'] == 'exclusive-between-public-samples', 'monitor exclusion missing')
     require(c['read_only_assets'] is True, 'read-only asset mount contract missing')
     require(c['operator_exclusive_reservations'] is True, 'operator reservation ownership missing')
@@ -199,7 +202,7 @@ class Store:
 
     def schema(self):
         expected = self.contract['schemas']
-        tables = {'game': ('instance_list', *STATE, *PROTECTED, 'rule_values', 'rule_sets', 'variables'),
+        tables = {'game': ('instance_list', *STATE, *PROTECTED, 'rule_values', 'rule_sets', 'variables', 'spawn_events'),
                   'content': ('spawn2', 'spawngroup', 'spawnentry', 'npc_types', 'zone')}
         require(set(expected) == {r+'.'+t for r, ts in tables.items() for t in ts}, 'schema contract incomplete')
         for role, names in tables.items():
@@ -238,6 +241,8 @@ class Store:
         require(len(active) <= 1 and (not active or active[0]['value'] == self.contract['ruleset_name']), 'active ruleset differs')
         sets = self.rows('game', 'rule_sets', 'ruleset_id=%s', (self.contract['ruleset_id'],))
         require(len(sets) == 1 and sets[0]['name'] == self.contract['ruleset_name'] == 'default', 'default ruleset ID/name mismatch')
+        for zone, *_ in ZONES:
+            require(not self.rows('game','spawn_events','zone=%s',(zone,)), 'shared zone spawn events refused')
         # rulesys.cpp loads explicit default rows, then the selected zone ruleset.
         for zone, zid, *_ in selected_zones(self.contract):
             item = self.contract['zones'][zone]
@@ -268,7 +273,18 @@ class Store:
             self.protected_empty(item['instance'])
             self.manifest['originals'][zone] = {'rows': originals,
                 'sha256': hashlib.sha256(encoded(originals).encode()).hexdigest()}
+        self.manifest['respawn_timers_before'] = self.timer_snapshot()
         # Retain range/row locks through bootstrap; no write happened before all checks.
+
+    def timer_snapshot(self):
+        """Complete bounded native-housekeeping evidence, never a restore source."""
+        stamp = self.sql('SELECT UNIX_TIMESTAMP(NOW()) AS captured_unix')[0]['captured_unix']
+        require(type(stamp) is int and stamp >= 0, 'invalid timer snapshot time')
+        rows = self.sql('SELECT * FROM '+self.table('game','respawn_times')+' ORDER BY id,instance_id LIMIT '+str(TIMER_ROWS+1))
+        require(len(rows) <= TIMER_ROWS, 'timer snapshot row bound')
+        snapshot = {'captured_unix':stamp, 'rows':rows}
+        require(len(encoded(snapshot).encode()) <= TIMER_BYTES, 'timer snapshot byte bound')
+        return snapshot
 
     def protected_empty(self, instance):
         for table, column in PROTECTED.items():
@@ -469,7 +485,10 @@ def main():
     def terminate(signum, frame):
         raise Refusal('operator terminated probe')
     signal.signal(signal.SIGTERM, terminate)
-    receipt = {'passed':False, 'cleanup':False, 'children':{}, 'reload_gap':'no qualified targeted reload route'}
+    receipt = {'passed':False, 'cleanup':False, 'children':{}, 'reload_gap':'no qualified targeted reload route',
+        'native_housekeeping':{'scope':'ordinary global expired NPC respawn timers, not fixture-confined',
+                               'attribution':'before/after differences may include concurrent world activity',
+                               'before':None,'after':None}}
     store = None
     committed = False
     try:
@@ -491,6 +510,7 @@ def main():
                 sock.bind(('0.0.0.0', item['port']))
         store = Store(config, c)
         store.preflight()
+        receipt['native_housekeeping']['before'] = store.manifest.get('respawn_timers_before')
         save(root/'ownership.json', store.manifest)
         store.bootstrap()
         save(root/'ownership.json', store.manifest)
@@ -530,6 +550,13 @@ def main():
                 except BaseException:
                     receipt['rollback_error'] = 'rollback unavailable'
             finally:
+                if receipt['native_housekeeping']['before'] is not None:
+                    try:
+                        receipt['native_housekeeping']['after'] = store.timer_snapshot()
+                        require(type(receipt['native_housekeeping']['after']) is dict, 'timer snapshot unavailable')
+                    except BaseException:
+                        receipt['passed'] = False
+                        receipt['housekeeping_snapshot_error'] = 'complete timer snapshot unavailable'
                 try:
                     store.db.close()
                 except BaseException:

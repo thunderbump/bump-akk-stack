@@ -10,7 +10,12 @@ changing that row. It inserts exactly one owned spawn2, spawngroup, spawnentry a
 instance_list row per zone. Runtime quests set size 6, faction 0, aggro/assist 0,
 speed 1.25, and process mobs while empty. Two GMMove calls place the fixed-query
 and route fixtures; only ordinary MoveTo(...,0,1) moves the route. No membership is
-created. Public instance zero, quests, actors, rules and spawn rows are untouched.
+created. Helper-managed writes are confined to owned fixture rows. Player/inventory, public
+spawn definitions, actor checkpoints, quests and rules are protected. Native zone
+startup additionally runs ordinary global expired-NPC-respawn-timer cleanup. Parent
+accepted that finite housekeeping limit for this staging test; it is not strict
+confinement of every native DB write. No stale timer is restored and no shared
+AUTO_INCREMENT counter is rewound.
 
 ## Parent preparation
 
@@ -43,6 +48,7 @@ Prepare an owner-only contract JSON, outside version control. Required fields:
   "monitor_window": "exclusive-between-public-samples",
   "operator_exclusive_reservations": true,
   "read_only_assets": true,
+  "allow_native_expired_timer_housekeeping": true,
   "world_pid": 123,
   "ruleset_id": 0,
   "ruleset_name": "default",
@@ -95,7 +101,7 @@ Do not accept schema pins from an unreviewed live dump automatically.
   `game.spawn_condition_values`, `game.spawn2_disabled`, `game.data_buckets`,
   `game.zone_state_spawns`, `game.instance_list_player`, `game.character_corpses`,
   `game.dynamic_zones`, `game.character_data`, `game.rule_values`, `game.rule_sets`,
-  `game.variables`.
+  `game.variables`, `game.spawn_events`.
 - Content keys: `content.spawn2`, `content.spawngroup`, `content.spawnentry`,
   `content.npc_types`, `content.zone`.
 
@@ -126,10 +132,25 @@ uses the native named-default fallback. Default rows load first, then the select
 zone ruleset rows, as rulesys.cpp does. Complete ordered row hashes are pinned and
 all five effective values must match; missing values refuse. A native zone controller
 can exist off-map but has no quest in the private root and is not NPC 2011. No public
-controller script or quest fallback is available. Matching
-version or -1 wildcard spawns, occupied row/instance/version reservations, existing
+controller script or quest fallback is available. Any spawn_events row for either selected zone refuses before bootstrap, including
+disabled rows. Nonzero instance/version does not isolate native event scheduling.
+Matching version or -1 wildcard spawns, occupied row/instance/version reservations, existing
 instance persistent state, memberships, corpses, characters or dynamic zones refuse.
 The helper never changes a production rule to meet these requirements.
+
+## Native housekeeping evidence
+
+Before bootstrap and after cleanup, retain the complete respawn_times rows and DB
+UNIX timestamps. Each snapshot is at most 256 rows and 65536 encoded bytes. A row
+or byte overflow refuses the probe or invalidates its result; no clipping or
+sampling. Native startup can delete globally expired rows. Concurrent world
+activity can also change them, so a difference is not process attribution. Neither
+timer snapshots nor fixture manifests authorize restoring stale public timers.
+
+Select unused content ID holes below current AUTO_INCREMENT counters where
+possible, and prove group IDs have no existing spawn2/spawnentry references. Parent
+retains exclusive reservations. Normal counter advancement from new owned instance
+rows is preserved during cleanup; do not reset counters or erase old instance state.
 
 ## Controlled invocation
 
