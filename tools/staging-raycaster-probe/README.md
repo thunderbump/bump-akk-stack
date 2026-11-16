@@ -43,6 +43,7 @@ Prepare an owner-only contract JSON, outside version control. Required fields:
   "world_pid": 123,
   "ruleset_id": 0,
   "ruleset_name": "default",
+  "default_rule_rows_sha256": "REVIEWED_64_HEX_SHA256",
   "assets": {
     "maps": "/READ_ONLY/maps",
     "patches": "/READ_ONLY/opcodes",
@@ -51,14 +52,16 @@ Prepare an owner-only contract JSON, outside version control. Required fields:
   },
   "zones": {
     "qeynos2": {
-      "instance": 30001, "version": 250, "port": 17901,
+      "instance": 90, "version": 250, "port": 17901,
+      "ruleset_id": 1, "rule_rows_sha256": "REVIEWED_64_HEX_SHA256",
       "spawn": 1900000001, "group": 1900000001,
       "reference": "/PRIVATE/qualified-qeynos2.log",
       "reference_sha256": "REVIEWED_64_HEX_SHA256",
       "reference_backend": "OFF"
     },
     "poknowledge": {
-      "instance": 30002, "version": 251, "port": 17902,
+      "instance": 91, "version": 251, "port": 17902,
+      "ruleset_id": 2, "rule_rows_sha256": "REVIEWED_64_HEX_SHA256",
       "spawn": 1900000002, "group": 1900000002,
       "reference": "/PRIVATE/qualified-poknowledge.log",
       "reference_sha256": "REVIEWED_64_HEX_SHA256",
@@ -111,9 +114,13 @@ has empty private plugins, modules, mods and logs, and ONLY
 `quests/ZONE/v<VERSION>/2011.pl`. No public/global quest fallback is installed.
 
 Before any insert, all explicit Map:FindBestZHeightAdjust=1,
-Map:FixZWhenPathing=true, Zone:UseZoneController=false, Bots:Enabled=false and
-Zone:StateSavingOnShutdown=false values must already match. The active ruleset
-name/ID and zone effective ruleset must agree; missing values refuse. Matching
+Map:FixZWhenPathing=true, Zone:UseZoneController=true, Bots:Enabled=false and
+Zone:StateSavingOnShutdown=false values must already match. The named default ID and each zone ruleset ID are pinned. Missing RuleSet variable
+uses the native named-default fallback. Default rows load first, then the selected
+zone ruleset rows, as rulesys.cpp does. Complete ordered row hashes are pinned and
+all five effective values must match; missing values refuse. A native zone controller
+can exist off-map but has no quest in the private root and is not NPC 2011. No public
+controller script or quest fallback is available. Matching
 version or -1 wildcard spawns, occupied row/instance/version reservations, existing
 instance persistent state, memberships, corpses, characters or dynamic zones refuse.
 The helper never changes a production rule to meet these requirements.

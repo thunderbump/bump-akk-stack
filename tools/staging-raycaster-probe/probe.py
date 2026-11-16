@@ -26,7 +26,7 @@ STATE = ('respawn_times', 'spawn_condition_values', 'spawn2_disabled',
 PROTECTED = {'instance_list_player': 'id', 'character_corpses': 'instance_id',
              'dynamic_zones': 'instance_id', 'character_data': 'zone_instance'}
 RULES = {'Map:FindBestZHeightAdjust': '1', 'Map:FixZWhenPathing': 'true',
-         'Zone:UseZoneController': 'false', 'Bots:Enabled': 'false',
+         'Zone:UseZoneController': 'true', 'Bots:Enabled': 'false',
          'Zone:StateSavingOnShutdown': 'false'}
 MAX_LOG = 4 * 1024 * 1024
 
@@ -221,21 +221,30 @@ class Store:
         require(self.sql("SELECT GET_LOCK('staging-raycaster-probe',0) AS locked")[0]['locked'] == 1, 'probe lock held')
         self.sql('SET SESSION TRANSACTION ISOLATION LEVEL SERIALIZABLE')
         game = self.table('game', 'rule_values')
-        rules = self.sql('SELECT rule_name,rule_value FROM '+game+' WHERE ruleset_id=%s', (self.contract['ruleset_id'],))
+        rules = self.sql('SELECT rule_name,rule_value FROM '+game+' WHERE ruleset_id=%s ORDER BY rule_name', (self.contract['ruleset_id'],))
+        require(hashlib.sha256(encoded(rules).encode()).hexdigest() == self.contract['default_rule_rows_sha256'], 'default rule rows differ')
         self.manifest['effective_rule_rows'] = {'rows': rules, 'sha256': hashlib.sha256(encoded(rules).encode()).hexdigest()}
         rules = {r['rule_name']: r['rule_value'].lower() for r in rules}
         require(all(rules.get(k) == v for k, v in RULES.items()), 'effective rules do not match fixed probe')
         require(self.sql('SELECT ruleset_id FROM '+game+' WHERE ruleset_id=%s LIMIT 1', (self.contract['ruleset_id'],)), 'ruleset absent')
         active = self.rows('game', 'variables', 'varname=%s', ('RuleSet',))
-        require(len(active) == 1 and active[0]['value'] == self.contract['ruleset_name'], 'active ruleset differs')
+        # Native zone/main.cpp falls back to the named default when absent.
+        require(len(active) <= 1 and (not active or active[0]['value'] == self.contract['ruleset_name']), 'active ruleset differs')
         sets = self.rows('game', 'rule_sets', 'ruleset_id=%s', (self.contract['ruleset_id'],))
-        require(len(sets) == 1 and sets[0]['name'] == self.contract['ruleset_name'], 'ruleset ID/name mismatch')
-        # No inherited defaults or per-zone rulesets: require reviewed explicit effective values.
+        require(len(sets) == 1 and sets[0]['name'] == self.contract['ruleset_name'] == 'default', 'default ruleset ID/name mismatch')
+        # rulesys.cpp loads explicit default rows, then the selected zone ruleset.
         for zone, zid, *_ in selected_zones(self.contract):
             item = self.contract['zones'][zone]
             require(item['instance'] <= int(rules.get('Instances:ReservedInstances', '0')), 'instance outside reserved range')
             zrows = self.rows('content', 'zone', 'zoneidnumber=%s AND (version=%s OR version=0)', (zid, item['version']))
-            require(zrows and all(int(r['ruleset']) == self.contract['ruleset_id'] for r in zrows), 'zone ruleset override refused')
+            require(zrows and all(int(r['ruleset']) == item['ruleset_id'] for r in zrows), 'zone ruleset differs')
+            selected_rules = self.sql('SELECT rule_name,rule_value FROM '+game+' WHERE ruleset_id=%s ORDER BY rule_name', (item['ruleset_id'],))
+            require(selected_rules, 'zone ruleset empty')
+            require(hashlib.sha256(encoded(selected_rules).encode()).hexdigest() == item['rule_rows_sha256'], 'zone rule rows differ')
+            effective = dict(rules)
+            effective.update({r['rule_name']:r['rule_value'].lower() for r in selected_rules})
+            require(all(effective.get(k) == v for k,v in RULES.items()), 'zone effective rules differ')
+            self.manifest.setdefault('zone_rules', {})[zone] = {'rows':selected_rules,'effective_fixed':{k:effective[k] for k in RULES}}
             require(not self.rows('game', 'instance_list', 'zone=%s AND version=%s', (zid, item['version'])), 'instance version already in use')
             originals = {'zone': zrows, 'active_ruleset': active, 'rule_sets': sets}
             originals['npc_types'] = self.rows('content', 'npc_types', 'id=2011')

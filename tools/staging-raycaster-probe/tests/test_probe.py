@@ -256,6 +256,43 @@ class ProbeTests(unittest.TestCase):
             with patch.object(driver.connections.Connection,'_process_auth',return_value=None), self.assertRaises(p.Refusal):
                 conn._process_auth(name.encode(),None)
 
+    def test_native_default_plus_zone_rules_and_absent_variable(self):
+        defaults = [{'rule_name':k,'rule_value':v} for k,v in sorted({**p.RULES,'Instances:ReservedInstances':'100'}.items())]
+        zone_rules = [{'rule_name':'Map:FindBestZHeightAdjust','rule_value':'1'}]
+        def sha(rows):
+            return p.hashlib.sha256(p.encoded(rows).encode()).hexdigest()
+        for bad in (False,True):
+            with self.subTest(override_mismatch=bad):
+                selected = copy.deepcopy(zone_rules)
+                if bad:
+                    selected[0]['rule_value'] = '20'
+                store = object.__new__(p.Store)
+                store.names = {'game':'game','content':'content'}
+                store.contract = {'ruleset_id':1,'ruleset_name':'default','default_rule_rows_sha256':sha(defaults),
+                  'zones':{z[0]:{'instance':90+n,'version':250+n,'spawn':1000+n,'group':1000+n,'ruleset_id':1+n,
+                      'rule_rows_sha256':sha(defaults if n==0 else selected)} for n,z in enumerate(p.ZONES)}}
+                store.manifest = {'originals':{}}
+                store.schema = MagicMock()
+                def sql(query,args=()):
+                    if 'GET_LOCK' in query:return [{'locked':1}]
+                    if 'SELECT rule_name,rule_value' in query:
+                        return defaults if args==(1,) else selected
+                    if 'SELECT ruleset_id' in query:return [{'ruleset_id':1}]
+                    return []
+                def rows(role,table,where,args=()):
+                    if table=='rule_sets':return [{'ruleset_id':1,'name':'default'}]
+                    if table=='zone':return [{'zoneidnumber':args[0],'ruleset':1 if args[0]==2 else 2}]
+                    if table=='npc_types':return [{'id':2011}]
+                    return []
+                store.sql = MagicMock(side_effect=sql)
+                store.rows = MagicMock(side_effect=rows)
+                if bad:
+                    with self.assertRaises(p.Refusal):store.preflight()
+                else:
+                    store.preflight()
+                    self.assertEqual(store.manifest['zone_rules']['poknowledge']['effective_fixed'],p.RULES)
+                self.assertFalse(any('INSERT' in call.args[0] for call in store.sql.call_args_list))
+
     def test_identifier_rejects_sql(self):
         for value in ('a;b','`bad`','x.y',''):
             with self.assertRaises(p.Refusal):
