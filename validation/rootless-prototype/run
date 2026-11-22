@@ -1,0 +1,45 @@
+#!/bin/bash
+# Throwaway rootless Docker proof. No changes to the default Docker context.
+set -euo pipefail
+here=$(cd -- "$(dirname -- "$0")" && pwd)
+state="${XDG_STATE_HOME:-$HOME/.local/state}/eqemu-rootless-proof"
+runtime="${XDG_RUNTIME_DIR:?A systemd user session is required}"
+socket="unix://$runtime/eqemu-rootless-proof.sock"
+unit=eqemu-rootless-proof
+image=gcc@sha256:857da05c62a46e014cf762cbaf19ccdef856f4a8af3299b2c8edd24410d6982c
+mkdir -p "$state"
+exec 9> "$state/run.lock"
+flock -n 9 || { echo 'Another prototype run is active' >&2; exit 1; }
+output=$(mktemp -d "$state/run-XXXXXXXX")
+name="eqemu-rootless-proof-${output##*/}"
+docker_proof() { docker --host "$socket" "$@"; }
+cleanup() {
+    docker_proof rm -f "$name" >/dev/null 2>&1 || true
+    systemctl --user stop "$unit"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+if ! systemctl --user is-active --quiet "$unit"; then
+    systemd-run --user --unit="$unit" --property=Delegate=yes \
+        --property=MemoryMax=2G --property=CPUQuota=200% \
+        --setenv="DOCKERD_ROOTLESS_ROOTLESSKIT_STATE_DIR=$runtime/eqemu-rootless-proof-kit" \
+        /usr/bin/dockerd-rootless.sh --host="$socket" --data-root="$state/docker" \
+        --exec-root="$runtime/eqemu-rootless-proof-exec" --pidfile="$runtime/eqemu-rootless-proof.pid"
+fi
+for attempt in {1..30}; do
+    if docker_proof info > "$output/docker-info.txt" 2>&1; then break; fi
+    sleep 1
+done
+docker_proof info --format '{{json .SecurityOptions}}' | grep '"name=rootless"'
+docker_proof pull "$image"
+printf 'Artifacts: %s\n' "$output"
+timeout 120 docker --host "$socket" run --name "$name" -i \
+    --network none --memory 512m --memory-swap 512m --cpus 1 --pids-limit 64 \
+    "$image" bash -s < "$here/probe.sh" | tee "$output/result.log"
+docker_proof cp "$name:/tmp/proof" "$output/proof"
+docker_proof cp "$name:/tmp/asan.log" "$output/asan.log"
+docker_proof inspect "$name" > "$output/container.json"
+docker_proof rm "$name"
+test -z "$(docker_proof ps -aq --filter "name=^${name}$")"
+printf 'PASS: exported binary and diagnostic to %s\n' "$output"

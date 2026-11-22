@@ -1,0 +1,78 @@
+#!/bin/bash
+# Throwaway rootless Docker proof. No changes to the default Docker context.
+set -euo pipefail
+here=$(cd -- "$(dirname -- "$0")" && pwd)
+state="${XDG_STATE_HOME:-$HOME/.local/state}/eqemu-rootless-proof"
+runtime="${XDG_RUNTIME_DIR:?A systemd user session is required}"
+socket="unix://$runtime/eqemu-rootless-proof.sock"
+unit=eqemu-rootless-proof
+repo=${1:?Usage: run SERVER_CHECKOUT FULL_COMMIT [IMAGE_DIGEST]}
+commit=${2:?An exact commit is required}
+image=${3:-eqemulator/eqemu-server:v16}
+[[ $commit =~ ^[0-9a-f]{40}$ ]] || exit 2
+test "$(git -C "$repo" rev-parse HEAD)" = "$commit"
+test -z "$(git -C "$repo" status --porcelain --untracked-files=all)"
+mkdir -p "$state"
+exec 9> "$state/run.lock"
+flock -n 9 || { echo 'Another prototype run is active' >&2; exit 1; }
+output=$(mktemp -d "$state/run-XXXXXXXX")
+name="eqemu-rootless-proof-${output##*/}"
+docker_proof() { docker --host "$socket" "$@"; }
+cleanup() {
+    docker_proof rm -f "$name" > "$output/cleanup.log" 2>&1
+    test -z "$(docker_proof ps -aq --filter "name=^${name}$")"
+    systemctl --user stop "$unit"
+    test "$(systemctl --user is-active "$unit" || :)" = inactive
+    printf "container absent; daemon inactive\n" >> "$output/cleanup.log"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+if ! systemctl --user is-active --quiet "$unit"; then
+    systemd-run --user --unit="$unit" --property=Delegate=yes \
+        --property=MemoryMax=8G --property=CPUQuota=200% \
+        --setenv="DOCKERD_ROOTLESS_ROOTLESSKIT_STATE_DIR=$runtime/eqemu-rootless-proof-kit" \
+        /usr/bin/dockerd-rootless.sh --host="$socket" --data-root="$state/docker" \
+        --exec-root="$runtime/eqemu-rootless-proof-exec" --pidfile="$runtime/eqemu-rootless-proof.pid"
+fi
+for attempt in {1..30}; do
+    if docker_proof info > "$output/docker-info.txt" 2>&1; then break; fi
+    sleep 1
+done
+docker_proof info --format '{{json .SecurityOptions}}' | grep '"name=rootless"'
+printf 'Artifacts: %s\n' "$output"
+git -C "$repo" archive "$commit" > "$output/source.tar"
+git -C "$repo" submodule status --recursive > "$output/submodules.txt"
+while read -r sha path rest; do
+    [[ $sha =~ ^[0-9a-f]{40}$ ]] || exit 2
+    test "$(git -C "$repo" rev-parse "$commit:$path")" = "$sha"
+    git -C "$repo/$path" archive --prefix="$path/" "$sha" > "$output/submodule.tar"
+    tar --concatenate --file="$output/source.tar" "$output/submodule.tar"
+done < "$output/submodules.txt"
+rm -f "$output/submodule.tar"
+printf '%s\n' "$commit" > "$output/commit.txt"
+docker_proof pull "$image"
+image=$(docker_proof image inspect --format '{{index .RepoDigests 0}}' "$image")
+printf '%s\n' "$image" > "$output/image.txt"
+rust_version=$(git -C "$repo" show "$commit:rust-toolchain.toml" | sed -n 's/^channel = "\(.*\)"/\1/p')
+docker_proof build --build-arg BASE="$image" --build-arg RUST_VERSION="$rust_version" -t eqemu-rootless-candidate:proof "$here" > "$output/image-build.log" 2>&1
+image=$(docker_proof image inspect --format '{{.Id}}' eqemu-rootless-candidate:proof)
+printf '%s\n' "$image" > "$output/derived-image.txt"
+docker_proof create --name "$name" --user 0 --entrypoint /bin/bash \
+    --memory 7g --memory-swap 7g --cpus 2 --pids-limit 512 \
+    "$image" /candidate/build.sh
+docker_proof cp "$here/." "$name:/candidate"
+fixture=${ROOTLESS_SMOKE_FIXTURE:?Set ROOTLESS_SMOKE_FIXTURE to the approved public runtime payload}
+docker_proof cp "$fixture" "$name:/candidate/fixture"
+docker_proof cp "$fixture/../runtime-bundle-manifest.json" "$name:/candidate/fixture-manifest.json"
+git -C "$repo" rev-parse "$commit:submodules/vcpkg" > "$output/vcpkg-commit"
+docker_proof cp "$output/vcpkg-commit" "$name:/candidate/vcpkg-commit"
+docker_proof cp "$output/source.tar" "$name:/candidate/source.tar"
+set +e
+timeout --signal=TERM --kill-after=30 7200 docker --host "$socket" start -a "$name" > "$output/build.log" 2>&1
+result=$?
+set -e
+docker_proof inspect "$name" > "$output/container.json"
+docker_proof cp "$name:/candidate/results" "$output/results" || true
+printf '%s\n' "$result" > "$output/exit-code"
+exit "$result"
