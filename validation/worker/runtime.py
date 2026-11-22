@@ -958,6 +958,9 @@ def request(connection, value):
     if data == {'version': 1, 'operation': 'last-result'}:
         return {'version': 1, 'operation': 'last-result', 'scope': 'worker-observation',
                 'exit_code': 0, 'result': read_json(Path(value['state_dir']) / 'last-result.json', limit=65536)}
+    if data.get('operation') == 'staging-build-export':
+        from staging_worker import run
+        return run(value, connection, data)
     if data.get('operation')=='integration-artifacts':
         if value.get('selection') or value.get('diagnostic_profile'): raise ValueError('Integration uses only the ordinary worker')
         if set(data)!={'version','operation','run_id'} or not isinstance(data['run_id'],str) or not re.fullmatch('[a-f0-9]{32}',data['run_id']):

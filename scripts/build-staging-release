@@ -1,0 +1,47 @@
+#!/usr/bin/python3 -I
+"""Prepare or submit ONE exact e35 staging build/export. No host candidate execution."""
+import argparse
+import json
+from pathlib import Path
+import sys
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'validation/worker'))
+from staging_release import frontend_identity, verify_media, write_json
+from release_artifacts import exchange
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--media', type=Path, required=True)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument('--prepare-only', type=Path, metavar='NEW_REQUEST_JSON')
+    mode.add_argument('--once', type=Path, metavar='NEW_ONCE_INTENT_JSON')
+    parser.add_argument('--output', type=Path, help='Fresh private output directory; never precreate it')
+    args = parser.parse_args(argv)
+    if args.prepare_only and args.output: parser.error('Prepare-only does not create an artifact output')
+    if args.once and args.output is None: parser.error('Submission requires fresh output and once intent')
+    try:
+        request = verify_media(args.media)
+        frontend = frontend_identity(Path(__file__).resolve().parents[1])
+        if args.prepare_only:
+            write_json(args.prepare_only, dict(scope='prepared-only', executed=False, request=request, frontend_sha256=frontend))
+            print(json.dumps(dict(scope='prepared-only', executed=False, request=request))); return 0
+        # The installed worker requires a separately reviewed root-admission marker.
+        config = json.loads(Path('/etc/eqemu-validator/config.json').read_bytes())
+        if config.get('socket') != '/run/eqemu-validator.sock': raise ValueError('release-fixed-socket')
+        write_json(args.once, dict(version=1, operation=request['operation'], request=request,
+            frontend_sha256=frontend,
+            argv=[str(Path(__file__).resolve()), *(sys.argv[1:] if argv is None else argv)],
+            media=str(args.media.absolute()), output=str(args.output.absolute()),
+            retry_authorized=False))
+        result = exchange(config['socket'], request, args.media, args.output)
+    except Exception:
+        result = dict(version=1, operation='staging-build-export', exit_code=2,
+                      error='fixed-release-client-refused-or-uncertain', retry_authorized=False)
+    print(json.dumps(result, separators=(',', ':')))
+    return result['exit_code']
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

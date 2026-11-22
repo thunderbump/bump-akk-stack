@@ -1,0 +1,220 @@
+{
+  "combined_manifest": {
+    "candidate": "e35d4513c44e5eacac796a36fd68cd30acb7706a",
+    "engine": {
+      "archive_bytes": 86360685,
+      "archive_sha256": "3fb5d1f13014c18cc54945bc177c58a9056a482dada031e17d12cf2e6922c973",
+      "expanded_regular_bytes": 235683676,
+      "publisher_authentication": "Official HTTPS download and official index observation only. Local SHA256 is not publisher signature.",
+      "version": "29.9.3"
+    },
+    "files": [
+      {
+        "bytes": 2942,
+        "name": "ENGINE-DEPENDENCY-CLOSURE.json",
+        "sha256": "d82e455ff8050e3eb94bba67b11de5edf6381953ea5b08229cdae28415264a6c"
+      },
+      {
+        "bytes": 5786,
+        "name": "ENGINE-MEMBER-INVENTORY.json",
+        "sha256": "cb0c63ba6ee8bc0a4b30d3702e6c29f179d3c04c65e41895f699d97c3885955b"
+      },
+      {
+        "bytes": 4122,
+        "name": "FINITE-RELEASE-BUDGET.json",
+        "sha256": "6e472120860680546ef4a91bc16e3b4da5c77bc482a338e07b3165739c498190"
+      },
+      {
+        "bytes": 10414,
+        "name": "LIVE-RUNTIME-ABI-READBACK.json",
+        "sha256": "f295038004a58404a952b454d8d02d41eb049ce31ba4dd6a1d6c25ac11693ca1"
+      },
+      {
+        "bytes": 1888209,
+        "name": "NATIVE-DEPENDENCIES-MANIFEST.json",
+        "sha256": "d84fa8b84bbc0b4b0f208aab71664c0d649661b9ad80ba1a50f1868c63ec3e1e"
+      },
+      {
+        "bytes": 4664,
+        "name": "OVERLAY2-PEAK-STORAGE-BUDGET.json",
+        "sha256": "76edd8f0de0bf59c7a8ed6de30fb7d79a2321481ad93e2776cb128022aa1b764"
+      },
+      {
+        "bytes": 752048,
+        "name": "RUNTIME-ABI-AND-LIBRARY-INVENTORY.json",
+        "sha256": "7fca16dfa0b22a568d6b01b5d25cb1ecdc64f2171fbf43f79546a0c708118615"
+      },
+      {
+        "bytes": 21250,
+        "name": "base-ubuntu-packages.manifest",
+        "sha256": "6ae2bf581f0e8babf5d6e440e53a243d51a697d975dbffec2742e9cd4564f72f"
+      },
+      {
+        "bytes": 1107503616,
+        "name": "builder-image.tar",
+        "sha256": "a73635f36ff3dd54bb698575eaa654dae0e33f63c2cf8146ee6a6b9359d2a5be"
+      },
+      {
+        "bytes": 86360685,
+        "name": "docker-29.9.3.tgz",
+        "sha256": "3fb5d1f13014c18cc54945bc177c58a9056a482dada031e17d12cf2e6922c973"
+      },
+      {
+        "bytes": 149678080,
+        "name": "native-dependencies.tar",
+        "sha256": "b7a4649eb6013a2a1e1bb6fdccd490cc9b2dd5e1af9ccb8eab51c8760e16a81b"
+      },
+      {
+        "bytes": 176957440,
+        "name": "rust-inputs.tar",
+        "sha256": "d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461"
+      },
+      {
+        "bytes": 82984960,
+        "name": "source.tar",
+        "sha256": "686719cea2e3e8543119e44e09587333c5d9a35f935fd92078d89d32900bf89e"
+      },
+      {
+        "bytes": 30013440,
+        "name": "vcpkg.tar",
+        "sha256": "b27c1cce510eeb3611de7af39f77987c3a095c23baeb993147c9ab460559b2ff"
+      },
+      {
+        "bytes": 3819520,
+        "name": "websocketpp.tar",
+        "sha256": "84f32687d73e54d5a68347c2bc8b1bd6391986cbed2c49101b084c8a942326eb"
+      }
+    ],
+    "files_total_bytes": 1640007176,
+    "ordinary_limits": "Unchanged. Separate fixed-operation media cap2147483648 bytes only. No worker/source/install/admission/execution/HOLD authority.",
+    "preserved_bindings": {
+      "Cargo_lock_sha256": "1e5c00abf14873f23fea9bbbbccb9e5f250b058404dfa8046c6b5a87a7476f53",
+      "Rust_bundle_sha256": "d5d8ae79833602b479fe117a4e39ac0a2a2722b195cabd31e2eefaf9e0619461",
+      "base_image_sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+      "builder_OCI_index": "sha256:dc2003a3fb395b63706f6dd975cb29e94c18fccf04784b4c47dab00d913f1894",
+      "builder_amd64_manifest": "sha256:72893ff0fecb9c490e85f9c12fe33bab094ec40bd35613cb8722d5df00ddd34d",
+      "builder_config": "sha256:fb6cfbccbb01c8ae0a7dea09b948ae5692c4f89102fce0c7da0bd32a2e17f1ad",
+      "runtime_OCI_index": "sha256:567ab88c5e9fb6632b0b3d8fd94d71083deb72aa1d7896af510d48ff256e2090",
+      "v1_handoff_sha256": "fcdf2dd26aaf7de2ad8fb55900f08bae262ee909f8483af7d78f21496ec055f6",
+      "v1_index_sha256": "b19f5f4e3c6651929ca9a5fd35bb6c4cb51fd0a5c57e9ab7df24de4727c5c861"
+    },
+    "selection": "fixed-e35-staging-build-export-v1",
+    "status": "PREPARATION_ONLY_NOT_ADMITTED",
+    "storage_selection": {
+      "data_root": "fresh guest-local private path",
+      "driver": "overlay2",
+      "fallback": "None. Refuse unsupported driver/backing filesystem before import/build; VFS rejected.",
+      "features": {
+        "containerd-snapshotter": false
+      },
+      "guest_disk_bytes": 51539607552,
+      "release_tar_cap_bytes": 724566016
+    },
+    "tree": "f288d612781a4ceb9d8595f4d36d797c863080b1"
+  },
+  "combined_manifest_sha256": "833e6bd1a159079c0c0cd93a5ee8f3ddb0c0b32ce679345a9d63eeb08024d2c0",
+  "media": {
+    "bytes": 1640396800,
+    "sha256": "9e57edc171376a17f11bfa84f8705fab99de0646289faf34106059ef15ebde9e"
+  },
+  "release_budget": {
+    "archive_rules": "Fixed safe relative names only. No symlinks, hardlinks, sparse entries, devices, FIFOs, sockets, duplicate names or extra members. Fixed file modes and numeric owner metadata. No PAX arbitrary paths. Validate all per-file/aggregate limits, content hashes, source/run/input identities before publication.",
+    "basis": "Actual retained six unstripped 788 binaries plus eight needed runtime libraries. This is a size baseline, not e35 fit or qualification.",
+    "binary_caps": [
+      {
+        "basis": "125% of observed bytes rounded upward to whole MiB",
+        "observed_bytes": 21980080,
+        "path": "bin/eqlaunch",
+        "proposed_max_bytes": 28311552
+      },
+      {
+        "basis": "125% of observed bytes rounded upward to whole MiB",
+        "observed_bytes": 40976752,
+        "path": "bin/queryserv",
+        "proposed_max_bytes": 51380224
+      },
+      {
+        "basis": "125% of observed bytes rounded upward to whole MiB",
+        "observed_bytes": 41766152,
+        "path": "bin/shared_memory",
+        "proposed_max_bytes": 52428800
+      },
+      {
+        "basis": "125% of observed bytes rounded upward to whole MiB",
+        "observed_bytes": 43159224,
+        "path": "bin/ucs",
+        "proposed_max_bytes": 54525952
+      },
+      {
+        "basis": "125% of observed bytes rounded upward to whole MiB",
+        "observed_bytes": 95455936,
+        "path": "bin/world",
+        "proposed_max_bytes": 119537664
+      },
+      {
+        "basis": "125% of observed bytes rounded upward to whole MiB",
+        "observed_bytes": 313348128,
+        "path": "bin/zone",
+        "proposed_max_bytes": 392167424
+      }
+    ],
+    "binary_total_max_bytes": 698351616,
+    "directories": [
+      "bin",
+      "metadata",
+      "logs"
+    ],
+    "failure_conditions": "Build, resource, ABI, size, missing-file, transfer or cleanup uncertainty is NONPASS. Retain bounded logs and terminal failure/partial receipt; never expose a partial tar as deployable. No stripping to fit, limit increase, retry, reused objects or fallback build route.",
+    "historical_binary_bytes": 556686272,
+    "historical_runtime_library_bytes": 9479760,
+    "libraries": "Do not bundle or replace runtime libc/Perl/native shared libraries. Record the exact needed closure and compare new outputs to pinned runtime567ab. New unresolved SONAME/symbol version or Perl/XS mismatch is NONPASS; no automatic library copying.",
+    "logs_aggregate_max_bytes": 8388608,
+    "logs_single_max_bytes": 2097152,
+    "metadata_aggregate_max_bytes": 16777216,
+    "metadata_single_max_bytes": 8388608,
+    "no_fit_promise": true,
+    "regular_file_count": 28,
+    "regular_payload_max_bytes": 723517440,
+    "required_exact_regular_files": [
+      "bin/eqlaunch",
+      "bin/queryserv",
+      "bin/shared_memory",
+      "bin/ucs",
+      "bin/world",
+      "bin/zone",
+      "SOURCE.json",
+      "INPUTS.json",
+      "BUILD.json",
+      "RUNTIME-ABI.json",
+      "SHA256SUMS",
+      "MANIFEST.json",
+      "metadata/CMakeCache.txt",
+      "metadata/compile_commands.json",
+      "metadata/Cargo.lock",
+      "metadata/toolchain-identity.json",
+      "metadata/eqlaunch.readelf.txt",
+      "metadata/queryserv.readelf.txt",
+      "metadata/shared_memory.readelf.txt",
+      "metadata/ucs.readelf.txt",
+      "metadata/world.readelf.txt",
+      "metadata/zone.readelf.txt",
+      "metadata/PerlConfig.json",
+      "metadata/PerlXS.json",
+      "logs/configure.log",
+      "logs/build.log",
+      "logs/rust-checks.log",
+      "logs/artifact-checks.log"
+    ],
+    "status": "Proposed finite release budget, not export implementation/admission",
+    "success_conditions": "All six new ELFs present, coherent source/input/tool identities, actual configuration and build/required-check exits complete, needed-symbol/version and Perl ABI checks pass, full required metadata retained, durable client file checksums complete, actual guest/container/VM cleanup evidence retained separately.",
+    "transport": "A new fixed release channel is required. Existing normal/integration JSON artifacts and bounds remain unchanged. Proposed tar limit is based on uncompressed exact payload; byte/chunk, terminal digest and durable receipt checks precede success.",
+    "uncompressed_tar_max_bytes": 724566016
+  },
+  "base_image_sha256": "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354",
+  "worker_source_base": "7d2559d93476872425bf0dc386d56deef2a7ad0a",
+  "static_kernel_filesystem_proof": {
+    "status": "unavailable",
+    "retained_kernel_package": "linux-image-6.8.0-139-generic6.8.0-139.139",
+    "limits": "Package inventory does not prove CONFIG_OVERLAY_FS, module bytes, root filesystem, loaded driver or engine availability. Actual guest gates mandatory; no new package or host privilege permitted."
+  }
+}
