@@ -1,0 +1,1 @@
+{"base_image":"/var/lib/eqemu-validator-inputs/base.qcow2","code_dir":"/srv/eqemu-validator-code","managed_binding":"sealed-worker-v1","shared_lock":"/var/lib/eqemu-validator/worker.lock","socket":"/run/eqemu-validator.sock","state_dir":"/var/lib/eqemu-validator/ordinary","submitter":"bump","user":"eqemu-validator","version":1,"worker_gid":980,"worker_uid":995}
