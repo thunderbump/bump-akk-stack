@@ -43,6 +43,15 @@ ENTRY_STAGES = (
 POSE_FORMAT = "qeynos2-pose-v1"
 POSE_FILE = "clientab.pose"
 
+# Headless clients coordination has selected, by executable SHA-256. Recorded
+# in result.json as identity.client.validation_pin; never used as a gate.
+VALIDATION_CLIENTS = {
+    "de96afb5d6458fe9c0601cccb02b2d2430891ec98203943da5d68ec2fd14be50": {
+        "revision": "fea4596cd14e9b61883e58966ad7d26150715914", "role": "routine"},
+    "6271c614d1668d2966f68867e2cdab50df6b94f4c8339a37c1750c564c460505": {
+        "revision": "d034b7eafae6a0c9cbd4461da6a09a847d61ba4a", "role": "older_client_check"},
+}
+
 # Pinned map inputs. The client's geometry digest is the .map SHA-256.
 PINNED_MAPS = {
     "qeynos2.map": "040343c54e3b02bfd1637ce8fca8839dd676e17c41fb24c042ccfa0bd649435c",
@@ -71,9 +80,10 @@ MILESTONES = HOST_PRE + GUEST + HOST_POST
 SERVER_START_TIMEOUT = 10.0
 READY_TIMEOUT = 90.0
 MOTION_EXPIRE_TIMEOUT = 2.0
-# The pinned client (d034b7e) sends its resting position only at a 1300 ms
+# The older client d034b7e sends its resting position only at a 1300 ms
 # keepalive and the first stationary packet about 1300 ms later, so the
-# server's stopped sample can lag the stop command by ~2.6 s.
+# server's stopped sample can lag the stop command by ~2.6 s. The routine
+# client fea4596 sends a rest update on the first step at rest.
 STOP_TIMEOUT = 8.0
 STOP_QUIET = 0.5
 TARGET_TIMEOUT = 3.0

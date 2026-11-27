@@ -52,6 +52,12 @@ class Inputs(unittest.TestCase):
         for name in host.HARNESS_FILES:
             self.assertTrue((self.run_dir / "harness" / name).is_file())
 
+    def test_validation_pin_recorded_not_enforced(self):
+        identity = host.stage_inputs(self.args(allow_unpinned_maps=True), self.run_dir)
+        self.assertIsNone(identity["client"]["validation_pin"])
+        roles = {v["role"] for v in F.VALIDATION_CLIENTS.values()}
+        self.assertEqual(roles, {"routine", "older_client_check"})
+
     def test_missing_inputs(self):
         with self.assertRaises(host.UsageError):
             host.stage_inputs(self.args(server=str(self.root / "nope")), self.run_dir)

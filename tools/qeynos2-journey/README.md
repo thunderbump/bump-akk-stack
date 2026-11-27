@@ -28,6 +28,18 @@ chooses the parent of the run directory and must be outside this source tree.
 Maps must match the pinned fixture hashes in `fixture.py` unless
 `--allow-unpinned-maps` is given.
 
+### Clients
+
+Routine runs use headless EQOxide `fea4596cd14e9b61883e58966ad7d26150715914`,
+binary SHA-256 `de96afb5d6458fe9c0601cccb02b2d2430891ec98203943da5d68ec2fd14be50`.
+Also run the older client `d034b7eafae6a0c9cbd4461da6a09a847d61ba4a` (binary
+`6271c614d1668d2966f68867e2cdab50df6b94f4c8339a37c1750c564c460505`) when a
+server change touches wire or transport. `fixture.VALIDATION_CLIENTS` lists
+both. `identity.client.validation_pin` in `result.json` names the matching
+role, or is null for any other client. Any client still runs. The routine
+journey keeps the 200 ms move, because a longer move with the routine client
+can stop past the fixture's accepted strip (X −934 to −924).
+
 One-time preparation loads the runtime image into the harness data root:
 
 ```sh
@@ -104,8 +116,9 @@ checkpointed in `progress.json` fails instead.
 | `restart` | `server1` stops on TERM. A new process on the same state directory reports `load outcome=ok` with the saved pose. |
 | `relog` | A fresh client reaches Ready. All entry stages pass again. The ACKed self spawn has the saved pose and heading. The client reports its feet at Z − 3.125. The pose file is unchanged. |
 
-The pinned client d034b7e reports its resting position only at a 1300 ms
-keepalive, and its first stationary packet about 1300 ms after that. The stop
+The older client d034b7e reports its resting position only at a 1300 ms
+keepalive, and its first stationary packet about 1300 ms after that. The
+routine client fea4596 sends a rest update on the first step at rest. The stop
 check therefore waits for the server's `stopped` line and compares against the
 last sample. It passes whether the stop arrives before the stop command, as a
 client that reports rest itself may do, or after it. `stop.evidence` records
