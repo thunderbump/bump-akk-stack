@@ -441,7 +441,7 @@ class Journey:
         self.stop_line = stop
         self.stop_samples = [l.raw for l in lines]
         player = self.player
-        count = len(lines)
+        count = len(checks.distinct_samples(lines))
 
         def updates(rows):
             found = [r for r in checks.unique_replies(rows, "0x7dfc") if r["entity"] == player]
