@@ -17,6 +17,7 @@ import os
 import secrets
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import time
@@ -127,7 +128,9 @@ class Daemon:
     """One rootless dockerd in a transient user systemd unit.
 
     The unit has ``RuntimeMaxSec`` so a daemon outlives a killed host process
-    by at most an hour. ``stop`` is idempotent and reports what it verified.
+    by at most an hour. ``stop`` is idempotent, never raises and reports what
+    it verified. ``started`` is set before ``systemd-run`` so an interruption
+    while the unit is being created still leads to a stop attempt.
     """
 
     def __init__(self, state_root: Path, run_id: str):
@@ -136,6 +139,7 @@ class Daemon:
         runtime = Path(f"/run/user/{uid}")
         self.data_root = state_root / "docker-data"
         self.exec_root = runtime / f"{UNIT_PREFIX}{run_id}-exec"
+        self.rootlesskit_dir = runtime / f"{UNIT_PREFIX}{run_id}-rootlesskit"
         self.pidfile = runtime / f"{UNIT_PREFIX}{run_id}.pid"
         self.socket = runtime / f"{UNIT_PREFIX}{run_id}.sock"
         self.started = False
@@ -149,7 +153,8 @@ class Daemon:
         return process
 
     def start(self) -> None:
-        active = subprocess.run(["systemctl", "--user", "list-units", "--plain", "--no-legend", "--state=active",
+        active = subprocess.run(["systemctl", "--user", "list-units", "--plain", "--no-legend",
+                                 "--state=active,activating,deactivating,reloading",
                                  f"{UNIT_PREFIX}*"], capture_output=True, text=True).stdout.strip()
         if active:
             raise EnvironmentFailure(f"journey daemon unit already active: {active}")
@@ -158,16 +163,17 @@ class Daemon:
             "systemd-run", "--user", "--quiet", f"--unit={self.unit}", "--collect",
             "--property=Delegate=yes", "--property=MemoryMax=4G", "--property=TasksMax=1024",
             f"--property=RuntimeMaxSec={DAEMON_RUNTIME_MAX}", "--property=TimeoutStopSec=60",
+            f"--setenv=DOCKERD_ROOTLESS_ROOTLESSKIT_STATE_DIR={self.rootlesskit_dir}",
             "/usr/bin/dockerd-rootless.sh", f"--data-root={self.data_root}", f"--exec-root={self.exec_root}",
             f"--pidfile={self.pidfile}", f"--host=unix://{self.socket}", "--storage-driver=overlay2",
             "--feature=containerd-snapshotter=false", "--bridge=none", "--iptables=false", "--ip6tables=false",
             "--ip-forward=false", "--ip-masq=false", "--userland-proxy=false",
         ]
         self.record["argv"] = argv
-        process = subprocess.run(argv, capture_output=True, text=True)
+        self.started = True
+        process = subprocess.run(argv, capture_output=True, text=True, timeout=60)
         if process.returncode != 0:
             raise EnvironmentFailure(f"systemd-run failed: {process.stderr.strip()}")
-        self.started = True
         deadline = time.monotonic() + DAEMON_START_TIMEOUT
         while True:
             if self.socket.exists():
@@ -195,18 +201,26 @@ class Daemon:
         if not self.started:
             out["complete"] = True
             return out
-        stop = subprocess.run(["systemctl", "--user", "stop", self.unit], capture_output=True, text=True,
-                              timeout=120)
-        out["stop_returncode"] = stop.returncode
-        state = subprocess.run(["systemctl", "--user", "show", self.unit, "-p", "ActiveState", "--value"],
-                               capture_output=True, text=True).stdout.strip()
-        out["active_state_after"] = state or "unloaded"
-        subprocess.run(["systemctl", "--user", "reset-failed", self.unit], capture_output=True)
-        out["socket_absent"] = not self.socket.exists()
-        if self.exec_root.exists():
-            shutil.rmtree(self.exec_root, ignore_errors=True)
-        out["exec_root_absent"] = not self.exec_root.exists()
-        out["complete"] = state in ("", "inactive", "failed") and out["socket_absent"]
+        try:
+            stop = subprocess.run(["systemctl", "--user", "stop", self.unit], capture_output=True, text=True,
+                                  timeout=120)
+            out["stop_returncode"] = stop.returncode
+            show = subprocess.run(["systemctl", "--user", "show", self.unit, "-p", "ActiveState", "--value"],
+                                  capture_output=True, text=True, timeout=30)
+            state = show.stdout.strip()
+            out["active_state_after"] = state
+            subprocess.run(["systemctl", "--user", "reset-failed", self.unit], capture_output=True, timeout=30)
+            for path in (self.exec_root, self.rootlesskit_dir):
+                if path.exists():
+                    shutil.rmtree(path, ignore_errors=True)
+            out["socket_absent"] = not self.socket.exists()
+            out["exec_root_absent"] = not self.exec_root.exists()
+            out["rootlesskit_dir_absent"] = not self.rootlesskit_dir.exists()
+            out["complete"] = (show.returncode == 0 and state in ("inactive", "failed")
+                               and out["socket_absent"] and out["rootlesskit_dir_absent"])
+        except Exception as error:  # cleanup must not raise
+            out["error"] = f"{type(error).__name__}: {error}"
+            out["complete"] = False
         self.started = not out["complete"]
         return out
 
@@ -216,6 +230,7 @@ class Container:
         self.daemon = daemon
         self.name = name
         self.created = False
+        self.argv = None
 
     def create(self, image: str, mounts: list[tuple[Path, str, bool]], argv: list[str], workdir="/") -> None:
         args = ["create", "--name", self.name, "--label", LABEL, "--pull", "never", "--network", "none",
@@ -226,31 +241,50 @@ class Container:
             args += ["--mount", f"type=bind,src={src},dst={dst}" + (",readonly" if readonly else "")]
         args += ["--entrypoint", argv[0], image, *argv[1:]]
         self.argv = args
-        self.daemon.docker(*args)
+        # Mark before creating: an interruption after Docker accepts the
+        # request must still lead to removal by this unique name.
         self.created = True
+        self.daemon.docker(*args)
 
     def run(self, log: Path, timeout: int) -> dict:
+        timed_out = False
         with log.open("wb") as handle:
             process = subprocess.Popen(["docker", "--host", f"unix://{self.daemon.socket}", "start", "-a", self.name],
                                        stdout=handle, stderr=subprocess.STDOUT)
-            timed_out = False
             try:
                 process.wait(timeout=timeout)
             except subprocess.TimeoutExpired:
                 timed_out = True
                 self.daemon.docker("stop", "-t", "30", self.name, check=False, timeout=60)
                 process.wait(timeout=60)
+            finally:
+                if process.poll() is None:
+                    process.terminate()
+                    try:
+                        process.wait(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        process.kill()
+                        process.wait()
         state = json.loads(self.daemon.docker("inspect", "--format", "{{json .State}}", self.name).stdout)
         return {"exit": state.get("ExitCode"), "oom_killed": state.get("OOMKilled"), "timed_out": timed_out,
                 "status": state.get("Status")}
 
     def remove(self) -> dict:
+        """Remove by name and verify; never raises."""
         if not self.created:
             return {"complete": True, "created": False}
-        self.daemon.docker("rm", "-f", self.name, check=False)
-        remaining = self.daemon.docker("ps", "-aq", "--filter", f"name=^{self.name}$", check=False).stdout.split()
-        self.created = bool(remaining)
-        return {"complete": not remaining, "created": True}
+        out = {"created": True}
+        try:
+            self.daemon.docker("rm", "-f", self.name, check=False, timeout=90)
+            listing = self.daemon.docker("ps", "-aq", "--filter", f"name=^{self.name}$", check=False, timeout=30)
+            out["verify_returncode"] = listing.returncode
+            remaining = listing.stdout.split()
+            out["complete"] = listing.returncode == 0 and not remaining
+        except Exception as error:
+            out["error"] = f"{type(error).__name__}: {error}"
+            out["complete"] = False
+        self.created = not out["complete"]
+        return out
 
 
 def stage_inputs(args, run_dir: Path) -> dict:
@@ -303,15 +337,32 @@ def fixture_identity() -> dict:
     }
 
 
-def milestone_table(guest: dict | None, pre: dict, cleanup_ok: bool | None) -> list[dict]:
-    table = [pre[name] for name in F.HOST_PRE if name in pre]
-    done = {m["name"] for m in table}
+GUEST_JSON_LIMIT = 16 * 1024 * 1024
+
+
+def read_guest_json(path: Path) -> dict | None:
+    """Read a guest-written JSON file only if it is a bounded regular file."""
+    try:
+        info = os.lstat(path)
+    except FileNotFoundError:
+        return None
+    if not stat.S_ISREG(info.st_mode) or info.st_size > GUEST_JSON_LIMIT:
+        raise EnvironmentFailure(f"{path.name} is not a regular file of at most {GUEST_JSON_LIMIT} bytes")
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+    with os.fdopen(fd) as handle:
+        data = json.load(handle)
+    if not isinstance(data, dict):
+        raise EnvironmentFailure(f"{path.name} is not a JSON object")
+    return data
+
+
+def milestone_table(guest_rows: list[dict] | None, pre: dict, cleanup_ok: bool | None) -> list[dict]:
+    table = []
     for name in F.HOST_PRE:
-        if name not in done:
-            table.append({"name": name, "status": "not_run"})
-    guest_rows = {m["name"]: m for m in (guest or {}).get("milestones", [])}
+        table.append(pre.get(name, {"name": name, "status": "not_run"}))
+    rows = {m["name"]: m for m in (guest_rows or []) if isinstance(m, dict) and "name" in m}
     for name in F.GUEST:
-        table.append(guest_rows.get(name, {"name": name, "status": "not_run"}))
+        table.append(rows.get(name, {"name": name, "status": "not_run"}))
     if cleanup_ok is None:
         table.append({"name": "cleanup", "status": "not_run"})
     else:
@@ -319,15 +370,45 @@ def milestone_table(guest: dict | None, pre: dict, cleanup_ok: bool | None) -> l
     return table
 
 
+def container_consistent(run: dict, guest: dict) -> str | None:
+    """Why the container's ending contradicts the guest report, or None."""
+    if run.get("oom_killed") or run.get("timed_out"):
+        return f"container OOM-killed or timed out: {run}"
+    expected = 0 if guest.get("status") == "PASS" else 1
+    if run.get("exit") != expected:
+        return f"container exit {run.get('exit')} disagrees with guest status {guest.get('status')}"
+    return None
+
+
 class Interrupted(Exception):
     pass
 
 
+SIGNALS = (signal.SIGINT, signal.SIGTERM, signal.SIGHUP)
+_received: list[int] = []
+
+
 def install_signal_handlers():
+    """Turn the first signal into ``Interrupted``; later ones are only recorded."""
     def handler(signum, frame):
-        raise Interrupted(f"received signal {signum}")
-    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        _received.append(signum)
+        if len(_received) == 1:
+            raise Interrupted(f"received signal {signum}")
+    for sig in SIGNALS:
         signal.signal(sig, handler)
+
+
+@contextlib.contextmanager
+def signals_deferred():
+    """Cleanup runs to completion: signals arriving now are recorded, not raised."""
+    previous = {sig: signal.getsignal(sig) for sig in SIGNALS}
+    for sig in SIGNALS:
+        signal.signal(sig, lambda signum, frame: _received.append(signum))
+    try:
+        yield
+    finally:
+        for sig, handler in previous.items():
+            signal.signal(sig, handler)
 
 
 def command_run(args) -> int:
@@ -342,18 +423,29 @@ def command_run(args) -> int:
         "harness": harness_identity(), "fixture": fixture_identity(), "image": args.image,
     }
     pre: dict = {}
-    run_dir = None
-    daemon = container = None
+    state = {"run_dir": None, "daemon": None, "container": None}
     guest = None
-    cleanup = {}
-    exit_code = EXIT_FAIL
+    guest_rows = None
+    cleanup: dict = {}
+    host_error = None  # (milestone, type, message, exit code)
+
+    def clean():
+        """Idempotent: keeps the first complete record of each step, retries incomplete ones."""
+        with signals_deferred():
+            for key, owner, act in (("container", state["container"], lambda c: c.remove()),
+                                    ("daemon", state["daemon"], lambda d: d.stop())):
+                if owner is not None and not cleanup.get(key, {}).get("complete"):
+                    cleanup[key] = act(owner)
+
     install_signal_handlers()
     try:
+        at = time.monotonic()
         try:
-            at = time.monotonic()
-            server_short = sha256(Path(args.server).expanduser())[:8] if Path(args.server).expanduser().is_file() else "missing"
-            run_dir = output_root / f"{run_id}-server-{server_short}"
+            server = Path(args.server).expanduser()
+            short = sha256(server)[:8] if server.is_file() else "missing"
+            run_dir = output_root / f"{run_id}-server-{short}"
             run_dir.mkdir(mode=0o700)
+            state["run_dir"] = run_dir
             result["artifacts"] = {"dir": str(run_dir)}
             result["identity"] = stage_inputs(args, run_dir)
             if result["harness"].get("dirty"):
@@ -361,95 +453,120 @@ def command_run(args) -> int:
             pre["inputs"] = {"name": "inputs", "status": "pass", "seconds": round(time.monotonic() - at, 3)}
         except (UsageError, OSError) as error:
             pre["inputs"] = {"name": "inputs", "status": "fail"}
-            result["first_failed_milestone"] = "inputs"
-            result["failure"] = {"milestone": "inputs", "type": type(error).__name__, "message": str(error)}
-            exit_code = EXIT_USAGE
-            return exit_code
-        at = time.monotonic()
-        try:
-            with harness_lock(state_root):
-                daemon = Daemon(state_root, run_id)
-                try:
-                    daemon.start()
-                    if daemon.docker("image", "inspect", args.image, check=False).returncode != 0:
-                        raise EnvironmentFailure(f"image {args.image} missing; run 'prepare-image' first")
-                    out = run_dir / "output"
-                    out.mkdir(mode=0o700)
-                    container = Container(daemon, f"eqemu-rust-journey-{run_id}")
-                    container.create(args.image, [
-                        (run_dir / "harness", "/journey", True),
-                        (run_dir / "inputs", "/inputs", True),
-                        (out, "/output", False),
-                    ], ["python3", "-B", "-s", "-E", "/journey/guest.py", "--output", "/output",
-                        "--server", "/inputs/server", "--client", "/inputs/client", "--maps", "/inputs/maps"])
-                    result["environment"] = {"daemon": daemon.record, "container_argv": container.argv}
-                    pre["environment"] = {"name": "environment", "status": "pass",
-                                          "seconds": round(time.monotonic() - at, 3)}
-                    run = container.run(run_dir / "guest.log", GUEST_TIMEOUT)
-                    result["container"] = run
-                    guest_path = out / "guest-result.json"
-                    if guest_path.exists():
-                        guest = json.loads(guest_path.read_text())
-                    elif run["oom_killed"] or run["timed_out"]:
-                        raise EnvironmentFailure(f"guest ended without a result: {run}")
-                    else:
-                        raise EnvironmentFailure(f"guest wrote no result (container exit {run['exit']}); see guest.log")
-                finally:
-                    if container:
-                        cleanup["container"] = container.remove()
-                    cleanup["daemon"] = daemon.stop()
-        except (EnvironmentFailure, subprocess.TimeoutExpired, OSError, json.JSONDecodeError) as error:
-            failed = "environment" if "environment" not in pre else (guest and guest.get("first_failed_milestone")) or "environment"
-            if "environment" not in pre:
-                pre["environment"] = {"name": "environment", "status": "fail"}
-            result["environment_error"] = {"type": type(error).__name__, "message": str(error)}
-            if not guest:
-                result["first_failed_milestone"] = failed
-                result["failure"] = {"milestone": failed, "type": type(error).__name__, "message": str(error)}
-            exit_code = EXIT_ENVIRONMENT
+            host_error = ("inputs", type(error).__name__, str(error), EXIT_USAGE)
+        if host_error is None:
+            at = time.monotonic()
+            out = run_dir / "output"
+            try:
+                with harness_lock(state_root):
+                    try:
+                        state["daemon"] = daemon = Daemon(state_root, run_id)
+                        daemon.start()
+                        if daemon.docker("image", "inspect", args.image, check=False).returncode != 0:
+                            raise EnvironmentFailure(f"image {args.image} missing; run 'prepare-image' first")
+                        out.mkdir(mode=0o700)
+                        state["container"] = container = Container(daemon, f"eqemu-rust-journey-{run_id}")
+                        container.create(args.image, [
+                            (run_dir / "harness", "/journey", True),
+                            (run_dir / "inputs", "/inputs", True),
+                            (out, "/output", False),
+                        ], ["python3", "-B", "-s", "-E", "/journey/guest.py", "--output", "/output",
+                            "--server", "/inputs/server", "--client", "/inputs/client", "--maps", "/inputs/maps"])
+                        result["environment"] = {"daemon": daemon.record, "container_argv": container.argv}
+                        pre["environment"] = {"name": "environment", "status": "pass",
+                                              "seconds": round(time.monotonic() - at, 3)}
+                        run = container.run(run_dir / "guest.log", GUEST_TIMEOUT)
+                        result["container"] = run
+                        guest = read_guest_json(out / "guest-result.json")
+                        if guest is None:
+                            progress = read_guest_json(out / "progress.json")
+                            raise EnvironmentFailure(
+                                f"guest wrote no result (container {run}); see guest.log"
+                                + ("" if progress else "; no progress either"))
+                        guest_rows = guest.get("milestones")
+                        problem = container_consistent(run, guest)
+                        if problem:
+                            raise EnvironmentFailure(problem)
+                    finally:
+                        clean()
+            except Exception as error:  # every host-side failure is an environment failure
+                host_error = (None, type(error).__name__, str(error), EXIT_ENVIRONMENT)
     except Interrupted as error:
-        result["failure"] = result.get("failure") or {"milestone": None, "type": "Interrupted", "message": str(error)}
-        exit_code = EXIT_ENVIRONMENT
+        host_error = (None, "Interrupted", str(error), EXIT_ENVIRONMENT)
     finally:
-        if container and container.created and "container" not in cleanup:
-            cleanup["container"] = container.remove()
-        if daemon and daemon.started:
-            cleanup["daemon"] = daemon.stop()
+        try:
+            clean()
+        except Exception as error:  # never lose the result
+            cleanup["error"] = f"{type(error).__name__}: {error}"
+        run_dir = state["run_dir"]
+        if host_error and host_error[0] is None:
+            # Name the milestone that was running when the host-side failure hit.
+            if "inputs" not in pre:
+                pre["inputs"] = {"name": "inputs", "status": "fail"}
+            elif "environment" not in pre:
+                pre["environment"] = {"name": "environment", "status": "fail"}
+            elif guest is None:
+                progress = None
+                with contextlib.suppress(Exception):
+                    progress = read_guest_json(run_dir / "output" / "progress.json")
+                guest_rows = [dict(m) for m in (progress or {}).get("milestones", [])]
+                running = [m for m in guest_rows if m.get("status") == "running"]
+                if running:
+                    running[0]["status"] = "fail"
+                    running[0]["note"] = "guest ended during this milestone"
+                else:
+                    pre["environment"] = dict(pre["environment"], status="fail")
+            else:
+                # A guest report exists but the container ending contradicts it.
+                pre["environment"] = dict(pre["environment"], status="fail")
         if guest:
             result["guest"] = {k: guest.get(k) for k in ("started_utc", "finished_utc", "processes",
                                                          "guest_processes_reaped", "log_redactions",
                                                          "trace_contract_violations", "command_receipts")}
-            if guest.get("first_failed_milestone") and not result["first_failed_milestone"]:
-                result["first_failed_milestone"] = guest["first_failed_milestone"]
-                result["failure"] = {k: guest["failure"].get(k) for k in ("milestone", "type", "message")}
-                result["guest_traceback"] = guest["failure"].get("traceback")
         cleanup_ok = None
-        if "inputs" in pre and pre["inputs"]["status"] == "pass":
-            cleanup_ok = all(part.get("complete") for part in cleanup.values()) and (
-                guest is None or bool(guest.get("guest_processes_reaped")))
+        if pre.get("inputs", {}).get("status") == "pass":
+            cleanup_ok = "error" not in cleanup and all(
+                part.get("complete") for part in cleanup.values() if isinstance(part, dict))
+            if guest is not None:
+                cleanup_ok = cleanup_ok and bool(guest.get("guest_processes_reaped"))
         result["cleanup"] = cleanup
-        result["milestones"] = milestone_table(guest, pre, cleanup_ok)
-        passed = all(m["status"] == "pass" for m in result["milestones"])
-        if passed:
+        table = milestone_table(guest_rows, pre, cleanup_ok)
+        result["milestones"] = table
+        failed = [m for m in table if m["status"] != "pass"]
+        first = next((m for m in failed if m["status"] == "fail"), failed[0] if failed else None)
+        if first is None:
             exit_code = EXIT_PASS
             result["status"] = "PASS"
-        elif cleanup_ok is False:
-            exit_code = EXIT_CLEANUP
-            if not result["first_failed_milestone"]:
-                result["first_failed_milestone"] = "cleanup"
-                result["failure"] = {"milestone": "cleanup", "type": "CleanupIncomplete", "message": json.dumps(cleanup)}
-        elif exit_code == EXIT_PASS:
-            exit_code = EXIT_FAIL
+        else:
+            result["first_failed_milestone"] = first["name"]
+            guest_failure = (guest or {}).get("failure") or {}
+            if guest_failure.get("milestone") == first["name"]:
+                result["failure"] = {k: guest_failure.get(k) for k in ("milestone", "type", "message")}
+                result["guest_traceback"] = guest_failure.get("traceback")
+            elif host_error:
+                result["failure"] = {"milestone": first["name"], "type": host_error[1], "message": host_error[2]}
+            elif first["name"] == "cleanup":
+                result["failure"] = {"milestone": "cleanup", "type": "CleanupIncomplete",
+                                     "message": json.dumps(cleanup, default=str)}
+            else:
+                result["failure"] = {"milestone": first["name"], "type": "NotRun", "message": first.get("note")}
+            if cleanup_ok is False:
+                exit_code = EXIT_CLEANUP
+            elif host_error:
+                exit_code = host_error[3]
+            else:
+                exit_code = EXIT_FAIL
         result["exit_code"] = exit_code
         result["finished_utc"] = utc()
         result["seconds"] = round(time.monotonic() - started, 3)
         if run_dir and run_dir.exists():
             logs = run_dir / "output" / "logs"
-            result.setdefault("artifacts", {})["logs"] = sorted(str(p) for p in logs.glob("*.log")) if logs.exists() else []
-            result["artifacts"]["guest_log"] = str(run_dir / "guest.log")
-            result["artifacts"]["evidence"] = str(run_dir / "output" / "evidence")
-            result["artifacts"]["state"] = str(run_dir / "output" / "state")
-            result["artifacts"]["result"] = str(run_dir / "result.json")
+            artifacts = result.setdefault("artifacts", {})
+            artifacts["logs"] = sorted(str(p) for p in logs.glob("*.log")) if logs.is_dir() else []
+            artifacts["guest_log"] = str(run_dir / "guest.log")
+            artifacts["evidence"] = str(run_dir / "output" / "evidence")
+            artifacts["state"] = str(run_dir / "output" / "state")
+            artifacts["result"] = str(run_dir / "result.json")
             write_json(run_dir / "result.json", result)
         summary = {k: result.get(k) for k in ("status", "exit_code", "first_failed_milestone")}
         summary["message"] = (result.get("failure") or {}).get("message")
@@ -464,7 +581,8 @@ def command_prepare_image(args) -> int:
     if not archive.is_file():
         print(f"--archive {archive} is not a file", file=sys.stderr)
         return EXIT_USAGE
-    record = {"archive": str(archive), "image": args.image, "started_utc": utc()}
+    record = {"archive": str(archive), "image": args.image, "started_utc": utc(), "image_present": False}
+    install_signal_handlers()
     with harness_lock(state_root):
         daemon = Daemon(state_root, "prepare-" + stamp())
         try:
@@ -476,8 +594,11 @@ def command_prepare_image(args) -> int:
                 record["loaded"] = load.stdout.strip()
             ok = daemon.docker("image", "inspect", args.image, check=False).returncode == 0
             record["image_present"] = ok
+        except Exception as error:
+            record["error"] = f"{type(error).__name__}: {error}"
         finally:
-            record["daemon_cleanup"] = daemon.stop()
+            with signals_deferred():
+                record["daemon_cleanup"] = daemon.stop()
     print(json.dumps(record, indent=2))
     return EXIT_PASS if record["image_present"] and record["daemon_cleanup"]["complete"] else EXIT_ENVIRONMENT
 
@@ -509,6 +630,7 @@ def command_build_server(args) -> int:
               "cargo build --release --locked --offline > /output/build.log 2>&1; "
               "cargo test --release --locked --offline > /output/tests.log 2>&1")
     code = EXIT_ENVIRONMENT
+    install_signal_handlers()
     with harness_lock(state_root):
         daemon = Daemon(state_root, "build-" + stamp())
         container = None
@@ -529,11 +651,13 @@ def command_build_server(args) -> int:
                 code = EXIT_PASS
             else:
                 code = EXIT_FAIL
-        except EnvironmentFailure as error:
-            record["environment_error"] = str(error)
+        except Exception as error:
+            record["environment_error"] = f"{type(error).__name__}: {error}"
+            code = EXIT_ENVIRONMENT
         finally:
-            record["cleanup"] = {"container": container.remove() if container else {"complete": True},
-                                 "daemon": daemon.stop()}
+            with signals_deferred():
+                record["cleanup"] = {"container": container.remove() if container else {"complete": True},
+                                     "daemon": daemon.stop()}
             if not all(p.get("complete") for p in record["cleanup"].values()):
                 code = EXIT_CLEANUP
             record["finished_utc"] = utc()

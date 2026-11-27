@@ -59,6 +59,19 @@ PERSISTENCE_FIELDS = {
     ("load", "failed"): ("kind",),
     ("save", "disabled"): (),
 }
+# Successful entry stages and their exact detail text.
+ENTRY_OK_DETAIL = {
+    "login_accepted": "",
+    "world_selected": "",
+    "world_authenticated": "",
+    "character_selected": "",
+    "zone_endpoint": "",
+    "zone_entered": "zone=2",
+    "client_ready": "zone=2",
+}
+# Diagnostic stderr lines that share a contract prefix but carry no attempt.
+DIAGNOSTIC_RE = re.compile(r"entry transport_send_error kind=\w+")
+
 NUMERIC = {
     "sequence",
     "x",
@@ -156,10 +169,8 @@ def parse_line(raw: str, index: int = 0) -> Line:
         ports = [int(match[i]) for i in range(1, 5)]
         endpoints = Endpoints(*ports, raw=raw)
         return Line("endpoints", raw, index, endpoints=endpoints)
-    prefix = raw.split(" ", 1)[0]
-    if prefix not in ("entry", "gameplay", "persistence") or not raw.startswith(
-        prefix + " attempt="
-    ):
+    prefix = re.split(r"\s", raw, maxsplit=1)[0]
+    if prefix not in ("entry", "gameplay", "persistence") or DIAGNOSTIC_RE.fullmatch(raw):
         return Line("other", raw, index)
     match = HEAD_RE.fullmatch(raw)
     if not match:
@@ -169,6 +180,14 @@ def parse_line(raw: str, index: int = 0) -> Line:
         if stage is None:
             return Line("malformed", raw, index, problem="entry without stage")
         pairs = _fields(rest) or []
+        if outcome == "ok":
+            expected_detail = ENTRY_OK_DETAIL.get(stage)
+            if expected_detail is None:
+                return Line(kind, raw, index, attempt, stage, outcome, dict(pairs),
+                            detail=rest or "", known=False)
+            if (rest or "") != expected_detail:
+                return Line("malformed", raw, index, attempt, stage, outcome,
+                            problem=f"detail {rest!r} != {expected_detail!r}")
         return Line(
             kind, raw, index, attempt, stage, outcome, dict(pairs), detail=rest or ""
         )
@@ -222,7 +241,12 @@ class Trace:
         ]
 
     def entry(self) -> list[Line]:
-        return self.of("entry")
+        """Entry-protocol lines, excluding gameplay rejections reported as entry lines."""
+        return [line for line in self.of("entry") if line.stage != "gameplay"]
+
+    def rejections(self) -> list[Line]:
+        """``entry attempt=N stage=gameplay outcome=rejected <reason>`` lines."""
+        return self.of("entry", stage="gameplay")
 
     def gameplay(self, *outcomes: str) -> list[Line]:
         return [l for l in self.of("gameplay") if not outcomes or l.outcome in outcomes]

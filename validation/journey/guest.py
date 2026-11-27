@@ -148,9 +148,22 @@ class Journey:
         self.facts = {}
 
     # ---- plumbing -------------------------------------------------------
+    def scrub(self, text: str) -> str:
+        for secret in self.secrets:
+            text = text.replace(secret, "[REDACTED]")
+        return text
+
+    def write_json(self, path: Path, data) -> None:
+        path.write_text(self.scrub(json.dumps(data, indent=2, default=str)))
+
+    def checkpoint(self) -> None:
+        """Progress for the host if the guest dies before writing its result."""
+        rows = [{"name": m["name"], "status": m["status"]} for m in self.result["milestones"]]
+        self.write_json(self.out / "progress.json", {"milestones": rows})
+
     def save_evidence(self, name: str, data) -> str:
         path = self.evidence_dir / (name + ".json")
-        path.write_text(json.dumps(data, indent=2, default=str))
+        self.write_json(path, data)
         return str(path.relative_to(self.out))
 
     def wait(self, predicate, timeout: float, message: str, interval=0.05, watch=()):
@@ -171,6 +184,10 @@ class Journey:
         if bad:
             self.result["trace_contract_violations"] = [l.as_dict() for l in bad]
             raise CheckFailed(f"server trace contract violation: {bad[0].raw!r} ({bad[0].problem})")
+        rejected = trace.rejections()
+        if rejected:
+            self.result["server_rejections"] = [l.raw for l in rejected]
+            raise CheckFailed(f"server rejected gameplay input: {rejected[0].raw!r}")
         return trace
 
     def wire(self, predicate, message: str) -> list[dict]:
@@ -196,6 +213,7 @@ class Journey:
             for name, step in zip(F.GUEST, steps):
                 record = {"name": name, "status": "running", "evidence": {}}
                 self.result["milestones"].append(record)
+                self.checkpoint()
                 at = time.monotonic()
                 try:
                     step(record["evidence"])
@@ -208,6 +226,7 @@ class Journey:
                         "type": type(error).__name__,
                         "message": str(error),
                         "traceback": traceback.format_exc(),
+                        "last_command_receipt": self.api.receipts[-1] if self.api and self.api.receipts else None,
                     }
                     if not isinstance(error, Exception):
                         raise
@@ -215,7 +234,11 @@ class Journey:
                 finally:
                     record["seconds"] = round(time.monotonic() - at, 3)
         finally:
-            self.cleanup()
+            try:
+                self.cleanup()
+            except Exception as error:  # never lose the result
+                self.result["cleanup_error"] = repr(error)
+                self.result["guest_processes_reaped"] = False
             done = {m["name"] for m in self.result["milestones"]}
             for name in F.GUEST:
                 if name not in done:
@@ -225,7 +248,7 @@ class Journey:
                 "PASS" if all(m["status"] == "pass" for m in self.result["milestones"]) else "FAIL"
             )
             self.result["command_receipts"] = self.api.receipts if self.api else []
-            (self.out / "guest-result.json").write_text(json.dumps(self.result, indent=2, default=str))
+            self.write_json(self.out / "guest-result.json", self.result)
         return self.result
 
     def cleanup(self):
@@ -237,13 +260,16 @@ class Journey:
             self.observer = None
         for child in reversed(self.children):
             if child.exit is None:
-                child.exit = child.stop(F.CHILD_STOP_TIMEOUT)
+                try:
+                    child.exit = child.stop(F.CHILD_STOP_TIMEOUT)
+                except Exception as error:  # keep going: other children and the result
+                    child.exit = {"pid": child.process.pid, "error": repr(error), "group_absent": False}
             self.result["processes"][child.name] = child.exit
         self.result["guest_processes_reaped"] = all(
             c.exit and c.exit["group_absent"] for c in self.children
         )
         redactions = {}
-        for path in sorted(self.logs.glob("*.log")):
+        for path in sorted(self.logs.glob("*.log")) if self.logs.is_dir() else []:
             raw = path.read_bytes()
             count = 0
             for secret in self.secrets:
@@ -393,6 +419,7 @@ class Journey:
                   "client movement lease expiry", interval=0.02, watch=[self.server, self.client])
         ev["lease_seconds"] = round(time.monotonic() - moved_at, 3)
         ev["client_motion_observed_active"] = seen_active
+        require(seen_active, "client never reported the movement active")
         trace = self.wait(lambda: (t := self.trace(self.server)).gameplay("moved") and t,
                           F.STOP_TIMEOUT, "server moved sample", watch=[self.server, self.client])
         ev["first_moved"] = trace.gameplay("moved")[0].raw
@@ -412,6 +439,7 @@ class Journey:
         ev["server_samples"] = [l.raw for l in lines]
         moves, stop = checks.ordered_movement(lines, self.attempt, F.SEED_XYZ)
         self.stop_line = stop
+        self.stop_samples = [l.raw for l in lines]
         player = self.player
         count = len(lines)
 
@@ -499,8 +527,9 @@ class Journey:
         require(h["entity"] == self.rat and h["percent"] == checks.hp_percent(after, F.RAT_MAX_HP), f"health packet {h}")
         ev["wire"] = proof
         needle = f"EQ: combat: {F.CHARACTER} hits "
-        applied = [l for l in self.client.text().splitlines() if needle in l and f"for {damage} damage" in l]
-        require(applied, "client combat log has no hit")
+        applied = self.wait(lambda: [l for l in self.client.text().splitlines()
+                                     if needle in l and f"for {damage} damage" in l],
+                            F.TARGET_TIMEOUT, "client combat log hit")
         ev["client_application"] = applied
 
     def m_camp(self, ev):
@@ -517,9 +546,17 @@ class Journey:
         trace = self.wait(lambda: (t := self.trace(self.server)).persistence("save") and t, 2.0,
                           "server save line", watch=[self.server])
         ev["server"] = [l.raw for l in trace.lines if l.kind == "persistence" or (l.outcome or "").startswith("camp")]
-        require(trace.gameplay("camp_started") and trace.gameplay("camp_completed"), "camp not started/completed")
+        camp = trace.gameplay("camp_started", "camp_completed", "camp_canceled", "camp_incomplete",
+                              "camp_interrupted", "logout_without_camp")
         saves = trace.persistence("save")
+        require([l.outcome for l in camp] == ["camp_started", "camp_completed"],
+                f"camp sequence {[l.raw for l in camp]}")
         require(len(saves) == 1 and saves[0].outcome == "ok", f"save {[l.raw for l in saves]}")
+        require(camp[0].index < camp[1].index < saves[0].index, "camp/save lines out of order")
+        require(all(l.attempt == self.attempt for l in camp + saves), "camp/save on another attempt")
+        # The movement record must be unchanged since stop (no late duplicate stop or move).
+        samples = [l.raw for l in trace.gameplay("moved", "stopped")]
+        require(samples == self.stop_samples, f"server samples changed after stop: {samples}")
         pose_file = self.state_dir / F.POSE_FILE
         raw = pose_file.read_bytes()
         pose = checks.parse_pose(raw)

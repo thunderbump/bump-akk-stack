@@ -49,7 +49,9 @@ summaries and binary hash, plus the binary itself, under
 
 Each command starts its own `dockerd-rootless.sh` as a transient user systemd
 unit, `eqemu-rust-journey-<id>.service`, on its own socket. The unit has
-`RuntimeMaxSec=3600`. All commands share the data root
+`RuntimeMaxSec=3600`, and a private RootlessKit state directory. If a killed
+host process leaves a unit behind, later commands refuse to start until it
+ends. Stop it with `systemctl --user stop 'eqemu-rust-journey-*'`. All commands share the data root
 `~/.local/state/eqemu-rust-journey/docker-data`, which holds only the runtime
 image. A non-blocking lock in that directory makes concurrent commands fail
 instead of sharing it. The default image is the PR118 runtime image
@@ -60,13 +62,21 @@ The container has no network, 2 GiB memory without swap, one CPU, 256 PIDs, a
 read-only root filesystem, a private `/tmp`, all capabilities dropped except
 `NET_RAW`, and `no-new-privileges`. Inputs and the harness copy are mounted
 read-only, and the run's `output/` is the only writable mount. Credentials and
-the control token are generated inside the container. After the processes
-exit, any occurrence of those values in the logs is replaced with
-`[REDACTED]`, and `log_redactions` counts the replacements. Nothing else in the
-logs is changed.
+the control token are generated inside the container. Every JSON file the
+guest writes (`guest-result.json`, `progress.json`, `evidence/`) is written
+with those values replaced by `[REDACTED]`. After the processes exit, the same
+replacement is applied to the logs, and `log_redactions` counts it. Nothing
+else in the logs is changed. A guest killed by SIGKILL can leave raw logs.
+
+The candidates run as the same container user as the guest, so a hostile
+binary could rewrite `/output`. The host reads guest JSON only as a bounded
+regular file. It accepts a PASS only when the container exits 0 without OOM
+or timeout and the guest report agrees. This guards against accidents, not a
+deliberately forged report.
 
 The command removes its container and stops its daemon unit in all cases,
-including SIGINT or SIGTERM. It records each step in `cleanup`. It does not
+including SIGINT or SIGTERM. Signals that arrive during cleanup are recorded
+and do not interrupt it. It records each step in `cleanup`. It does not
 touch `bump-akk-stack-validation`, the system Docker daemon, or other
 `eqemu-*` units and data roots.
 
@@ -75,7 +85,11 @@ touch `bump-akk-stack-validation`, the system Docker daemon, or other
 In order: `inputs`, `environment`, `observer_self_check`, `server_start`,
 `entry`, `move`, `stop`, `target`, `hit`, `camp`, `restart`, `relog`,
 `cleanup`. The journey stops at the first failure. Each later milestone is
-`not_run`, except `cleanup`, which always runs.
+`not_run`, except `cleanup`, which always runs. `environment` covers the
+daemon and the container from start to exit. A container that is OOM-killed,
+times out, or exits with a status that disagrees with the guest report fails
+`environment`. If the guest dies without a report, the milestone it had
+checkpointed in `progress.json` fails instead.
 
 | Milestone | Passes when |
 | --- | --- |
@@ -101,7 +115,9 @@ The journey never uses command receipts or client events as evidence. Effects
 are proven by the server trace, by ACKed wire replies, and by client log
 lines. Server trace parsing lives only in `servertrace.py`. A line that starts
 with a contract prefix but changes a known shape fails the current milestone
-as a trace contract violation.
+as a trace contract violation. This includes the exact detail of successful
+entry stages. Any `entry ... stage=gameplay outcome=rejected` line fails the
+milestone during which it appears. A correct run logs none.
 
 ## Result
 
@@ -134,7 +150,7 @@ as a trace contract violation.
 | 0 | Every milestone passed, including cleanup. |
 | 1 | A journey milestone failed. Cleanup completed. |
 | 2 | Invalid arguments or inputs. Nothing was started. |
-| 3 | The environment failed: daemon, image, container or guest crash, timeout or interruption. |
+| 3 | The environment failed: daemon, image, container, guest crash, timeout, OOM or interruption. |
 | 4 | Cleanup could not be confirmed, whatever the journey verdict. Check `cleanup`. |
 
 ## Tests

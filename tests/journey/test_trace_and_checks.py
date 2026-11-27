@@ -18,8 +18,8 @@ entry attempt=1 stage=world_selected outcome=ok
 entry attempt=1 stage=world_authenticated outcome=ok
 entry attempt=1 stage=character_selected outcome=ok
 entry attempt=1 stage=zone_endpoint outcome=ok
-entry attempt=1 stage=zone_entered outcome=ok
-entry attempt=1 stage=client_ready outcome=ok
+entry attempt=1 stage=zone_entered outcome=ok zone=2
+entry attempt=1 stage=client_ready outcome=ok zone=2
 gameplay attempt=1 outcome=moved sequence=8 x=-931.25 y=1194 z=3.125
 gameplay attempt=1 outcome=moved sequence=9 x=-931.875 y=1194 z=3.125
 gameplay attempt=1 outcome=stopped sequence=10 x=-931.875 y=1194 z=3.125
@@ -75,6 +75,23 @@ class TraceContract(unittest.TestCase):
         line = parse_line("entry attempt=1 stage=world_login outcome=ended handoff_expired")
         self.assertEqual((line.kind, line.detail), ("entry", "handoff_expired"))
         self.assertEqual(parse_line("entry attempt=none stage=x outcome=ended").attempt, "none")
+
+    def test_entry_ok_detail_is_contract(self):
+        self.assertEqual(parse_line("entry attempt=1 stage=zone_entered outcome=ok zone=9").kind, "malformed")
+        self.assertEqual(parse_line("entry attempt=1 stage=zone_entered outcome=ok").kind, "malformed")
+        self.assertEqual(parse_line("entry attempt=1 stage=login_accepted outcome=ok x=1").kind, "malformed")
+        self.assertEqual(parse_line("entry attempt=1 stage=new_stage outcome=ok").known, False)
+
+    def test_prefix_shape_changes_are_malformed(self):
+        self.assertEqual(parse_line("gameplay  attempt=1 outcome=camp_started").kind, "malformed")
+        self.assertEqual(parse_line("gameplay outcome=camp_started").kind, "malformed")
+        self.assertEqual(parse_line("entry transport_send_error kind=WouldBlock").kind, "other")
+        self.assertEqual(parse_line("entryway").kind, "other")
+
+    def test_gameplay_rejections_are_separate_from_entry(self):
+        trace = Trace(SERVER1 + "entry attempt=1 stage=gameplay outcome=rejected movement_too_fast\n")
+        self.assertEqual([l.stage for l in trace.entry()], list(F.ENTRY_STAGES))
+        self.assertEqual([l.detail for l in trace.rejections()], ["movement_too_fast"])
 
     def test_endpoint_line_exact(self):
         self.assertEqual(parse_line("login=127.0.0.1:1 world=127.0.0.1:2 zone=127.0.0.1:3 zone_id=2 ").kind, "other")
