@@ -8,7 +8,8 @@ import time
 import unittest
 from unittest.mock import patch
 
-from validation.journey import observer
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "qeynos2-journey"))
+import observer  # noqa: E402
 
 
 ZONE_PORT = 17001

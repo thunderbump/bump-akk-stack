@@ -110,5 +110,5 @@ packages remain historical identities and do not qualify this checkout.
 `scripts/qeynos2-journey run --server BIN --client BIN --maps DIR` runs the
 Rust server's Qeynos2 journey with headless EQOxide in a per-command rootless
 Docker daemon and writes `result.json` naming the first failed milestone. See
-`validation/journey/README.md`. Routine runs neither seal nor run the native
+`tools/qeynos2-journey/README.md`. Routine runs neither seal nor run the native
 comparison. Run artifacts stay under `~/.local/state/eqemu-rust-journey/`.

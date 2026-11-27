@@ -11,7 +11,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "validation" / "journey"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "tools" / "qeynos2-journey"))
 
 import fixture as F  # noqa: E402
 import host  # noqa: E402
