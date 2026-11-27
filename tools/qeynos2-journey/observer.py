@@ -55,6 +55,20 @@ opcode, then the application payload:
   with ``w = struct.unpack_from('<5I', payload, 347)`` and the same position
   decoding as ``0x7dfc``.
 
+* ``0x7280`` delete spawn, payload exactly 5 bytes ending in ``00 00 01``::
+
+    {"direction", "sequence", "opcode": "0x7280", "entity": u16le[0:2],
+     "payload_hex"}
+
+* ``0x6097`` new NPC spawn, with a NUL-terminated printable ASCII name of
+  1..64 bytes and exactly 266 bytes after the name (including its NUL)::
+
+    {"direction", "sequence", "opcode": "0x6097", "entity": u32le,
+     "name": str, "npc": True, "hp_percent": int, "position": [x, y, z],
+     "heading": int, "payload_bytes": int, "payload_hex"}
+
+  Position and heading use the same decoding as ``0x5089``.
+
 Client-to-server packets to ``zone_port`` whose UDP payload is exactly 4 bytes
 starting with ``00 15`` (session ACK)::
 
@@ -77,6 +91,8 @@ OPCODE_TARGET = 0x58E2
 OPCODE_DAMAGE = 0x6F15
 OPCODE_HEALTH = 0x37B1
 OPCODE_SELF_SPAWN = 0x5089
+OPCODE_DELETE_SPAWN = 0x7280
+OPCODE_NEW_SPAWN = 0x6097
 
 DEFAULT_MAX_ROWS = 4096
 _PACKET_HOST = 0
@@ -105,8 +121,9 @@ def decode_datagram(
     """Return the selected row for one UDP payload, or None if not selected.
 
     Pure function: no clock, no socket. ``monotonic``/ports/``packet_type`` are
-    added by the caller. Wrong lengths, other opcodes, other ports and
-    non-matching self spawns return None.
+    added by the caller. Wrong lengths, other opcodes or ports, non-matching
+    self spawns, malformed deletions and new spawns outside the NPC layout
+    return None.
     """
     if dst_port == zone_port and len(udp_payload) == 4 and udp_payload[:2] == b"\x00\x15":
         return {
@@ -155,6 +172,31 @@ def decode_datagram(
             "heading": (words[2] >> 19) & 0xfff,
             "position_words_hex": payload[347:367].hex(),
             "payload_bytes": 430,
+        }
+    elif kind == (OPCODE_DELETE_SPAWN, 5):
+        if payload[2:] != b"\x00\x00\x01":
+            return None
+        entity, = struct.unpack_from("<H", payload)
+        fields = {"entity": entity}
+    elif opcode == OPCODE_NEW_SPAWN:
+        name_length = payload.find(b"\x00", 0, 65)
+        # wire.rs at 75e8ffd, lines 54–57 and 152–188, defines offsets from the name.
+        if name_length < 1 or len(payload) != name_length + 266:
+            return None
+        name = payload[:name_length]
+        npc = payload[name_length + 10] == 1
+        if not npc or any(byte < 0x20 or byte > 0x7e for byte in name):
+            return None
+        entity, = struct.unpack_from("<I", payload, name_length + 1)
+        words = struct.unpack_from("<5I", payload, name_length + 183)
+        fields = {
+            "entity": entity,
+            "name": name.decode("ascii"),
+            "npc": npc,
+            "hp_percent": payload[name_length + 29],
+            "position": _position(words),
+            "heading": (words[2] >> 19) & 0xfff,
+            "payload_bytes": len(payload),
         }
     else:
         return None
@@ -356,11 +398,11 @@ def self_check(character: str) -> dict:
     """Known-traffic control run before the journey starts.
 
     Binds two loopback UDP sockets, starts an ``Observer`` on the "server"
-    port, sends one known datagram of each selected kind (two ``0x7dfc``,
-    then ``0x58e2``, ``0x6f15``, ``0x37b1``, ``0x5089``) with sequences 5..10,
-    confirms each was received by the "client" socket, sends one ACK for 10
+    port, sends two ``0x7dfc`` datagrams followed by ``0x58e2``, ``0x6f15``,
+    ``0x37b1``, ``0x5089``, ``0x7280`` and ``0x6097`` with sequences 5..12,
+    confirms each was received by the "client" socket, sends one ACK for 12
     back, waits briefly, stops the observer and correlates. It requires exactly
-    six correlated replies in order, every ACK equal to 10, and decoded values
+    eight correlated replies in order, every ACK equal to 12, and decoded values
     equal to what was sent. Raises ``ObserverError`` on any mismatch, including
     an observer that captured nothing. Returns::
 
@@ -380,6 +422,22 @@ def self_check(character: str) -> dict:
     struct.pack_into("<I", spawn, len(name), 1)
     spawn[347:367] = position_words
 
+    rat_x = -935
+    rat_words = struct.pack("<5I", encoded_y << 12, 0, (rat_x * 8) & 0x7ffff, encoded_z << 10, 0)
+    # wire.rs at 75e8ffd, lines 152–188, with the rat's appearance from content.rs.
+    rat_spawn = (
+        b"a_large_rat\x00"
+        + struct.pack("<IBfBI", 2, 1, 5.0, 1, 2)  # entity, level, radius, NPC, gender
+        + bytes(9)
+        + struct.pack("<BIB", 1, 21, 100)  # property count, body type, HP
+        + bytes(22)
+        + struct.pack("<fBffIBIII", 7.0, 0, 0.46, 0.7, 36, 0, 0, 0xffffffff, 0)
+        + bytes([1, 0, 100, 0, 0, 0])  # class, PvP, standing, light, gravity, surname
+        + bytes(27) + b"\xff" * 8 + bytes(60)
+        + rat_words
+        + bytes(9) + b"0000000000000000\x00" + bytes(37)
+    )
+
     replies = [
         (OPCODE_POSITION, position_payload, position_fields),
         (OPCODE_POSITION, position_payload, position_fields),
@@ -391,8 +449,13 @@ def self_check(character: str) -> dict:
             **position_fields, "name": character, "heading": 0,
             "position_words_hex": position_words.hex(), "payload_bytes": 430,
         }),
+        (OPCODE_DELETE_SPAWN, b"\x02\x00\x00\x00\x01", {"entity": 2}),
+        (OPCODE_NEW_SPAWN, rat_spawn, {
+            "entity": 2, "name": "a_large_rat", "npc": True, "hp_percent": 100,
+            "position": [rat_x, y, z], "heading": 0, "payload_bytes": len(rat_spawn),
+        }),
     ]
-    ack_payload = b"\x00\x15\x00\x0a"
+    ack_payload = b"\x00\x15\x00\x0c"
     expected = []
     try:
         with (
@@ -430,12 +493,12 @@ def self_check(character: str) -> dict:
 
     correlations = correlate(observation)
     if len(correlations) != len(replies):
-        raise ObserverError(f"self-check expected six captured replies, got {len(correlations)}")
+        raise ObserverError(f"self-check expected eight captured replies, got {len(correlations)}")
     for pair, expected_reply in zip(correlations, expected):
         reply = pair["reply"]
         if any(reply.get(key) != value for key, value in expected_reply.items()):
             raise ObserverError(f"self-check decoded an unexpected reply for {expected_reply['sequence']}")
-        if pair["ack"]["ACK"] != 10:
+        if pair["ack"]["ACK"] != 12:
             raise ObserverError(f"self-check captured an unexpected ACK for {reply['sequence']}")
     return {
         "status": "PASS",

@@ -358,12 +358,13 @@ def read_guest_json(path: Path) -> dict | None:
     return data
 
 
-def milestone_table(guest_rows: list[dict] | None, pre: dict, cleanup_ok: bool | None) -> list[dict]:
+def milestone_table(guest_rows: list[dict] | None, pre: dict, cleanup_ok: bool | None,
+                    variant: str = "routine") -> list[dict]:
     table = []
     for name in F.HOST_PRE:
         table.append(pre.get(name, {"name": name, "status": "not_run"}))
     rows = {m["name"]: m for m in (guest_rows or []) if isinstance(m, dict) and "name" in m}
-    for name in F.GUEST:
+    for name in F.VARIANTS[variant]["milestones"]:
         table.append(rows.get(name, {"name": name, "status": "not_run"}))
     if cleanup_ok is None:
         table.append({"name": "cleanup", "status": "not_run"})
@@ -423,6 +424,7 @@ def command_run(args) -> int:
         "schema": RESULT_SCHEMA, "run_id": run_id, "label": args.label, "status": "FAIL",
         "exit_code": None, "first_failed_milestone": None, "failure": None, "started_utc": utc(),
         "harness": harness_identity(), "fixture": fixture_identity(), "image": args.image,
+        "variant": args.variant, "server_mode": F.VARIANTS[args.variant]["server_mode"],
     }
     pre: dict = {}
     state = {"run_dir": None, "daemon": None, "container": None}
@@ -473,7 +475,8 @@ def command_run(args) -> int:
                             (run_dir / "inputs", "/inputs", True),
                             (out, "/output", False),
                         ], ["python3", "-B", "-s", "-E", "/journey/guest.py", "--output", "/output",
-                            "--server", "/inputs/server", "--client", "/inputs/client", "--maps", "/inputs/maps"])
+                            "--server", "/inputs/server", "--client", "/inputs/client", "--maps", "/inputs/maps",
+                            "--variant", args.variant])
                         result["environment"] = {"daemon": daemon.record, "container_argv": container.argv}
                         pre["environment"] = {"name": "environment", "status": "pass",
                                               "seconds": round(time.monotonic() - at, 3)}
@@ -532,7 +535,7 @@ def command_run(args) -> int:
             if guest is not None:
                 cleanup_ok = cleanup_ok and bool(guest.get("guest_processes_reaped"))
         result["cleanup"] = cleanup
-        table = milestone_table(guest_rows, pre, cleanup_ok)
+        table = milestone_table(guest_rows, pre, cleanup_ok, args.variant)
         result["milestones"] = table
         failed = [m for m in table if m["status"] != "pass"]
         first = next((m for m in failed if m["status"] == "fail"), failed[0] if failed else None)
@@ -685,6 +688,8 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--output-root", help="parent directory for the run directory")
     run.add_argument("--image", default=DEFAULT_IMAGE)
     run.add_argument("--allow-unpinned-maps", action="store_true")
+    run.add_argument("--variant", choices=sorted(F.VARIANTS), default="routine",
+                     help="routine (default, ~40 s) or kill-respawn (fast-respawn mode, ~60 s)")
     run.set_defaults(func=command_run)
     prep = sub.add_parser("prepare-image", help="load the runtime image into the harness data root")
     prep.add_argument("--archive", required=True)

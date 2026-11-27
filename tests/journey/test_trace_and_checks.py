@@ -51,7 +51,7 @@ class TraceContract(unittest.TestCase):
         self.assertEqual(hit.fields["damage"], "2")
         save = trace.persistence("save", "ok")[0]
         self.assertEqual(save.xyz(), [-931.875, 1194.0, 3.125])
-        self.assertEqual(trace.lines[-1].kind, "other")
+        self.assertEqual(trace.lines[-1].kind, "diagnostic")
 
     def test_partial_last_line_ignored(self):
         trace = Trace("login=127.0.0.1:1 world=127.0.0.1:2 zone=127.0.0.1:3 zone_id=2\nentry attempt=1 st")
@@ -67,25 +67,71 @@ class TraceContract(unittest.TestCase):
     def test_non_numeric_is_malformed(self):
         self.assertEqual(parse_line("gameplay attempt=1 outcome=moved sequence=8 x=NaN y=1 z=1").kind, "malformed")
 
-    def test_unknown_outcome_kept(self):
-        line = parse_line("gameplay attempt=1 outcome=npc_died entity_id=2")
-        self.assertEqual((line.kind, line.known), ("gameplay", False))
+    def test_unknown_outcomes_fail_loudly(self):
+        for raw in ("gameplay attempt=1 outcome=npc_revived entity_id=2",
+                    "persistence attempt=1 stage=save outcome=maybe",
+                    "zone outcome=npc_despawned entity_id=2 incarnation=1 spawn_id=10863 npc_type=2011",
+                    "zone attempt=1 outcome=npc_respawned entity_id=2 incarnation=2 spawn_id=10863 npc_type=2011",
+                    "entry attempt=1 stage=new_stage outcome=ok",
+                    "entry attempt=1 stage=zone_entry outcome=paused",
+                    "entry attempt=1 stage=zone_entry outcome=rejected Bad Reason",
+                    "entry attempt=1 stage=gameplay outcome=rejected stale_target opcode=75d"):
+            self.assertEqual(parse_line(raw).kind, "malformed", raw)
+
+    def test_value_types_are_contract(self):
+        for raw in ("gameplay attempt=none outcome=camp_started",
+                    "gameplay attempt=1 outcome=attack_off canceled=maybe",
+                    "zone outcome=npc_respawned entity_id=2 incarnation=2.5 spawn_id=10863 npc_type=2011",
+                    "gameplay attempt=1 outcome=melee_hit source_entity=1 target_entity=2 incarnation=1 "
+                    "spawn_id=10863 npc_type=2011 damage=-2 hp_before=11 hp_after=13",
+                    "gameplay attempt=1 outcome=melee_refused source_entity=1 target_entity=2 incarnation=1 "
+                    "reason=Stale",
+                    "persistence attempt=1 stage=save outcome=failed kind=permission_denied",
+                    "persistence attempt=1 stage=save outcome=ok character=Client2 zone=2 x=1 y=2 z=3 heading=0",
+                    "entry transport_send_error kind=1"):
+            self.assertEqual(parse_line(raw).kind, "malformed", raw)
+        diag = parse_line("entry transport_send_error kind=ConnectionRefused")
+        self.assertEqual((diag.kind, diag.fields["kind"]), ("diagnostic", "ConnectionRefused"))
+        self.assertEqual(parse_line("gameplay attempt=1 outcome=attack_off canceled=true").kind, "gameplay")
+        self.assertEqual(parse_line("persistence attempt=none stage=load outcome=failed kind=InvalidData").kind,
+                         "persistence")
+
+    def test_lifecycle_shapes(self):
+        died = parse_line("gameplay attempt=1 outcome=npc_died entity_id=2 incarnation=1 spawn_id=10863 npc_type=2011")
+        self.assertEqual((died.kind, died.fields["incarnation"]), ("gameplay", "1"))
+        self.assertEqual(parse_line("gameplay attempt=1 outcome=npc_died incarnation=1 entity_id=2 "
+                                    "spawn_id=10863 npc_type=2011").kind, "malformed")
+        born = parse_line("zone outcome=npc_respawned entity_id=2 incarnation=2 spawn_id=10863 npc_type=2011")
+        self.assertEqual((born.kind, born.outcome, born.attempt, born.fields["incarnation"]),
+                         ("zone", "npc_respawned", None, "2"))
+        self.assertEqual(len(Trace(born.raw + "\n").zone("npc_respawned")), 1)
+        refused = parse_line("gameplay attempt=1 outcome=melee_refused source_entity=1 target_entity=2 "
+                             "incarnation=1 reason=stale_target")
+        self.assertEqual(refused.fields["reason"], "stale_target")
+
+    def test_entry_reject_and_end_shapes(self):
+        for raw in ("entry attempt=1 stage=gameplay outcome=rejected stale_target opcode=0x075d",
+                    "entry attempt=none stage=zone_entry outcome=rejected no_zone_handoff",
+                    "entry attempt=3 stage=world_login outcome=ended handoff_expired"):
+            self.assertEqual(parse_line(raw).kind, "entry", raw)
 
     def test_entry_free_detail(self):
         line = parse_line("entry attempt=1 stage=world_login outcome=ended handoff_expired")
         self.assertEqual((line.kind, line.detail), ("entry", "handoff_expired"))
-        self.assertEqual(parse_line("entry attempt=none stage=x outcome=ended").attempt, "none")
+        self.assertEqual(parse_line("entry attempt=none stage=zone_entry outcome=ended handoff_expired").attempt, "none")
 
     def test_entry_ok_detail_is_contract(self):
         self.assertEqual(parse_line("entry attempt=1 stage=zone_entered outcome=ok zone=9").kind, "malformed")
         self.assertEqual(parse_line("entry attempt=1 stage=zone_entered outcome=ok").kind, "malformed")
         self.assertEqual(parse_line("entry attempt=1 stage=login_accepted outcome=ok x=1").kind, "malformed")
-        self.assertEqual(parse_line("entry attempt=1 stage=new_stage outcome=ok").known, False)
+        self.assertEqual(parse_line("entry attempt=1 stage=login_accepted outcome=ok zone=2").kind, "malformed")
+        self.assertEqual(parse_line("entry attempt=1 stage=complete outcome=ok zone=2").kind, "malformed")
+        self.assertEqual(parse_line("entry attempt=1 stage=complete outcome=ok").kind, "entry")
 
     def test_prefix_shape_changes_are_malformed(self):
         self.assertEqual(parse_line("gameplay  attempt=1 outcome=camp_started").kind, "malformed")
         self.assertEqual(parse_line("gameplay outcome=camp_started").kind, "malformed")
-        self.assertEqual(parse_line("entry transport_send_error kind=WouldBlock").kind, "other")
+        self.assertEqual(parse_line("entry transport_send_error kind=WouldBlock").kind, "diagnostic")
         self.assertEqual(parse_line("entryway").kind, "other")
 
     def test_gameplay_rejections_are_separate_from_entry(self):
@@ -181,6 +227,48 @@ class Wire(unittest.TestCase):
     def test_retransmission_deduplicated(self):
         rows = [reply(8, 1, (0, 0, 0)), reply(8, 1, (0, 0, 0)), reply(8, 1, (0, 0, 0), port=50001)]
         self.assertEqual(len(checks.unique_replies(rows, "0x7dfc")), 2)
+
+
+def hit_lines(*rows, incarnation=1, attempt=1):
+    text = "".join(f"gameplay attempt={attempt} outcome=melee_hit source_entity=1 target_entity=2 "
+                   f"incarnation={incarnation} spawn_id=10863 npc_type=2011 damage={d} hp_before={b} hp_after={a}\n"
+                   for d, b, a in rows)
+    text += "gameplay attempt=1 outcome=npc_died entity_id=2 incarnation=1 spawn_id=10863 npc_type=2011\n"
+    trace = Trace(text)
+    return trace.gameplay("melee_hit"), trace.gameplay("npc_died")[0]
+
+
+class Kill(unittest.TestCase):
+    def chain(self, hits, died):
+        return checks.hit_chain(hits, died, attempt="1", player=1, rat=2, incarnation=1, spawn_id=10863,
+                                npc_type=2011, max_hp=11, damage_range=(1, 3), hit_range=(4, 11))
+
+    def test_seeded_fresh_server_sequence(self):
+        # Rust thread: a fresh server rolls 2, 2, 2, 3, 2 and the rat dies on the fifth hit.
+        self.assertEqual(self.chain(*hit_lines((2, 11, 9), (2, 9, 7), (2, 7, 5), (3, 5, 2), (2, 2, 0))),
+                         [2, 2, 2, 3, 2])
+
+    def test_hit_on_dead_rat_rejected(self):
+        with self.assertRaises(checks.CheckFailed):
+            self.chain(*hit_lines((3, 11, 8), (3, 8, 5), (3, 5, 2), (2, 2, 0), (1, 0, 0)))
+
+    def test_overkill_clamps_to_zero(self):
+        self.chain(*hit_lines((3, 11, 8), (3, 8, 5), (3, 5, 2), (3, 2, 0)))
+
+    def test_rejections(self):
+        for rows in (((2, 11, 9), (2, 9, 7), (2, 7, 5)),  # alive at the end / too few
+                     ((2, 11, 9), (2, 8, 6), (3, 6, 3), (3, 3, 0)),  # chain gap
+                     ((4, 11, 7), (3, 7, 4), (3, 4, 1), (1, 1, 0)),  # damage over 3
+                     ((2, 10, 8), (3, 8, 5), (3, 5, 2), (2, 2, 0)),  # does not start at 11
+                     ((2, 11, 9), (2, 9, 7), (2, 7, 5), (3, 5, 1), (1, 1, 0))):  # wrong hp_after
+            with self.assertRaises(checks.CheckFailed, msg=rows):
+                self.chain(*hit_lines(*rows))
+        with self.assertRaises(checks.CheckFailed):
+            self.chain(*hit_lines((3, 11, 8), (3, 8, 5), (3, 5, 2), (2, 2, 0), incarnation=2))
+        hits, died = hit_lines((3, 11, 8), (3, 8, 5), (3, 5, 2), (2, 2, 0))
+        late = Trace("\n".join([died.raw] + [h.raw for h in hits]) + "\n")
+        with self.assertRaises(checks.CheckFailed):  # hits after the death line
+            self.chain(late.gameplay("melee_hit"), late.gameplay("npc_died")[0])
 
 
 class Pose(unittest.TestCase):

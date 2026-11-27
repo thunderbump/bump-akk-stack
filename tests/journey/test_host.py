@@ -96,6 +96,14 @@ class Table(unittest.TestCase):
         self.assertEqual(table[-1]["status"], "pass")
         self.assertEqual(host.milestone_table(None, pre, None)[-1]["status"], "not_run")
 
+    def test_kill_respawn_table(self):
+        table = host.milestone_table(None, {}, None, "kill-respawn")
+        names = [m["name"] for m in table]
+        self.assertEqual(names, list(F.milestones("kill-respawn")))
+        self.assertEqual(names[names.index("hit") + 1:names.index("camp")], ["kill", "death", "no_swing_after_death", "respawn"])
+        self.assertEqual(F.VARIANTS["kill-respawn"]["server_mode"], "qeynos2-hunting-fast")
+        self.assertEqual(F.VARIANTS["routine"]["server_mode"], "qeynos2-hunting")
+
 
 def quiet(fn, *args):
     with contextlib.redirect_stdout(io.StringIO()):
