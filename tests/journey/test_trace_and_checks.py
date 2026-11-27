@@ -117,6 +117,20 @@ class Movement(unittest.TestCase):
         checks.ordered_movement(samples(("moved", 65535, -931.25, 1194, 3.125),
                                         ("stopped", 0, -931.25, 1194, 3.125)), "1", self.seed)
 
+    def test_rest_sample_at_new_position_moved_then_stopped(self):
+        # 4be36c2 (PR 14): one rest sample yields moved then stopped, same sequence and position.
+        moves, stop = checks.ordered_movement(samples(("moved", 0, -931.875, 1194, 3.125),
+                                                      ("stopped", 0, -931.875, 1194, 3.125)), "1", self.seed)
+        self.assertEqual(stop.xyz(), [-931.875, 1194.0, 3.125])
+        checks.ordered_movement(samples(("moved", 0, -931.25, 1194, 3.125), ("moved", 1, -931.875, 1194, 3.125),
+                                        ("stopped", 1, -931.875, 1194, 3.125)), "1", self.seed)
+
+    def test_same_sequence_stop_elsewhere_rejected(self):
+        self.bad(("moved", 0, -931.875, 1194, 3.125), ("stopped", 0, -931.25, 1194, 3.125))
+        self.bad(("moved", 1, -931.25, 1194, 3.125), ("stopped", 0, -931.25, 1194, 3.125))
+        self.bad(("moved", 0, -931.25, 1194, 3.125), ("moved", 0, -931.875, 1194, 3.125),
+                 ("stopped", 1, -931.875, 1194, 3.125))  # repeated sequence between moves
+
     def bad(self, *rows, attempt="1"):
         with self.assertRaises(checks.CheckFailed):
             checks.ordered_movement(samples(*rows), attempt, self.seed)
@@ -156,6 +170,13 @@ class Wire(unittest.TestCase):
         with self.assertRaises(checks.CheckFailed):
             checks.wire_positions([reply(8, 1, (-931.25, 1194, 3.125)), reply(9, 2, (-931.25, 1194, 3.125))],
                                   self.lines, 1)
+
+    def test_rest_pair_has_one_reply(self):
+        pair = samples(("moved", 0, -931.875, 1194, 3.125), ("stopped", 0, -931.875, 1194, 3.125))
+        checks.wire_positions([reply(8, 1, (-931.875, 1194, 3.125))], pair, 1)
+        with self.assertRaises(checks.CheckFailed):
+            checks.wire_positions([reply(8, 1, (-931.875, 1194, 3.125)), reply(9, 1, (-931.875, 1194, 3.125))],
+                                  pair, 1)
 
     def test_retransmission_deduplicated(self):
         rows = [reply(8, 1, (0, 0, 0)), reply(8, 1, (0, 0, 0)), reply(8, 1, (0, 0, 0), port=50001)]

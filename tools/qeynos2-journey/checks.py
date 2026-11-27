@@ -26,7 +26,10 @@ def ordered_movement(lines, attempt: str, start_xyz) -> tuple[list, object]:
     sample, all on ``attempt``. Each ``moved`` sample must step strictly west
     of the previous accepted pose with Y and Z unchanged, sequences must move
     forward, and the stop must equal the *final* accepted sample (not the
-    first). Returns ``(moved_lines, stopped_line)``.
+    first). A rest sample at a new position (zero deltas, animation 0)
+    makes the server log ``moved`` and then ``stopped`` for the same sample,
+    with the same sequence and position; that final pair counts as one
+    sample. Returns ``(moved_lines, stopped_line)``.
     """
     moves = [l for l in lines if l.outcome in ("moved", "stopped")]
     require(moves, "no server moved/stopped samples")
@@ -41,7 +44,9 @@ def ordered_movement(lines, attempt: str, start_xyz) -> tuple[list, object]:
         require(all(math.isfinite(v) for v in xyz), "non-finite server pose")
         sequence = int(line.fields["sequence"])
         require(0 <= sequence <= 0xFFFF, "sequence outside u16")
-        if previous_sequence is not None:
+        same_sample = (line.outcome == "stopped" and previous_sequence == sequence
+                       and xyz == last)
+        if previous_sequence is not None and not same_sample:
             require(forward(previous_sequence, sequence), "position sequence not forward")
         previous_sequence = sequence
         if line.outcome == "moved":
@@ -68,11 +73,27 @@ def unique_replies(rows, opcode: str) -> list[dict]:
     return out
 
 
+def distinct_samples(moves: list) -> list:
+    """moved/stopped lines with a same-sample stop folded into its moved line."""
+    out = []
+    for line in moves:
+        if (out and line.outcome == "stopped" and out[-1].outcome == "moved"
+                and int(line.fields["sequence"]) == int(out[-1].fields["sequence"])
+                and line.xyz() == out[-1].xyz()):
+            continue
+        out.append(line)
+    return out
+
+
 def wire_positions(updates: list[dict], moves: list, player: int) -> None:
-    """Each accepted moved/stopped sample has one matching 0x7dfc reply, in order."""
-    require(len(updates) == len(moves), f"{len(updates)} position replies for {len(moves)} samples")
+    """Each accepted sample has one matching 0x7dfc reply, in order.
+
+    A ``moved``/``stopped`` pair from one rest sample has one reply.
+    """
+    samples = distinct_samples(moves)
+    require(len(updates) == len(samples), f"{len(updates)} position replies for {len(samples)} samples")
     previous = None
-    for reply, line in zip(updates, moves):
+    for reply, line in zip(updates, samples):
         require(reply["entity"] == player, f"position reply for entity {reply['entity']}")
         require(reply["position"] == line.xyz(), f"wire {reply['position']} != trace {line.xyz()}")
         if previous is not None:
