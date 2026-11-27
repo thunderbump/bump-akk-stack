@@ -78,7 +78,8 @@ def distinct_samples(moves: list) -> list:
     out = []
     for line in moves:
         if (out and line.outcome == "stopped" and out[-1].outcome == "moved"
-                and line.fields["sequence"] == out[-1].fields["sequence"] and line.xyz() == out[-1].xyz()):
+                and int(line.fields["sequence"]) == int(out[-1].fields["sequence"])
+                and line.xyz() == out[-1].xyz()):
             continue
         out.append(line)
     return out
