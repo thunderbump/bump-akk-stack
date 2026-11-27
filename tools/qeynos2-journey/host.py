@@ -304,6 +304,8 @@ def stage_inputs(args, run_dir: Path) -> dict:
             raise UsageError(f"--{role} changed while copying")
         revision = getattr(args, f"{role}_revision")
         record["revision"] = revision
+        if role == "client":
+            record["validation_pin"] = F.VALIDATION_CLIENTS.get(record["sha256"])
         identity[role] = record
     maps = Path(args.maps).expanduser().resolve()
     if not maps.is_dir():
