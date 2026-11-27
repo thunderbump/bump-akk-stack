@@ -689,7 +689,7 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--image", default=DEFAULT_IMAGE)
     run.add_argument("--allow-unpinned-maps", action="store_true")
     run.add_argument("--variant", choices=sorted(F.VARIANTS), default="routine",
-                     help="routine (default, ~40 s) or kill-respawn (fast-respawn mode, ~90 s)")
+                     help="routine (default, ~40 s) or kill-respawn (fast-respawn mode, ~60 s)")
     run.set_defaults(func=command_run)
     prep = sub.add_parser("prepare-image", help="load the runtime image into the harness data root")
     prep.add_argument("--archive", required=True)

@@ -145,6 +145,7 @@ def hit_chain(hits, died, *, attempt: str, player: int, rat: int, incarnation: i
                 and int(line.fields["spawn_id"]) == spawn_id
                 and int(line.fields["npc_type"]) == npc_type, f"hit attribution {line.raw}")
         require(damage_range[0] <= damage <= damage_range[1], f"damage {line.raw}")
+        require(hp > 0, f"hit on a rat already at 0 HP: {line.raw}")
         require(int(line.fields["hp_before"]) == hp and int(line.fields["hp_after"]) == max(0, hp - damage),
                 f"HP chain broken at {line.raw} (expected hp_before={hp})")
         require(line.index < died.index, f"hit after death: {line.raw}")

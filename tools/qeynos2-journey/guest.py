@@ -13,6 +13,7 @@ import datetime
 import hashlib
 import json
 import os
+import re
 import secrets
 import signal
 import subprocess
@@ -545,8 +546,16 @@ class Journey:
         try:
             return {"accepted_by_client": True, "response": self.api.command(name, operation)}
         except urllib.error.HTTPError as error:
-            body = error.read().decode("utf-8", "replace")[:2000]
-            return {"accepted_by_client": False, "http_status": error.code, "body": body}
+            # Keep only structured, bounded fields; never arbitrary response text.
+            out = {"accepted_by_client": False, "http_status": error.code}
+            try:
+                body = json.loads(error.read(65536))
+                for key in ("reason", "journaled", "status"):
+                    if isinstance(body.get(key), (str, bool, int)) and len(str(body[key])) <= 80:
+                        out[key] = body[key]
+            except (ValueError, AttributeError):
+                pass
+            return out
 
     def live_rat(self, state: dict):
         return [e for e in state["nearby"]["entities"]
@@ -556,21 +565,34 @@ class Journey:
         """Re-arm after the routine hit and keep the lease alive until the rat dies."""
         renewals = []
         attack_at = time.monotonic()
-        last = 0.0
         deadline = attack_at + F.KILL_TIMEOUT
+
+        def renew():
+            answer = self.try_command(f"journey-attack-k{len(renewals) + 1}",
+                                      {"kind": "attack", "lease_ms": F.KILL_LEASE_MS})
+            renewals.append({"t": round(time.monotonic() - attack_at, 3), **answer})
+            if not answer["accepted_by_client"]:
+                raise CheckFailed(f"client refused an attack command while the rat lived: {answer}")
+
+        # Re-arm, then renew only at fixed offsets after each observed hit, so a
+        # renewal never races the next due swing (repeat 3.5 s, melee.rs:10).
+        renew()
+        seen_hits, due = 0, []
         while True:
             trace = self.trace(self.server)
             if trace.gameplay("npc_died"):
+                self.died_seen_at = time.monotonic()
                 break
             require(time.monotonic() < deadline, f"rat not dead {F.KILL_TIMEOUT}s after re-arm")
             require(self.server.alive() and self.client.alive(), "a process exited during the kill")
-            if time.monotonic() - last >= F.ATTACK_RENEW:
-                answer = self.try_command(f"journey-attack-k{len(renewals) + 1}",
-                                          {"kind": "attack", "lease_ms": F.KILL_LEASE_MS})
-                renewals.append({"t": round(time.monotonic() - attack_at, 3), **answer})
-                last = time.monotonic()
-                if not answer["accepted_by_client"] and not self.trace(self.server).gameplay("npc_died"):
-                    raise CheckFailed(f"client refused an attack renewal while the rat lived: {answer}")
+            hits = len(trace.gameplay("melee_hit"))
+            if hits > seen_hits:
+                seen_hits = hits
+                now = time.monotonic()
+                due = [now + offset for offset in F.RENEW_AFTER_HIT]
+            if due and time.monotonic() >= due[0]:
+                due.pop(0)
+                renew()
             time.sleep(0.02)
         ev["kill_seconds_after_rearm"] = round(time.monotonic() - attack_at, 3)
         ev["attack_renewals"] = len(renewals)
@@ -595,10 +617,13 @@ class Journey:
             return None
 
         proof = self.wire(effects, f"{count} damage and health replies ACKed")
-        damage_rows = sorted((p["reply"] for p in proof if p["reply"]["opcode"] == "0x6f15"),
-                             key=lambda r: r["monotonic"])
-        health_rows = sorted((p["reply"] for p in proof if p["reply"]["opcode"] == "0x37b1"),
-                             key=lambda r: r["monotonic"])
+        base = min(p["reply"]["sequence"] for p in proof)
+
+        def by_sequence(opcode):
+            rows = [p["reply"] for p in proof if p["reply"]["opcode"] == opcode]
+            return sorted(rows, key=lambda r: (r["sequence"] - base) & 0xFFFF)
+
+        damage_rows, health_rows = by_sequence("0x6f15"), by_sequence("0x37b1")
         require(len(damage_rows) == count and len(health_rows) == count,
                 f"{len(damage_rows)} damage / {len(health_rows)} health replies for {count} hits")
         for line, d, h in zip(hits, damage_rows, health_rows):
@@ -608,10 +633,17 @@ class Journey:
             require(h["entity"] == self.rat and h["percent"] == checks.hp_percent(after, F.RAT_MAX_HP),
                     f"health packet {h} for {line.raw}")
         ev["wire_health_percents"] = [h["percent"] for h in health_rows]
-        needle = f"EQ: combat: {F.CHARACTER} hits "
-        applied = self.wait(lambda: (lines := [l for l in self.client.text().splitlines() if needle in l])
-                            and len(lines) >= count and lines, F.TARGET_TIMEOUT, "client combat log hits")
-        ev["client_hit_lines"] = len(applied)
+        pattern = re.compile(rf"EQ: combat: {F.CHARACTER} hits (\S+) for (\d+) damage")
+
+        def client_hits():
+            found = [m.groups() for m in map(pattern.search, self.client.text().splitlines()) if m]
+            return found if len(found) >= count else None
+
+        applied = self.wait(client_hits, F.TARGET_TIMEOUT, "client combat log hits")
+        expected = [(F.RAT_NAME_PREFIX, l.fields["damage"]) for l in hits]
+        require([(name.startswith(F.RAT_NAME_PREFIX) and F.RAT_NAME_PREFIX, dmg) for name, dmg in applied]
+                == expected, f"client combat log {applied} != trace {expected}")
+        ev["client_hits"] = applied
         self.died = died
 
     def m_death(self, ev):
@@ -630,8 +662,14 @@ class Journey:
         ev["wire_delete"] = proof
         self.delete_row = proof[0]["reply"]
         require(not checks.unique_replies(self.observer.rows, "0x6097"), "new spawn before respawn")
-        gone = self.wait(lambda: (st := self.api.state()) and not self.live_rat(st) and st,
-                         F.ROSTER_TIMEOUT, "client roster loses the rat")
+        def roster_without_rat():
+            st = self.api.state()
+            nearby = st["nearby"]
+            if st.get("phase") != "ready" or not nearby.get("available") or nearby.get("truncated"):
+                return None
+            return None if any(e["id"] == rat for e in nearby["entities"]) else st
+
+        gone = self.wait(roster_without_rat, F.ROSTER_TIMEOUT, "client roster drops the rat's entry")
         ev["client_target_after_death"] = gone["self"].get("target_id")
 
     def m_no_swing_after_death(self, ev):
@@ -647,53 +685,69 @@ class Journey:
         server's own tests.
         """
         died = self.died
-        start = time.monotonic()
+        start = self.died_seen_at  # the server's death, not this milestone's start
         attack_on_samples = []
+        swings = ("attack_armed", "melee_hit", "melee_refused")
 
-        def after_death():
+        def check_after_death():
             trace = self.trace(self.server)
-            require(not trace.zone("npc_respawned"), "respawned inside the stale window")
-            return [l for l in trace.lines if l.index > died.index and l.kind == "gameplay"]
+            require(not trace.zone("npc_respawned"), "respawned inside the no-swing window")
+            lines = [l for l in trace.lines if l.index > died.index and l.kind == "gameplay"]
+            bad = [l.raw for l in lines if l.outcome in swings]
+            require(not bad, f"swing resolved after death: {bad}")
+            return lines
 
         while time.monotonic() - start < F.STALE_OBSERVE:
-            lines = after_death()
-            bad = [l.raw for l in lines if l.outcome in ("attack_armed", "melee_hit", "melee_refused")]
-            require(not bad, f"swing resolved after death: {bad}")
+            check_after_death()
             attack_on_samples.append((round(time.monotonic() - start, 3), self.api.state()["self"]["attack_on"]))
-            require(self.server.alive() and self.client.alive(), "a process exited in the stale window")
+            require(self.server.alive() and self.client.alive(), "a process exited in the no-swing window")
             time.sleep(0.1)
+        ev["server_after_death"] = [l.raw for l in check_after_death()]  # final snapshot is checked too
         ev["client_attack_on_samples"] = attack_on_samples[::5]
-        ev["server_after_death"] = [l.raw for l in after_death()]
         held = [t for t, on in attack_on_samples if on and t >= F.REPEAT_DELAY]
         require(held, "client released auto-attack before one swing interval passed; the window proves nothing")
         ev["client_attack_on_through_s"] = max(held)
-        # Observation only: a target for the dead ID. Headless is expected to
-        # refuse it locally (client behavior, recorded, not a pass condition).
-        # If it does reach the server, only the exact stale rejection passes.
-        stale = "stale_target opcode=0x075d"
-        self.allowed_rejections.add(stale)
+        # Observation: a target for the dead ID. Headless is expected to refuse it
+        # locally (recorded, not a pass condition). If the client reports it sent,
+        # the server must reject it. After the kill the peer's binding is gone
+        # (front/zone.rs:437-439), so the wire ID resolves to nothing
+        # (front/zone.rs:486-493) and the exact correct rejection is
+        # `unpublished_target` (play.rs:159-161).
+        expected = "unpublished_target opcode=0x075d"
+        if time.monotonic() - start + F.STALE_TARGET_WAIT > F.FAST_RESPAWN - F.RESPAWN_MARGIN:
+            ev["observation_dead_id_target"] = {"skipped": "too close to the respawn"}
+            return
+        self.allowed_rejections.add(expected)
         try:
             answer = self.try_command("journey-target-stale", {"kind": "target", "entity_id": self.rat})
             time.sleep(F.STALE_TARGET_WAIT)
             if answer["accepted_by_client"]:
                 answer["final_receipt"] = self.api.receipt("journey-target-stale")
             trace = self.trace(self.server)
-            rejected = [l.raw for l in trace.rejections()]
-            require(not trace.zone("npc_respawned"), "respawn arrived inside the no-swing window")
-            require(all(l.detail == stale and l.attempt == self.attempt for l in trace.rejections()),
-                    f"unexpected rejection for a dead-ID target: {rejected}")
-            ev["observation_dead_id_target"] = {"client": answer, "server_rejections": rejected}
+            rejected = [l for l in trace.rejections() if l.index > died.index]
+            targeted = [l.raw for l in trace.gameplay("targeted") if l.index > died.index]
+            require(not targeted, f"a target succeeded for the dead ID: {targeted}")
+            sent = answer["accepted_by_client"] and answer["final_receipt"].get("status") != "refused"
+            if sent:
+                require([(l.detail, l.attempt) for l in rejected] == [(expected, self.attempt)],
+                        f"client reports the dead-ID target sent; server answered {[l.raw for l in rejected]}")
+            else:
+                require(not rejected, f"client refused the dead-ID target; server logged {[l.raw for l in rejected]}")
+            ev["observation_dead_id_target"] = {"client": answer, "client_sent": sent,
+                                                "server_rejections": [l.raw for l in rejected]}
         finally:
-            self.allowed_rejections.discard(stale)
+            self.allowed_rejections.discard(expected)
 
     def m_respawn(self, ev):
         died = self.died
+        swings = ("attack_armed", "melee_hit", "melee_refused")
 
         def respawned():
             lines = self.trace(self.server).zone("npc_respawned")
             return lines or None
 
-        lines = self.wait(respawned, F.RESPAWN_TIMEOUT, "server npc_respawned", watch=[self.server, self.client])
+        remaining = max(0.0, self.died_seen_at + F.RESPAWN_TIMEOUT - time.monotonic())
+        lines = self.wait(respawned, remaining, "server npc_respawned", watch=[self.server, self.client])
         ev["server"] = [l.raw for l in lines]
         require(len(lines) == 1, f"{len(lines)} respawn lines")
         line = lines[0]
@@ -724,11 +778,10 @@ class Journey:
         ev["server_target"] = targeted[0].raw
         require(len(targeted) == 1 and targeted[0].attempt == self.attempt
                 and int(targeted[0].fields["entity_id"]) == rat, f"retarget {targeted[0].raw}")
-        swings = ("attack_armed", "melee_hit", "melee_refused")
         trace = self.trace(self.server)
-        early = [l.raw for l in trace.lines if line.index < l.index < targeted[0].index
-                 and l.kind == "gameplay" and l.outcome in swings]
-        require(not early, f"swing on the new incarnation before it was targeted: {early}")
+        early = [l.raw for l in trace.lines if died.index < l.index < targeted[0].index
+                 and l.kind == "gameplay" and l.outcome in swings + ("targeted",)]
+        require(not early, f"swing or target after the death and before the re-target: {early}")
         after_spawn = spawn["sequence"]
         echo = self.wire(lambda rows: [r for r in checks.unique_replies(rows, "0x58e2")
                                        if checks.forward(after_spawn, r["sequence"])], "retarget echo ACKed")

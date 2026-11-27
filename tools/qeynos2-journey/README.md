@@ -145,19 +145,25 @@ unchanged and remains the default.
 
 | Milestone | Passes when |
 | --- | --- |
-| `kill` | After the routine hit's `attack_off`, the variant re-arms and renews the attack lease every 0.5 s until `npc_died`, within 60 s. Every `melee_hit`, including the routine first hit, is attributed to player→rat incarnation 1. HP falls from 11 to 0, each `hp_before` equals the previous `hp_after`, and each hit does 1–3 damage. 4–11 hits are required in total. Each hit has one ACKed `0x6f15` and `0x37b1` matching the trace, and the last health is 0 %. The client logs every hit. No swing is refused before the death. |
-| `death` | Exactly one `npc_died` occurs for the rat's entity, incarnation, spawn and NPC type on the active attempt, after the final hit. One ACKed `OP_DeleteSpawn` `0x7280` names the rat, no `OP_NewSpawn` has arrived yet, and the client's roster loses the live rat. |
-| `no_swing_after_death` | For 4.5 s after the death (one 3.5 s swing interval plus margin), the client still reports `attack_on` after the full interval, and the server logs no `attack_armed`, `melee_hit` or `melee_refused`. As an observation only, the variant also sends a `target` for the dead ID and records the client's answer and final receipt. Headless refuses it locally. If it reaches the server anyway, only `rejected stale_target opcode=0x075d` passes. |
-| `respawn` | Exactly one `zone outcome=npc_respawned` occurs for the same entity, spawn and NPC type with a higher incarnation. One ACKed `OP_NewSpawn` `0x6097` arrives for that entity, an NPC named `a_large_rat` at 100 % HP, 5–20 s after the delete on the wire. The roster regains the rat, and re-targeting yields `targeted ... incarnation=<new>` with an ACKed `0x58e2` echo that the client applies. No swing is logged against the new incarnation before that re-target. As an observation only, the variant records `attack_on` at re-target and any swing lines in the following 1.5 s without a fresh attack-on. |
+| `kill` | After the routine hit's `attack_off`, the variant re-arms. It renews the attack lease 1.0, 2.0 and 3.0 s after each observed hit, clear of the next swing due at 3.5 s, until `npc_died`, within 60 s. Any refused renewal fails. Every `melee_hit`, including the routine first hit, is attributed to player→rat incarnation 1. HP falls from 11 to 0, each `hp_before` equals the previous `hp_after`, each hit does 1–3 damage, and only the last hit reaches 0. 4–11 hits are required in total. Each hit has one ACKed `0x6f15` and `0x37b1` matching the trace, and the last health is 0 %. The client logs every hit, in order, with the same damage. No swing is refused before the death. |
+| `death` | Exactly one `npc_died` occurs for the rat's entity, incarnation, spawn and NPC type on the active attempt, after the final hit. One ACKed `OP_DeleteSpawn` `0x7280` names the rat, no `OP_NewSpawn` has arrived yet, and the client's ready, untruncated roster drops the rat's entry. |
+| `no_swing_after_death` | For 4.5 s after the death was first seen (one 3.5 s swing interval plus margin), the client still reports `attack_on` after the full interval, and the server logs no `attack_armed`, `melee_hit` or `melee_refused`, including in the final snapshot. As an observation only, the variant also sends a `target` for the dead ID and records the client's answer and final receipt. Headless refuses it locally. If the client reports it as sent, the server must log exactly `rejected unpublished_target opcode=0x075d`: the kill removed the peer's binding, so the ID resolves to nothing. No `targeted` line may follow the death. |
+| `respawn` | Exactly one `zone outcome=npc_respawned` occurs for the same entity, spawn and NPC type with a higher incarnation. One ACKed `OP_NewSpawn` `0x6097` arrives for that entity, an NPC named `a_large_rat` at 100 % HP, 5–20 s after the delete on the wire. The roster regains the rat, and re-targeting yields `targeted ... incarnation=<new>` with an ACKed `0x58e2` echo that the client applies. No swing or target is logged between the death and that re-target. As an observation only, the variant records `attack_on` at re-target and any swing lines in the following 1.5 s without a fresh attack-on. |
 
 Server facts at bump-eqemu-rust `75e8ffdf8393be1e6a38697c4798e13d7818073c`:
 
 * Swings repeat every 3.5 s (`src/rof2/melee.rs:10`). A repeated
   `OP_AutoAttack` while armed is ignored (`src/rof2/play.rs:177-179`), so
   lease renewals do not change the cadence.
-* The fast mode is in `src/main.rs:22-25`, with a 10 s respawn
+* The fast mode is in `src/main.rs:22-29`, with a 10 s respawn
   (`src/rof2/content.rs:166`). The ordinary mode respawns after 640 s
   (`src/rof2/content.rs:137`).
+* After the kill the peer's binding for the wire ID is removed
+  (`src/rof2/front/zone.rs:437-439`). A later `OP_TargetMouse` for it
+  resolves to nothing (`front/zone.rs:486-493`) and is rejected as
+  `unpublished_target` (`src/rof2/play.rs:159-161`). An attack-on after the
+  kill is rejected as `no_target` (`play.rs:180`), so the variant never renews
+  the lease near a swing.
 * Death sends `OP_DeleteSpawn` `0x7280`, 5 bytes `[id_lo, id_hi, 0, 0, 1]`
   (`src/rof2/wire.rs:37`, `wire.rs:252-255`). Respawn sends `OP_NewSpawn`
   `0x6097` built by the same `spawn_packet` as the zone-entry spawn, at hp 100

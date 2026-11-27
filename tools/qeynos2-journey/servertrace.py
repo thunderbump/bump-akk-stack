@@ -90,25 +90,20 @@ ENTRY_OK_DETAIL = {
     "client_ready": "zone=2",
 }
 # Diagnostic stderr lines that share a contract prefix but carry no attempt.
-DIAGNOSTIC_RE = re.compile(r"entry transport_send_error kind=\w+")
+# trace.rs Trace::TransportSendError, printed to stderr.
+DIAGNOSTIC_RE = re.compile(r"entry transport_send_error kind=[A-Z][A-Za-z]*")
 
-NUMERIC = {
-    "sequence",
-    "x",
-    "y",
-    "z",
-    "heading",
-    "zone",
-    "entity_id",
-    "incarnation",
-    "spawn_id",
-    "npc_type",
-    "source_entity",
-    "target_entity",
-    "damage",
-    "hp_before",
-    "hp_after",
-}
+# Field value types, from the Rust types formatted in trace.rs.
+FLOAT_FIELDS = {"x", "y", "z"}  # f32 Display
+UINT_FIELDS = {"sequence", "heading", "zone", "entity_id", "incarnation", "spawn_id", "npc_type",
+               "source_entity", "target_entity", "damage", "hp_before", "hp_after"}
+BOOL_FIELDS = {"canceled"}
+WORD_FIELDS = {"reason"}  # &'static str snake_case codes
+KIND_FIELDS = {"kind"}  # io::ErrorKind Debug
+UINT_RE = re.compile(r"\d+")
+WORD_RE = re.compile(r"[a-z_]+")
+KIND_RE = re.compile(r"[A-Z][A-Za-z]*")
+CHARACTER_RE = re.compile(r"[A-Za-z]+")
 
 
 @dataclass(frozen=True)
@@ -174,8 +169,15 @@ def _check(expected: tuple, pairs: list[tuple[str, str]]) -> str | None:
     if names != expected:
         return f"fields {names} != {expected}"
     for key, value in pairs:
-        if key in NUMERIC and not NUMBER_RE.fullmatch(value):
-            return f"non-numeric {key}={value}"
+        ok = (NUMBER_RE.fullmatch(value) if key in FLOAT_FIELDS
+              else UINT_RE.fullmatch(value) if key in UINT_FIELDS
+              else value in ("true", "false") if key in BOOL_FIELDS
+              else WORD_RE.fullmatch(value) if key in WORD_FIELDS
+              else KIND_RE.fullmatch(value) if key in KIND_FIELDS
+              else CHARACTER_RE.fullmatch(value) if key == "character"
+              else False)
+        if not ok:
+            return f"bad value {key}={value}"
     return None
 
 
@@ -187,8 +189,11 @@ def parse_line(raw: str, index: int = 0) -> Line:
         endpoints = Endpoints(*ports, raw=raw)
         return Line("endpoints", raw, index, endpoints=endpoints)
     prefix = re.split(r"\s", raw, maxsplit=1)[0]
-    if prefix not in FAMILIES or DIAGNOSTIC_RE.fullmatch(raw):
+    if prefix not in FAMILIES:
         return Line("other", raw, index)
+    if DIAGNOSTIC_RE.fullmatch(raw):
+        return Line("diagnostic", raw, index, outcome="transport_send_error",
+                    fields={"kind": raw.rsplit("=", 1)[1]})
     if prefix == "zone":
         match = ZONE_RE.fullmatch(raw)
         pairs = _fields(match[2]) if match else None
@@ -213,8 +218,9 @@ def parse_line(raw: str, index: int = 0) -> Line:
             return Line("malformed", raw, index, attempt, stage, outcome,
                         problem=f"unknown entry outcome shape {outcome} {rest!r}")
         pairs = _fields(rest) or []
-        if outcome == "ok" and stage in ENTRY_OK_DETAIL:
-            expected_detail = ENTRY_OK_DETAIL[stage]
+        if outcome == "ok":
+            # Only zone_entered and client_ready print `ok zone=N` (OkInZone).
+            expected_detail = ENTRY_OK_DETAIL.get(stage, "")
             if (rest or "") != expected_detail:
                 return Line("malformed", raw, index, attempt, stage, outcome,
                             problem=f"detail {rest!r} != {expected_detail!r}")
@@ -225,6 +231,8 @@ def parse_line(raw: str, index: int = 0) -> Line:
     if pairs is None:
         return Line("malformed", raw, index, attempt, stage, outcome, problem="bad fields")
     if kind == "gameplay":
+        if attempt == "none":
+            return Line("malformed", raw, index, problem="gameplay attempt=none")
         if stage is not None:
             return Line("malformed", raw, index, problem="gameplay with stage")
         expected = GAMEPLAY_FIELDS.get(outcome)

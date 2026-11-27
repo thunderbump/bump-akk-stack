@@ -92,19 +92,23 @@ def milestones(variant: str) -> tuple:
 
 
 # Kill-and-respawn timing. Swings repeat every 3.5 s (src/rof2/melee.rs:10);
-# fast respawn is 10 s. The client attack lease is renewed every
-# ATTACK_RENEW so at least lease - ATTACK_RENEW remains at the kill, which
-# outlasts the next due swing and lets the server report it stale.
+# fast respawn is 10 s (src/main.rs:22-29, src/rof2/content.rs:166). Lease
+# renewals go at fixed offsets after each observed hit, clear of the next due
+# swing; the last one leaves the client's attack-on active long enough to
+# observe that no swing follows the death (the server cancels it on a kill,
+# src/rof2/zone.rs:524-531).
 KILL_HITS = (4, 11)  # 11 HP at 1-3 per hit, counting the routine first hit
 KILL_LEASE_MS = 5000
-ATTACK_RENEW = 0.5
+RENEW_AFTER_HIT = (1.0, 2.0, 3.0)  # seconds after each observed hit; the next swing is due at 3.5
 KILL_TIMEOUT = 60.0
 REPEAT_DELAY = 3.5  # server swing interval, src/rof2/melee.rs:10
 STALE_OBSERVE = 4.5  # observe one swing interval plus margin after the death
 ROSTER_TIMEOUT = 3.0
-RESPAWN_TIMEOUT = 20.0  # after the death line
+RESPAWN_TIMEOUT = 20.0  # after the death was first observed
 RESPAWN_DELAY_RANGE = (5.0, 20.0)  # delete-to-new-spawn wire gap accepted
 STALE_TARGET_WAIT = 2.0
+FAST_RESPAWN = 10.0  # src/rof2/content.rs:166
+RESPAWN_MARGIN = 1.0  # the dead-ID probe must finish this long before it
 RETARGET_OBSERVE = 1.5  # > 150 ms windup plus margin
 
 # Waits (seconds).

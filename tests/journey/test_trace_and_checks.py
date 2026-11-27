@@ -51,7 +51,7 @@ class TraceContract(unittest.TestCase):
         self.assertEqual(hit.fields["damage"], "2")
         save = trace.persistence("save", "ok")[0]
         self.assertEqual(save.xyz(), [-931.875, 1194.0, 3.125])
-        self.assertEqual(trace.lines[-1].kind, "other")
+        self.assertEqual(trace.lines[-1].kind, "diagnostic")
 
     def test_partial_last_line_ignored(self):
         trace = Trace("login=127.0.0.1:1 world=127.0.0.1:2 zone=127.0.0.1:3 zone_id=2\nentry attempt=1 st")
@@ -77,6 +77,24 @@ class TraceContract(unittest.TestCase):
                     "entry attempt=1 stage=zone_entry outcome=rejected Bad Reason",
                     "entry attempt=1 stage=gameplay outcome=rejected stale_target opcode=75d"):
             self.assertEqual(parse_line(raw).kind, "malformed", raw)
+
+    def test_value_types_are_contract(self):
+        for raw in ("gameplay attempt=none outcome=camp_started",
+                    "gameplay attempt=1 outcome=attack_off canceled=maybe",
+                    "zone outcome=npc_respawned entity_id=2 incarnation=2.5 spawn_id=10863 npc_type=2011",
+                    "gameplay attempt=1 outcome=melee_hit source_entity=1 target_entity=2 incarnation=1 "
+                    "spawn_id=10863 npc_type=2011 damage=-2 hp_before=11 hp_after=13",
+                    "gameplay attempt=1 outcome=melee_refused source_entity=1 target_entity=2 incarnation=1 "
+                    "reason=Stale",
+                    "persistence attempt=1 stage=save outcome=failed kind=permission_denied",
+                    "persistence attempt=1 stage=save outcome=ok character=Client2 zone=2 x=1 y=2 z=3 heading=0",
+                    "entry transport_send_error kind=1"):
+            self.assertEqual(parse_line(raw).kind, "malformed", raw)
+        diag = parse_line("entry transport_send_error kind=ConnectionRefused")
+        self.assertEqual((diag.kind, diag.fields["kind"]), ("diagnostic", "ConnectionRefused"))
+        self.assertEqual(parse_line("gameplay attempt=1 outcome=attack_off canceled=true").kind, "gameplay")
+        self.assertEqual(parse_line("persistence attempt=none stage=load outcome=failed kind=InvalidData").kind,
+                         "persistence")
 
     def test_lifecycle_shapes(self):
         died = parse_line("gameplay attempt=1 outcome=npc_died entity_id=2 incarnation=1 spawn_id=10863 npc_type=2011")
@@ -106,11 +124,14 @@ class TraceContract(unittest.TestCase):
         self.assertEqual(parse_line("entry attempt=1 stage=zone_entered outcome=ok zone=9").kind, "malformed")
         self.assertEqual(parse_line("entry attempt=1 stage=zone_entered outcome=ok").kind, "malformed")
         self.assertEqual(parse_line("entry attempt=1 stage=login_accepted outcome=ok x=1").kind, "malformed")
+        self.assertEqual(parse_line("entry attempt=1 stage=login_accepted outcome=ok zone=2").kind, "malformed")
+        self.assertEqual(parse_line("entry attempt=1 stage=complete outcome=ok zone=2").kind, "malformed")
+        self.assertEqual(parse_line("entry attempt=1 stage=complete outcome=ok").kind, "entry")
 
     def test_prefix_shape_changes_are_malformed(self):
         self.assertEqual(parse_line("gameplay  attempt=1 outcome=camp_started").kind, "malformed")
         self.assertEqual(parse_line("gameplay outcome=camp_started").kind, "malformed")
-        self.assertEqual(parse_line("entry transport_send_error kind=WouldBlock").kind, "other")
+        self.assertEqual(parse_line("entry transport_send_error kind=WouldBlock").kind, "diagnostic")
         self.assertEqual(parse_line("entryway").kind, "other")
 
     def test_gameplay_rejections_are_separate_from_entry(self):
@@ -226,6 +247,10 @@ class Kill(unittest.TestCase):
         # Rust thread: a fresh server rolls 2, 2, 2, 3, 2 and the rat dies on the fifth hit.
         self.assertEqual(self.chain(*hit_lines((2, 11, 9), (2, 9, 7), (2, 7, 5), (3, 5, 2), (2, 2, 0))),
                          [2, 2, 2, 3, 2])
+
+    def test_hit_on_dead_rat_rejected(self):
+        with self.assertRaises(checks.CheckFailed):
+            self.chain(*hit_lines((3, 11, 8), (3, 8, 5), (3, 5, 2), (2, 2, 0), (1, 0, 0)))
 
     def test_overkill_clamps_to_zero(self):
         self.chain(*hit_lines((3, 11, 8), (3, 8, 5), (3, 5, 2), (3, 2, 0)))
