@@ -124,5 +124,35 @@ def pose_line_matches(line, pose: dict) -> bool:
     )
 
 
+def hit_chain(hits, died, *, attempt: str, player: int, rat: int, incarnation: int, spawn_id: int,
+              npc_type: int, max_hp: int, damage_range: tuple, hit_range: tuple) -> list[int]:
+    """Check every melee_hit from the first swing to the death.
+
+    All hits are on ``attempt`` from ``player`` to ``rat``'s ``incarnation``
+    and precede ``died``. HP starts at ``max_hp``; each hit_before equals the
+    previous hp_after, hp_after = max(0, hp_before - damage), damage is within
+    ``damage_range``, the chain ends at 0 and the count is within ``hit_range``.
+    Returns the damages.
+    """
+    low, high = hit_range
+    require(low <= len(hits) <= high, f"{len(hits)} hits to kill a {max_hp} HP rat")
+    hp, damages = max_hp, []
+    for line in hits:
+        damage = int(line.fields["damage"])
+        require(line.attempt == attempt and int(line.fields["source_entity"]) == player
+                and int(line.fields["target_entity"]) == rat
+                and int(line.fields["incarnation"]) == incarnation
+                and int(line.fields["spawn_id"]) == spawn_id
+                and int(line.fields["npc_type"]) == npc_type, f"hit attribution {line.raw}")
+        require(damage_range[0] <= damage <= damage_range[1], f"damage {line.raw}")
+        require(int(line.fields["hp_before"]) == hp and int(line.fields["hp_after"]) == max(0, hp - damage),
+                f"HP chain broken at {line.raw} (expected hp_before={hp})")
+        require(line.index < died.index, f"hit after death: {line.raw}")
+        hp = int(line.fields["hp_after"])
+        damages.append(damage)
+    require(hp == 0, f"rat HP ends at {hp}")
+    return damages
+
+
 def hp_percent(hp: int, max_hp: int) -> int:
     return hp * 100 // max_hp

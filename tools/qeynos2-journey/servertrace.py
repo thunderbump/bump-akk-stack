@@ -1,14 +1,15 @@
 """The Rust server's stdout trace contract, parsed in one place.
 
-The startup endpoint line and the ``entry``, ``gameplay`` and ``persistence``
-lines are a contract the server refactor must keep byte-identical. Every other
-part of the journey reads server output only through this module.
+The startup endpoint line and the ``entry``, ``gameplay``, ``persistence`` and
+``zone`` lines are a contract the server refactor must keep byte-identical.
+Every other part of the journey reads server output only through this module.
 
-Known outcomes are checked for exact field names and order. A line that starts
-with a contract prefix but does not match its known shape is ``malformed``
-and the journey treats it as a contract violation. An unknown gameplay outcome
-with well-formed ``key=value`` fields is kept with ``known=False`` so new
-server behavior does not break routine runs.
+The shapes are closed: they mirror the server's single emitter,
+``src/rof2/trace.rs`` (``Trace`` and its ``Display``) at bump-eqemu-rust
+75e8ffdf8393be1e6a38697c4798e13d7818073c. A line whose first word is a
+contract family but whose stage, outcome, fields or field order is not one of
+those shapes is ``malformed``, and the journey fails loudly on it. A new
+server line therefore needs a matching change here.
 """
 
 from __future__ import annotations
@@ -19,9 +20,24 @@ from dataclasses import dataclass, field
 ENDPOINT_RE = re.compile(
     r"login=127\.0\.0\.1:(\d+) world=127\.0\.0\.1:(\d+) zone=127\.0\.0\.1:(\d+) zone_id=(\d+)"
 )
+FAMILIES = ("entry", "gameplay", "persistence", "zone")
 HEAD_RE = re.compile(
     r"(entry|gameplay|persistence) attempt=(none|\d+)(?: stage=([a-z_]+))? outcome=([a-z_]+)(?: (.*))?"
 )
+ZONE_RE = re.compile(r"zone outcome=([a-z_]+)(?: (.*))?")
+# trace.rs Stage::label.
+ENTRY_STAGES = {
+    "login_session", "credentials", "login_accepted", "server_list", "world_selection",
+    "world_selected", "world_login", "world_authenticated", "character_selection",
+    "character_selected", "zone_endpoint", "zone_entry", "zone_entered", "request_spawn",
+    "request_new_zone", "experience_echo", "client_ready", "complete", "gameplay",
+}
+# trace.rs Entry: ok | ok zone=N | rejected R | rejected R opcode=0xHHHH | ended R.
+ENTRY_DETAIL_RE = {
+    "ok": re.compile(r"(?:zone=\d+)?"),
+    "rejected": re.compile(r"[a-z_]+(?: opcode=0x[0-9a-f]{4})?"),
+    "ended": re.compile(r"[a-z_]+"),
+}
 NUMBER_RE = re.compile(r"-?\d+(?:\.\d+)?")
 TOKEN_RE = re.compile(r"([a-z_]+)=(\S+)")
 
@@ -49,6 +65,10 @@ GAMEPLAY_FIELDS = {
     "logout_without_camp": (),
     "camp_completed": (),
     "camp_interrupted": ("reason",),
+    "npc_died": ("entity_id", "incarnation", "spawn_id", "npc_type"),
+}
+ZONE_FIELDS = {
+    "npc_respawned": ("entity_id", "incarnation", "spawn_id", "npc_type"),
 }
 PERSISTENCE_FIELDS = {
     ("save", "ok"): POSE_FIELDS,
@@ -117,7 +137,6 @@ class Line:
     outcome: str | None = None
     fields: dict = field(default_factory=dict)
     detail: str = ""
-    known: bool = True
     endpoints: Endpoints | None = None
     problem: str | None = None
 
@@ -135,8 +154,6 @@ class Line:
                 out[key] = value
         if self.fields:
             out["fields"] = dict(self.fields)
-        if not self.known:
-            out["known"] = False
         return out
 
 
@@ -170,8 +187,18 @@ def parse_line(raw: str, index: int = 0) -> Line:
         endpoints = Endpoints(*ports, raw=raw)
         return Line("endpoints", raw, index, endpoints=endpoints)
     prefix = re.split(r"\s", raw, maxsplit=1)[0]
-    if prefix not in ("entry", "gameplay", "persistence") or DIAGNOSTIC_RE.fullmatch(raw):
+    if prefix not in FAMILIES or DIAGNOSTIC_RE.fullmatch(raw):
         return Line("other", raw, index)
+    if prefix == "zone":
+        match = ZONE_RE.fullmatch(raw)
+        pairs = _fields(match[2]) if match else None
+        expected = ZONE_FIELDS.get(match[1]) if match else None
+        if pairs is None or expected is None:
+            return Line("malformed", raw, index, problem="unknown zone line")
+        problem = _check(expected, pairs)
+        if problem:
+            return Line("malformed", raw, index, outcome=match[1], problem=problem)
+        return Line("zone", raw, index, outcome=match[1], fields=dict(pairs))
     match = HEAD_RE.fullmatch(raw)
     if not match:
         return Line("malformed", raw, index, problem="head does not match")
@@ -179,12 +206,15 @@ def parse_line(raw: str, index: int = 0) -> Line:
     if kind == "entry":
         if stage is None:
             return Line("malformed", raw, index, problem="entry without stage")
+        if stage not in ENTRY_STAGES:
+            return Line("malformed", raw, index, problem=f"unknown entry stage {stage}")
+        detail_re = ENTRY_DETAIL_RE.get(outcome)
+        if detail_re is None or not detail_re.fullmatch(rest or ""):
+            return Line("malformed", raw, index, attempt, stage, outcome,
+                        problem=f"unknown entry outcome shape {outcome} {rest!r}")
         pairs = _fields(rest) or []
-        if outcome == "ok":
-            expected_detail = ENTRY_OK_DETAIL.get(stage)
-            if expected_detail is None:
-                return Line(kind, raw, index, attempt, stage, outcome, dict(pairs),
-                            detail=rest or "", known=False)
+        if outcome == "ok" and stage in ENTRY_OK_DETAIL:
+            expected_detail = ENTRY_OK_DETAIL[stage]
             if (rest or "") != expected_detail:
                 return Line("malformed", raw, index, attempt, stage, outcome,
                             problem=f"detail {rest!r} != {expected_detail!r}")
@@ -203,7 +233,8 @@ def parse_line(raw: str, index: int = 0) -> Line:
             return Line("malformed", raw, index, problem="persistence without stage")
         expected = PERSISTENCE_FIELDS.get((stage, outcome))
     if expected is None:
-        return Line(kind, raw, index, attempt, stage, outcome, dict(pairs), known=False)
+        return Line("malformed", raw, index, attempt, stage, outcome,
+                    problem=f"unknown {kind} outcome {outcome}")
     problem = _check(expected, pairs)
     if problem:
         return Line("malformed", raw, index, attempt, stage, outcome, problem=problem)
@@ -243,6 +274,9 @@ class Trace:
     def entry(self) -> list[Line]:
         """Entry-protocol lines, excluding gameplay rejections reported as entry lines."""
         return [line for line in self.of("entry") if line.stage != "gameplay"]
+
+    def zone(self, *outcomes: str) -> list[Line]:
+        return [l for l in self.of("zone") if not outcomes or l.outcome in outcomes]
 
     def rejections(self) -> list[Line]:
         """``entry attempt=N stage=gameplay outcome=rejected <reason>`` lines."""

@@ -126,11 +126,56 @@ client that reports rest itself may do, or after it. `stop.evidence` records
 
 The journey never uses command receipts or client events as evidence. Effects
 are proven by the server trace, by ACKed wire replies, and by client log
-lines. Server trace parsing lives only in `servertrace.py`. A line that starts
-with a contract prefix but changes a known shape fails the current milestone
-as a trace contract violation. This includes the exact detail of successful
-entry stages. Any `entry ... stage=gameplay outcome=rejected` line fails the
-milestone during which it appears. A correct run logs none.
+lines. Server trace parsing lives only in `servertrace.py`. Its shapes are
+closed and mirror the server's single emitter, `src/rof2/trace.rs`. A line in
+the `entry`, `gameplay`, `persistence` or `zone` family with an unknown stage,
+outcome, field set or field order fails the current milestone as a trace
+contract violation. This includes the exact detail of successful entry
+stages. A new server line therefore needs a matching parser change. Any
+`entry ... stage=gameplay outcome=rejected` line fails the milestone during
+which it appears, unless that milestone names the exact rejection it expects.
+A correct run logs none.
+
+## Kill-and-respawn variant
+
+`run --variant kill-respawn` starts the server in `qeynos2-hunting-fast`:
+the same content as `qeynos2-hunting`, with a 10 s respawn. It inserts four
+milestones between `hit` and `camp` and takes about 60 s. The routine run is
+unchanged and remains the default.
+
+| Milestone | Passes when |
+| --- | --- |
+| `kill` | After the routine hit's `attack_off`, the variant re-arms and renews the attack lease every 0.5 s until `npc_died`, within 60 s. Every `melee_hit`, including the routine first hit, is attributed to player→rat incarnation 1. HP falls from 11 to 0, each `hp_before` equals the previous `hp_after`, and each hit does 1–3 damage. 4–11 hits are required in total. Each hit has one ACKed `0x6f15` and `0x37b1` matching the trace, and the last health is 0 %. The client logs every hit. No swing is refused before the death. |
+| `death` | Exactly one `npc_died` occurs for the rat's entity, incarnation, spawn and NPC type on the active attempt, after the final hit. One ACKed `OP_DeleteSpawn` `0x7280` names the rat, no `OP_NewSpawn` has arrived yet, and the client's roster loses the live rat. |
+| `no_swing_after_death` | For 4.5 s after the death (one 3.5 s swing interval plus margin), the client still reports `attack_on` after the full interval, and the server logs no `attack_armed`, `melee_hit` or `melee_refused`. As an observation only, the variant also sends a `target` for the dead ID and records the client's answer and final receipt. Headless refuses it locally. If it reaches the server anyway, only `rejected stale_target opcode=0x075d` passes. |
+| `respawn` | Exactly one `zone outcome=npc_respawned` occurs for the same entity, spawn and NPC type with a higher incarnation. One ACKed `OP_NewSpawn` `0x6097` arrives for that entity, an NPC named `a_large_rat` at 100 % HP, 5–20 s after the delete on the wire. The roster regains the rat, and re-targeting yields `targeted ... incarnation=<new>` with an ACKed `0x58e2` echo that the client applies. No swing is logged against the new incarnation before that re-target. As an observation only, the variant records `attack_on` at re-target and any swing lines in the following 1.5 s without a fresh attack-on. |
+
+Server facts at bump-eqemu-rust `75e8ffdf8393be1e6a38697c4798e13d7818073c`:
+
+* Swings repeat every 3.5 s (`src/rof2/melee.rs:10`). A repeated
+  `OP_AutoAttack` while armed is ignored (`src/rof2/play.rs:177-179`), so
+  lease renewals do not change the cadence.
+* The fast mode is in `src/main.rs:22-25`, with a 10 s respawn
+  (`src/rof2/content.rs:166`). The ordinary mode respawns after 640 s
+  (`src/rof2/content.rs:137`).
+* Death sends `OP_DeleteSpawn` `0x7280`, 5 bytes `[id_lo, id_hi, 0, 0, 1]`
+  (`src/rof2/wire.rs:37`, `wire.rs:252-255`). Respawn sends `OP_NewSpawn`
+  `0x6097` built by the same `spawn_packet` as the zone-entry spawn, at hp 100
+  (`wire.rs:38`, `wire.rs:152-189`, `src/rof2/front/zone.rs:436-444`).
+* `zone outcome=npc_respawned ...` has no attempt field
+  (`src/rof2/trace.rs:233-240`). `npc_died` is a gameplay line
+  (`trace.rs:264-271`).
+* `kill()` clears the target and cancels the auto-attack of every player who
+  had the dead NPC targeted, without a trace line (`src/rof2/zone.rs:524-531`).
+  A client therefore cannot reach the server's three `stale_target` paths
+  after a kill: a due swing is never scheduled, and headless refuses a
+  `target` or `attack` for an entity missing from its roster. The three server
+  `stale_target` paths (`OP_TargetMouse`, `OP_AutoAttack` and a due swing) are
+  covered by the server's own tests, not by this journey.
+* The client's attack lease lasts at most 5000 ms, and headless refuses
+  `attack` without a live target. At the 10 s respawn the client therefore
+  normally reports `attack_on` false, so the re-target observation cannot
+  show a client that still believes attack is on.
 
 ## Result
 

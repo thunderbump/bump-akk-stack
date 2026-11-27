@@ -22,6 +22,22 @@ def reliable(opcode, payload, sequence=SEQUENCE):
     return b"\x00\x09" + struct.pack("!H", sequence) + struct.pack("<H", opcode) + payload
 
 
+def npc_spawn(name=b"a_large_rat", npc=1):
+    # wire.rs at 75e8ffd, lines 54–57 and 152–163: u32 ID at L+1, NPC at L+10, HP at L+29.
+    identity = name + b"\x00\x23\x81\x00\x00\x01" + struct.pack("<f", 5.0)
+    properties = bytes([npc]) + b"\x02\x00\x00\x00" + bytes(9) + b"\x01\x15\x00\x00\x00\x49"
+    # Lines 164–179: 153 bytes of appearance after HP, including 60 bytes of NPC equipment.
+    appearance = (
+        bytes(22) + struct.pack("<f", 7.0) + b"\x00" + struct.pack("<ff", 0.46, 0.7)
+        + struct.pack("<IBIII", 36, 0, 0, 0xffffffff, 0) + b"\x01\x00\x64\x00\x00\x00"
+        + bytes(27) + b"\xff" * 8 + bytes(60)
+    )
+    # Lines 183–188 and 217–219: position starts at L+183. Grid units (-99, 121, -26)
+    # decode to (-12.375, 15.125, -3.25), with heading 0xabc in word 2.
+    words = struct.pack("<5I", 121 << 12, 0, (0xabc << 19) | (0x80000 - 99), (0x80000 - 26) << 10, 0)
+    return identity + properties + appearance + words + bytes(9) + b"0000000000000000\x00" + bytes(37)
+
+
 def udp_frame(payload, options=b"", protocol=socket.IPPROTO_UDP, source=b"\x7f\x00\x00\x01"):
     ip_header = struct.pack(
         "!BBHHHBBH4s4s", 0x45 + len(options) // 4, 0,
@@ -58,12 +74,18 @@ class DatagramTests(unittest.TestCase):
                 "entity": 1, "name": CHARACTER, "position": self.position, "heading": self.heading,
                 "payload_bytes": 430, "position_words_hex": words.hex(),
             }),
+            # wire.rs at 75e8ffd, lines 252–255: LE u16 followed by 00 00 01.
+            (0x7280, b"\xcd\xab\x00\x00\x01", {"entity": 0xabcd}),
+            (0x6097, npc_spawn(), {
+                "entity": 0x8123, "name": "a_large_rat", "npc": True, "hp_percent": 73,
+                "position": [-12.375, 15.125, -3.25], "heading": 0xabc, "payload_bytes": 277,
+            }),
         ]
 
     def decode(self, datagram, src=ZONE_PORT, dst=PEER_PORT, character=CHARACTER):
         return observer.decode_datagram(datagram, src, dst, ZONE_PORT, character)
 
-    def test_five_server_opcodes(self):
+    def test_seven_server_opcodes(self):
         for opcode, payload, fields in self.cases:
             with self.subTest(opcode=hex(opcode)):
                 self.assertEqual(self.decode(reliable(opcode, payload)), {
@@ -88,11 +110,33 @@ class DatagramTests(unittest.TestCase):
         self.assertIsNone(self.decode(datagram[:5]))
 
     def test_self_spawn_requires_name_and_entity_one(self):
-        _, spawn, _ = self.cases[-1]
+        _, spawn, _ = self.cases[4]
         self.assertIsNone(self.decode(reliable(0x5089, spawn), character="Observer"))
         entity_offset = len(CHARACTER.encode()) + 1
         other_entity = spawn[:entity_offset] + struct.pack("<I", 2) + spawn[entity_offset + 4:]
         self.assertIsNone(self.decode(reliable(0x5089, other_entity)))
+
+    def test_delete_spawn_requires_fixed_suffix(self):
+        for suffix in (b"\x01\x00\x01", b"\x00\x01\x01", b"\x00\x00\x00"):
+            with self.subTest(suffix=suffix):
+                self.assertIsNone(self.decode(reliable(0x7280, b"\xcd\xab" + suffix)))
+
+    def test_new_spawn_requires_npc_and_printable_ascii_name(self):
+        for name in (b"", b"a" * 65, b"rat\n", b"rat\x7f", b"rat\xff", b"a\x00rat"):
+            with self.subTest(name=name):
+                self.assertIsNone(self.decode(reliable(0x6097, npc_spawn(name))))
+        for npc in (0, 2):
+            with self.subTest(npc=npc):
+                self.assertIsNone(self.decode(reliable(0x6097, npc_spawn(npc=npc))))
+        for name in (b"~", b" " * 64):
+            with self.subTest(name=name):
+                row = self.decode(reliable(0x6097, npc_spawn(name)))
+                self.assertEqual(row["name"], name.decode("ascii"))
+
+    def test_spawn_changes_require_zone_source_port(self):
+        for opcode, payload, _ in self.cases[-2:]:
+            with self.subTest(opcode=hex(opcode)):
+                self.assertIsNone(self.decode(reliable(opcode, payload), src=PEER_PORT, dst=ZONE_PORT))
 
     def test_client_ack(self):
         ack = b"\x00\x15\xab\xcd"
@@ -272,14 +316,15 @@ class LiveObserverTests(unittest.TestCase):
             return
         result = observer.self_check(CHARACTER)
         self.assertEqual(result["status"], "PASS")
-        self.assertEqual(len(result["observation"]["rows"]), 7)
-        self.assertEqual([pair["reply"]["sequence"] for pair in result["correlations"]], list(range(5, 11)))
+        self.assertEqual(len(result["observation"]["rows"]), 9)
+        self.assertEqual([pair["reply"]["sequence"] for pair in result["correlations"]], list(range(5, 13)))
+        self.assertEqual([pair["ack"]["ACK"] for pair in result["correlations"]], [12] * 8)
 
     def test_live_outgoing_only_fails_self_check(self):
         if self.rerun_if_unprivileged():
             return
         with patch.object(observer, "_PACKET_HOST", 4):
-            with self.assertRaisesRegex(observer.ObserverError, "expected six captured replies, got 0"):
+            with self.assertRaisesRegex(observer.ObserverError, "expected eight captured replies, got 0"):
                 observer.self_check(CHARACTER)
 
     def test_live_observer_round_trip(self):

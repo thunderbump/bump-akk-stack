@@ -76,6 +76,37 @@ GUEST = (
 HOST_POST = ("cleanup",)
 MILESTONES = HOST_PRE + GUEST + HOST_POST
 
+# Journey variants. "routine" is the default ~40 s run. "kill-respawn" uses the
+# server's fast-respawn mode (bump-eqemu-rust 75e8ffd src/main.rs:22-25,
+# src/rof2/content.rs:166) and adds four milestones between hit and camp.
+KILL_RESPAWN = GUEST[:GUEST.index("hit") + 1] + ("kill", "death", "no_swing_after_death", "respawn") \
+    + GUEST[GUEST.index("hit") + 1:]
+VARIANTS = {
+    "routine": {"server_mode": SERVER_MODE, "milestones": GUEST},
+    "kill-respawn": {"server_mode": "qeynos2-hunting-fast", "milestones": KILL_RESPAWN},
+}
+
+
+def milestones(variant: str) -> tuple:
+    return HOST_PRE + VARIANTS[variant]["milestones"] + HOST_POST
+
+
+# Kill-and-respawn timing. Swings repeat every 3.5 s (src/rof2/melee.rs:10);
+# fast respawn is 10 s. The client attack lease is renewed every
+# ATTACK_RENEW so at least lease - ATTACK_RENEW remains at the kill, which
+# outlasts the next due swing and lets the server report it stale.
+KILL_HITS = (4, 11)  # 11 HP at 1-3 per hit, counting the routine first hit
+KILL_LEASE_MS = 5000
+ATTACK_RENEW = 0.5
+KILL_TIMEOUT = 60.0
+REPEAT_DELAY = 3.5  # server swing interval, src/rof2/melee.rs:10
+STALE_OBSERVE = 4.5  # observe one swing interval plus margin after the death
+ROSTER_TIMEOUT = 3.0
+RESPAWN_TIMEOUT = 20.0  # after the death line
+RESPAWN_DELAY_RANGE = (5.0, 20.0)  # delete-to-new-spawn wire gap accepted
+STALE_TARGET_WAIT = 2.0
+RETARGET_OBSERVE = 1.5  # > 150 ms windup plus margin
+
 # Waits (seconds).
 SERVER_START_TIMEOUT = 10.0
 READY_TIMEOUT = 90.0
