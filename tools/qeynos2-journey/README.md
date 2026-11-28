@@ -55,24 +55,36 @@ it records opcode, first payload byte and length for every client packet.
 Census record at the 64492b6 pin (2026-11-28), against Rust b395aee:
 
 * 64492b6 sends **no** `OP_AutoAttack` (`0x109d`) attack-off after any zone
-  entry. 9623e8a sent three per session; fea4596 sent two.
-* The remaining attack-offs are unchanged. The routine `hit` milestone's
-  explicit `attack_off` sends one. In the kill-and-respawn variant, the
-  client sends one at lease expiry after the death.
+  entry. 9623e8a sent three after each zone entry, and fea4596 sent two.
+* The other attack-offs remain. Both variants send one for the `hit`
+  milestone's explicit `attack_off`. Kill-and-respawn also sends one at lease
+  expiry, 5.0 s after the last renewal, after the death.
 * Camp with attack already off now sends none (9623e8a sent one). Camp with
   attack on, which should send one, is not exercised by either journey.
 * Every other outbound reliable packet is identical in order, opcode, first
-  payload byte and length. Outbound unreliable traffic is all 46-byte
-  `OP_ClientUpdate`, with exactly 23 in the camp window in all four runs.
-  Total counts varied by one between runs (9623e8a itself gave 26 and 27
-  routine), as keepalive timing does.
+  payload byte and length. Client keepalive and session datagram counts are
+  equal. Client ACK counts follow the reliable-packet difference.
+* Outbound unreliable traffic is all 46-byte `OP_ClientUpdate`, with exactly
+  23 in the camp window in all four runs. The totals were 27 vs 26 (routine)
+  and 43 vs 44 (kill-and-respawn), for 64492b6 vs 9623e8a. The difference is
+  at the move-to-rest transition. Sometimes the rest update follows a
+  separate moving update (two updates, two server samples). Sometimes it is
+  the only update, at a new position, and the server logs `moved` and
+  `stopped` for that one sample. Either client shows either form,
+  depending on timing. The server's reliable packet count moves with it: 13
+  vs 12 and 23 vs 24, one position reply per sample. A count change anywhere
+  else would be a real difference.
 * Census runs: `20261128T044933Z-2225fa` (64492b6 routine),
   `…045011Z-4debb1` (9623e8a routine), `…045050Z-21c252` (64492b6
   kill-respawn) and `…045151Z-a5885a` (9623e8a kill-respawn), all with
   `run --census` from Stack f5dc79e.
 
-The earlier 9623e8a-versus-fea4596 census (the third attack-off) is under
-`~/.local/state/eqemu-rust-journey/probes/transport-census-v3/`.
+The earlier census that found the third attack-off (9623e8a vs fea4596) used
+the pre-check-in probe, which `census.py` matches in what it records. It is
+under `~/.local/state/eqemu-rust-journey/probes/transport-census-v3/`, runs
+`20261128T023827Z-122427` (fea4596 routine), `…023906Z-c4dfaf` (9623e8a
+routine), `…023944Z-1c44cc` (fea4596 kill-respawn) and `…024045Z-a72a25`
+(9623e8a kill-respawn).
 
 One-time preparation loads the runtime image into the harness data root:
 
