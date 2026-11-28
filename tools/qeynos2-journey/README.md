@@ -36,24 +36,39 @@ Also run the older client `d034b7eafae6a0c9cbd4461da6a09a847d61ba4a` (binary
 `6271c614d1668d2966f68867e2cdab50df6b94f4c8339a37c1750c564c460505`) when a
 server change touches wire or transport. `fixture.VALIDATION_CLIENTS` lists
 both, plus the previous routine client `fea4596cd14e9b61883e58966ad7d26150715914`
-(binary `de96afb5…`) so that older results still name their role.
-`identity.client.validation_pin` in `result.json` names the matching role, or
-is null for any other client. Any client still runs. The routine journey
-keeps the 200 ms move, because a longer move with the routine client can stop
-past the fixture's accepted strip (X −934 to −924).
+(binary `de96afb5d6458fe9c0601cccb02b2d2430891ec98203943da5d68ec2fd14be50`) so
+that older results still name their role. `identity.client.validation_pin` in
+`result.json` names the matching role, or is null for any other client. Any
+client still runs. The routine journey keeps the 200 ms move. In the
+stop-timing probes, a longer move with client fea4596 stopped past the
+fixture's accepted strip at X −934.1 (the strip is X −934 to −924).
 
-At every pin move, compare a census of outbound client datagrams with the
-previous routine client instead of taking a "no wire change" claim on trust.
+At every pin move, run the routine journey and the kill-and-respawn variant
+with `--census` for both the previous and the new routine client, and compare
+the `transport-census.json` files. Do not take a "no wire change" claim on
+trust. The census compares ACK, keepalive and session datagrams by count only;
+it records opcode, first payload byte and length for every client packet.
+
 Known difference at the 9623e8a pin (2026-11-28): 9623e8a sends three
 `OP_AutoAttack` (`0x109d`) attack-offs (payload byte 0) after each zone entry
-where fea4596 sends two. The extra one comes about 150–180 ms after "zone
-entry complete", just before headless logs "zone-in: armed". The server
-treats it as a no-op, and both journeys pass. Everything else outbound
-matched: the 46-byte `OP_ClientUpdate` stream, ACK, keepalive and session
-datagrams, and every reliable payload size. Census probe and runs:
-`~/.local/state/eqemu-rust-journey/probes/transport-census-v3/` (runs
-`20261128T023827Z-122427`, `…023906Z-c4dfaf`, `…023944Z-1c44cc` and
-`…024045Z-a72a25` against Rust b395aee).
+where fea4596 sends two. The client logs show the extra one 157–178 ms after
+"zone entry complete", within about 2 ms of "zone-in: armed", on either side.
+The server treats it as a no-op, and both journeys pass. In the four census
+runs the following matched:
+
+* the per-direction datagram counts for ACK, keepalive and session datagrams;
+* the outbound unreliable opcode and payload-length sequences (27 and 44
+  46-byte `OP_ClientUpdate`);
+* the reliable opcode, first-payload-byte and payload-length sequences, once
+  the extra attack-offs are excluded.
+
+Positions inside `OP_ClientUpdate` differ from run to run, as usual. The runs
+were made with the pre-check-in probe at
+`~/.local/state/eqemu-rust-journey/probes/transport-census-v3/` against Rust
+b395aee, with run IDs `20261128T023827Z-122427` (fea4596 routine),
+`…023906Z-c4dfaf` (9623e8a routine), `…023944Z-1c44cc` (fea4596
+kill-respawn) and `…024045Z-a72a25` (9623e8a kill-respawn). `census.py` is
+that probe, checked in unchanged in what it records.
 
 One-time preparation loads the runtime image into the harness data root:
 
@@ -133,7 +148,7 @@ checkpointed in `progress.json` fails instead.
 
 The older client d034b7e reports its resting position only at a 1300 ms
 keepalive, and its first stationary packet about 1300 ms after that. The
-routine client (fea4596 and later) sends a rest update on the first step at rest. The stop
+clients fea4596 and 9623e8a send a rest update on the first step at rest. The stop
 check therefore waits for the server's `stopped` line and compares against the
 last sample. It passes whether the stop arrives before the stop command, as a
 client that reports rest itself may do, or after it. `stop.evidence` records

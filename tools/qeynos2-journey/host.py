@@ -28,7 +28,7 @@ sys.path.insert(0, str(HERE))
 import fixture as F  # noqa: E402
 
 REPO = HERE.parent.parent
-HARNESS_FILES = ("guest.py", "fixture.py", "servertrace.py", "checks.py", "observer.py")
+HARNESS_FILES = ("guest.py", "fixture.py", "servertrace.py", "checks.py", "observer.py", "census.py")
 DEFAULT_STATE_ROOT = Path.home() / ".local/state/eqemu-rust-journey"
 DEFAULT_IMAGE = "sha256:630e294d6568c1b5f253f2967c5704b52ee3d0e5f73db0ba2ab01de77e71e873"
 RESULT_SCHEMA = "qeynos2-journey-result/v1"
@@ -425,6 +425,7 @@ def command_run(args) -> int:
         "exit_code": None, "first_failed_milestone": None, "failure": None, "started_utc": utc(),
         "harness": harness_identity(), "fixture": fixture_identity(), "image": args.image,
         "variant": args.variant, "server_mode": F.VARIANTS[args.variant]["server_mode"],
+        "census": args.census,
     }
     pre: dict = {}
     state = {"run_dir": None, "daemon": None, "container": None}
@@ -474,7 +475,7 @@ def command_run(args) -> int:
                             (run_dir / "harness", "/journey", True),
                             (run_dir / "inputs", "/inputs", True),
                             (out, "/output", False),
-                        ], ["python3", "-B", "-s", "-E", "/journey/guest.py", "--output", "/output",
+                        ], ["python3", "-B", "-s", "-E", "/journey/census.py" if args.census else "/journey/guest.py", "--output", "/output",
                             "--server", "/inputs/server", "--client", "/inputs/client", "--maps", "/inputs/maps",
                             "--variant", args.variant])
                         result["environment"] = {"daemon": daemon.record, "container_argv": container.argv}
@@ -688,6 +689,8 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--output-root", help="parent directory for the run directory")
     run.add_argument("--image", default=DEFAULT_IMAGE)
     run.add_argument("--allow-unpinned-maps", action="store_true")
+    run.add_argument("--census", action="store_true",
+                     help="also record a passive datagram census (output/evidence/transport-census.json)")
     run.add_argument("--variant", choices=sorted(F.VARIANTS), default="routine",
                      help="routine (default, ~40 s) or kill-respawn (fast-respawn mode, ~60 s)")
     run.set_defaults(func=command_run)

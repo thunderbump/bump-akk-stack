@@ -119,9 +119,9 @@ READY_TIMEOUT = 90.0
 MOTION_EXPIRE_TIMEOUT = 2.0
 # The older client d034b7e sends its resting position only at a 1300 ms
 # keepalive and the first stationary packet about 1300 ms later, so the
-# server's stopped sample can lag the stop command by ~2.6 s. Clients from
-# fea4596 on (including the routine 9623e8a) send a rest update on the first
-# step at rest.
+# server's stopped sample can lag the stop command by ~2.6 s. Clients fea4596
+# and 9623e8a (the verified revisions) send a rest update on the first step
+# at rest.
 STOP_TIMEOUT = 8.0
 STOP_QUIET = 0.5
 TARGET_TIMEOUT = 3.0
