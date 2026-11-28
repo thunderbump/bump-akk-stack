@@ -30,14 +30,17 @@ Maps must match the pinned fixture hashes in `fixture.py` unless
 
 ### Clients
 
-Routine runs use headless EQOxide `9623e8a451b8794ec56649271b738eddb5ca1c20`,
-binary SHA-256 `b8d56995fe2843bea1ccb6687e31f0b15783e393b47ba3cbe066fcda381a6c8b`.
+Routine runs use headless EQOxide `64492b63f8fb7f6f2f33c835b7211328d79957ff`,
+binary SHA-256 `af425c5748312f9d67a0a3c0fa94f04f2031f8d73383f1dfbb5ba7af72b65aa9`.
 Also run the older client `d034b7eafae6a0c9cbd4461da6a09a847d61ba4a` (binary
 `6271c614d1668d2966f68867e2cdab50df6b94f4c8339a37c1750c564c460505`) when a
 server change touches wire or transport. `fixture.VALIDATION_CLIENTS` lists
-both, plus the previous routine client `fea4596cd14e9b61883e58966ad7d26150715914`
-(binary `de96afb5d6458fe9c0601cccb02b2d2430891ec98203943da5d68ec2fd14be50`) so
-that older results still name their role. `identity.client.validation_pin` in
+both. It also lists the previous routine client
+`9623e8a451b8794ec56649271b738eddb5ca1c20` (binary
+`b8d56995fe2843bea1ccb6687e31f0b15783e393b47ba3cbe066fcda381a6c8b`) and the
+historical `fea4596cd14e9b61883e58966ad7d26150715914` (binary
+`de96afb5d6458fe9c0601cccb02b2d2430891ec98203943da5d68ec2fd14be50`), so that
+older results still name their role. `identity.client.validation_pin` in
 `result.json` names the matching role, or is null for any other client. Any
 client still runs. The routine journey keeps the 200 ms move. In the
 stop-timing probes, a longer move with client fea4596 stopped past the
@@ -49,26 +52,39 @@ the `transport-census.json` files. Do not take a "no wire change" claim on
 trust. The census compares ACK, keepalive and session datagrams by count only;
 it records opcode, first payload byte and length for every client packet.
 
-Known difference at the 9623e8a pin (2026-11-28): 9623e8a sends three
-`OP_AutoAttack` (`0x109d`) attack-offs (payload byte 0) after each zone entry
-where fea4596 sends two. The client logs show the extra one 157–178 ms after
-"zone entry complete", within about 2 ms of "zone-in: armed", on either side.
-The server treats it as a no-op, and both journeys pass. In the four census
-runs the following matched:
+Census record at the 64492b6 pin (2026-11-28), against Rust b395aee:
 
-* the per-direction datagram counts for ACK, keepalive and session datagrams;
-* the outbound unreliable opcode and payload-length sequences (27 and 44
-  46-byte `OP_ClientUpdate`);
-* the reliable opcode, first-payload-byte and payload-length sequences, once
-  the extra attack-offs are excluded.
+* 64492b6 sends **no** `OP_AutoAttack` (`0x109d`) attack-off after any zone
+  entry. 9623e8a sent three after each zone entry, and fea4596 sent two.
+* The other attack-offs remain. Both variants send one for the `hit`
+  milestone's explicit `attack_off`. Kill-and-respawn also sends one at lease
+  expiry, 5.0 s after the last renewal, after the death.
+* Camp with attack already off now sends none (9623e8a sent one). Camp with
+  attack on, which should send one, is not exercised by either journey.
+* Every other outbound reliable packet is identical in order, opcode, first
+  payload byte and length. Client keepalive and session datagram counts are
+  equal. Client ACK counts follow the reliable-packet difference.
+* Outbound unreliable traffic is all 46-byte `OP_ClientUpdate`, with exactly
+  23 in the camp window in all four runs. The totals were 27 vs 26 (routine)
+  and 43 vs 44 (kill-and-respawn), for 64492b6 vs 9623e8a. The difference is
+  at the move-to-rest transition. Sometimes the rest update follows a
+  separate moving update (two updates, two server samples). Sometimes it is
+  the only update, at a new position, and the server logs `moved` and
+  `stopped` for that one sample. Either client shows either form,
+  depending on timing. The server's reliable packet count moves with it: 13
+  vs 12 and 23 vs 24, one position reply per sample. A count change anywhere
+  else would be a real difference.
+* Census runs: `20261128T044933Z-2225fa` (64492b6 routine),
+  `…045011Z-4debb1` (9623e8a routine), `…045050Z-21c252` (64492b6
+  kill-respawn) and `…045151Z-a5885a` (9623e8a kill-respawn), all with
+  `run --census` from Stack f5dc79e.
 
-Positions inside `OP_ClientUpdate` differ from run to run, as usual. The runs
-were made with the pre-check-in probe at
-`~/.local/state/eqemu-rust-journey/probes/transport-census-v3/` against Rust
-b395aee, with run IDs `20261128T023827Z-122427` (fea4596 routine),
-`…023906Z-c4dfaf` (9623e8a routine), `…023944Z-1c44cc` (fea4596
-kill-respawn) and `…024045Z-a72a25` (9623e8a kill-respawn). `census.py` is
-that probe, checked in unchanged in what it records.
+The earlier census that found the third attack-off (9623e8a vs fea4596) used
+the pre-check-in probe, which `census.py` matches in what it records. It is
+under `~/.local/state/eqemu-rust-journey/probes/transport-census-v3/`, runs
+`20261128T023827Z-122427` (fea4596 routine), `…023906Z-c4dfaf` (9623e8a
+routine), `…023944Z-1c44cc` (fea4596 kill-respawn) and `…024045Z-a72a25`
+(9623e8a kill-respawn).
 
 One-time preparation loads the runtime image into the harness data root:
 
@@ -148,7 +164,7 @@ checkpointed in `progress.json` fails instead.
 
 The older client d034b7e reports its resting position only at a 1300 ms
 keepalive, and its first stationary packet about 1300 ms after that. The
-clients fea4596 and 9623e8a send a rest update on the first step at rest. The stop
+clients fea4596, 9623e8a and 64492b6 send a rest update on the first step at rest. The stop
 check therefore waits for the server's `stopped` line and compares against the
 last sample. It passes whether the stop arrives before the stop command, as a
 client that reports rest itself may do, or after it. `stop.evidence` records
