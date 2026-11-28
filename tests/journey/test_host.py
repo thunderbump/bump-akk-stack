@@ -56,7 +56,9 @@ class Inputs(unittest.TestCase):
         identity = host.stage_inputs(self.args(allow_unpinned_maps=True), self.run_dir)
         self.assertIsNone(identity["client"]["validation_pin"])
         roles = {v["role"] for v in F.VALIDATION_CLIENTS.values()}
-        self.assertEqual(roles, {"routine", "older_client_check"})
+        self.assertEqual(roles, {"routine", "older_client_check", "previous_routine"})
+        self.assertEqual([v["revision"] for v in F.VALIDATION_CLIENTS.values() if v["role"] == "routine"],
+                         ["9623e8a451b8794ec56649271b738eddb5ca1c20"])
 
     def test_missing_inputs(self):
         with self.assertRaises(host.UsageError):
@@ -151,6 +153,7 @@ class FakeContainer:
 
     def create(self, image, mounts, argv, workdir="/"):
         self.created = True
+        type(self).last_argv = argv
         self.out = mounts[2][0]
 
     def run(self, log, timeout):
@@ -233,6 +236,18 @@ class RunVerdict(unittest.TestCase):
     def test_unreaped_guest_processes_fail_cleanup(self):
         code, result = self.run_with(guest=guest_result(reaped=False))
         self.assertEqual(code, host.EXIT_CLEANUP)
+
+    def test_census_selects_its_entry_point(self):
+        self.run_with(guest=guest_result())
+        self.assertIn("/journey/guest.py", FakeContainer.last_argv)
+        for p in (self.root / "runs").glob("*/result.json"):
+            p.unlink()
+        self.argv.append("--census")
+        code, result = self.run_with(guest=guest_result())
+        self.assertEqual(code, 0)
+        self.assertTrue(result["census"])
+        self.assertIn("/journey/census.py", FakeContainer.last_argv)
+        self.assertNotIn("/journey/guest.py", FakeContainer.last_argv)
 
     def test_symlinked_result_refused(self):
         target = self.root / "elsewhere.json"
