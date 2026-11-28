@@ -77,6 +77,10 @@ GUEST = (
 )
 HOST_POST = ("cleanup",)
 MILESTONES = HOST_PRE + GUEST + HOST_POST
+# Milestone statuses that do not fail a run. `not_applicable` is used only for
+# observer_self_check in client-api evidence mode, which has no known-traffic
+# control; the result says so (known_traffic_control: false).
+PASSING = ("pass", "not_applicable")
 
 # Journey variants. "routine" is the default ~40 s run. "kill-respawn" uses the
 # server's fast-respawn mode (bump-eqemu-rust 75e8ffd src/main.rs:22-25,

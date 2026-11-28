@@ -135,7 +135,7 @@ checkpointed in `progress.json` fails instead.
 
 | Milestone | Passes when |
 | --- | --- |
-| `observer_self_check` | Known loopback datagrams of all five selected opcodes, and their ACK, are captured and decoded exactly. This check found the real observer bug in the first movement run. |
+| `observer_self_check` | Observer mode only (`not_applicable` with `--evidence client-api`): known loopback datagrams of all seven selected opcodes (eight replies), and their ACK, are captured and decoded exactly. This check found the real observer bug in the first movement run. |
 | `server_start` | The endpoint line is first, with `zone_id=2`. The empty state directory reports `load outcome=seeded` at the seed pose. |
 | `entry` | The client reports Ready in zone 2, with the pinned geometry digest and ready region data. The seven `entry` stages appear in order on one attempt, all `ok`. The ACKed self spawn is at the seed pose. |
 | `move` | One 200 ms westward `move_for` runs and the client's lease ends on its own. The server reports at least one `moved` sample. |
@@ -165,6 +165,34 @@ stages. A new server line therefore needs a matching parser change. Any
 `entry ... stage=gameplay outcome=rejected` line fails the milestone during
 which it appears, unless that milestone names the exact rejection it expects.
 A correct run logs none.
+
+## Wire evidence modes
+
+`run --evidence observer` (the default) proves every reply with the external
+raw-socket observer. A client ACK datagram covering the reply must be seen on
+the wire, and the proof is labelled `wire_observed`. It is the only evidence
+not reported by the client under test, and it keeps the known-traffic
+self-check. Use it for Rust changes that touch wire or transport and at every
+client pin move.
+
+`run --evidence client-api` takes the same evidence from the running client's
+`GET /v2/player/packets` (bump-eqoxide 9623e8a, docs/headless-player.md
+"Packet trace") and starts no observer:
+
+* Inbound reliable rows of the journey's opcodes are converted to the
+  observer's row shapes (`wire.convert_api_row`). Delivery is the client's own
+  `acked_at_ms`/`ack_seq` report, and each proof is labelled
+  `client_reported`.
+* `observer_self_check` is `not_applicable`, and `result.json` records
+  `evidence_mode: client-api` and `known_traffic_control: false`. This mode's
+  controls are offline (`tests/journey/test_wire.py`). A deliberately wrong
+  server reply fails both modes, and a hit reported twice under two sequences
+  fails.
+* The trace lives in the client process, so session 1 is read before the
+  camp command. Any page with `gap: true` fails the run. The client says a
+  retransmit never adds a row, and the journey still deduplicates by reliable
+  sequence.
+* The milestones and every assertion are the same in both modes.
 
 ## Kill-and-respawn variant
 

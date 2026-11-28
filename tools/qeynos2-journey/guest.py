@@ -27,6 +27,7 @@ from pathlib import Path
 import checks
 import fixture as F
 import observer as obs
+import wire as W
 from checks import CheckFailed, require
 from servertrace import Trace
 
@@ -142,6 +143,8 @@ class Journey:
         self.result = {
             "schema": "qeynos2-journey-guest/v1",
             "variant": getattr(args, "variant", "routine"),
+            "evidence_mode": getattr(args, "evidence", "observer"),
+            "known_traffic_control": getattr(args, "evidence", "observer") == "observer",
             "started_utc": utc(),
             "milestones": [],
             "first_failed_milestone": None,
@@ -150,7 +153,8 @@ class Journey:
             "trace_contract_violations": [],
         }
         self.children: list[Child] = []
-        self.observer = None
+        self.wire_source = None
+        self.evidence_mode = getattr(args, "evidence", "observer")
         self.secrets: list[str] = []
         self.api = None
         self.facts = {}
@@ -200,17 +204,18 @@ class Journey:
 
     def wire(self, predicate, message: str) -> list[dict]:
         """Wait until the selected rows are all ACKed by the client peer."""
+        source = self.wire_source
+        require(source is not None, "no wire evidence source is running")
+
         def attempt():
-            error = self.observer.error
+            error = source.error
             if error:
-                raise obs.ObserverError("observer error: " + error)
-            rows = self.observer.rows
-            selected = predicate(rows)
+                raise obs.ObserverError(f"{source.mode} evidence error: {error}")
+            selected = predicate(source.rows)
             if not selected:
                 return None
-            acks = [r for r in rows if r["direction"] == "client_to_server"]
             try:
-                return obs.correlate({"error": None, "rows": selected + acks})
+                return source.correlate(selected)
             except obs.ObserverError:
                 return None
         return self.wait(attempt, F.WIRE_ACK_TIMEOUT, message)
@@ -224,8 +229,8 @@ class Journey:
                 self.checkpoint()
                 at = time.monotonic()
                 try:
-                    step(record["evidence"])
-                    record["status"] = "pass"
+                    outcome = step(record["evidence"])
+                    record["status"] = outcome or "pass"
                 except BaseException as error:
                     record["status"] = "fail"
                     self.result["first_failed_milestone"] = name
@@ -253,19 +258,19 @@ class Journey:
                     self.result["milestones"].append({"name": name, "status": "not_run"})
             self.result["finished_utc"] = utc()
             self.result["status"] = (
-                "PASS" if all(m["status"] == "pass" for m in self.result["milestones"]) else "FAIL"
+                "PASS" if all(m["status"] in F.PASSING for m in self.result["milestones"]) else "FAIL"
             )
             self.result["command_receipts"] = self.api.receipts if self.api else []
             self.write_json(self.out / "guest-result.json", self.result)
         return self.result
 
     def cleanup(self):
-        if self.observer:
+        if self.wire_source:
             try:
-                self.save_evidence("observer-final", self.observer.stop())
+                self.save_evidence("wire-final", self.wire_source.snapshot())
             except Exception as error:  # evidence only
-                self.result["observer_stop_error"] = repr(error)
-            self.observer = None
+                self.result["wire_snapshot_error"] = repr(error)
+            self.wire_source = None
         for child in reversed(self.children):
             if child.exit is None:
                 try:
@@ -350,6 +355,12 @@ class Journey:
     def m_observer_self_check(self, ev):
         self.logs.mkdir(mode=0o700)
         self.evidence_dir.mkdir(mode=0o700)
+        if self.evidence_mode == "client-api":
+            ev["evidence_mode"] = "client-api"
+            ev["known_traffic_control"] = False
+            ev["note"] = ("client-api mode takes wire evidence from the client's packet trace; "
+                          "it has no known-traffic control (offline controls only)")
+            return "not_applicable"
         result = obs.self_check(F.CHARACTER)
         ev["status"] = result["status"]
         ev["file"] = self.save_evidence("observer-self-check", result)
@@ -391,11 +402,20 @@ class Journey:
                 and load.xyz() == list(F.SEED_XYZ) and int(load.fields["heading"]) == F.SEED_HEADING,
                 f"seed pose {load.raw}")
         self.endpoints = endpoints
-        self.observer = obs.Observer(endpoints.zone, F.CHARACTER)
-        require(self.observer.error is None, f"observer: {self.observer.error}")
+        self.start_observer()
+
+    def start_observer(self):
+        if self.evidence_mode == "observer":
+            self.wire_source = W.ObserverSource(self.endpoints.zone, F.CHARACTER)
+            require(self.wire_source.error is None, f"observer: {self.wire_source.error}")
+
+    def start_client_evidence(self):
+        if self.evidence_mode == "client-api":
+            self.wire_source = W.ApiSource(self.api, F.CHARACTER)
 
     def m_entry(self, ev):
         self.client = self.start_client("client1", self.endpoints)
+        self.start_client_evidence()
         state = self.await_ready(self.server, self.client)
         ev["client_ready"] = {k: state.get(k) for k in ("phase", "zone", "geometry", "self")}
         self.attempt = self.entry_stages(self.server, ev)
@@ -526,13 +546,7 @@ class Journey:
             return damage_rows + health_rows if damage_rows and health_rows else None
 
         proof = self.wire(effects, "damage and health replies ACKed")
-        damage_rows = [p["reply"] for p in proof if p["reply"]["opcode"] == "0x6f15"]
-        health_rows = [p["reply"] for p in proof if p["reply"]["opcode"] == "0x37b1"]
-        require(len(damage_rows) == 1 and len(health_rows) == 1, "extra or missing damage/health reply")
-        d, h = damage_rows[0], health_rows[0]
-        require((d["target"], d["source"], d["type"], d["spell"], d["damage"]) == (self.rat, self.player, 4, 0xFFFF, damage),
-                f"damage packet {d}")
-        require(h["entity"] == self.rat and h["percent"] == checks.hp_percent(after, F.RAT_MAX_HP), f"health packet {h}")
+        checks.melee_wire(hits, proof, player=self.player, rat=self.rat, max_hp=F.RAT_MAX_HP)
         ev["wire"] = proof
         needle = f"EQ: combat: {F.CHARACTER} hits "
         applied = self.wait(lambda: [l for l in self.client.text().splitlines()
@@ -617,21 +631,8 @@ class Journey:
             return None
 
         proof = self.wire(effects, f"{count} damage and health replies ACKed")
-        base = min(p["reply"]["sequence"] for p in proof)
-
-        def by_sequence(opcode):
-            rows = [p["reply"] for p in proof if p["reply"]["opcode"] == opcode]
-            return sorted(rows, key=lambda r: (r["sequence"] - base) & 0xFFFF)
-
-        damage_rows, health_rows = by_sequence("0x6f15"), by_sequence("0x37b1")
-        require(len(damage_rows) == count and len(health_rows) == count,
-                f"{len(damage_rows)} damage / {len(health_rows)} health replies for {count} hits")
-        for line, d, h in zip(hits, damage_rows, health_rows):
-            damage, after = int(line.fields["damage"]), int(line.fields["hp_after"])
-            require((d["target"], d["source"], d["type"], d["spell"], d["damage"])
-                    == (self.rat, self.player, 4, 0xFFFF, damage), f"damage packet {d} for {line.raw}")
-            require(h["entity"] == self.rat and h["percent"] == checks.hp_percent(after, F.RAT_MAX_HP),
-                    f"health packet {h} for {line.raw}")
+        damage_rows, health_rows = checks.melee_wire(hits, proof, player=self.player, rat=self.rat,
+                                                     max_hp=F.RAT_MAX_HP)
         ev["wire_health_percents"] = [h["percent"] for h in health_rows]
         pattern = re.compile(rf"EQ: combat: {F.CHARACTER} hits (\S+) for (\d+) damage")
 
@@ -661,7 +662,7 @@ class Journey:
         require(len(proof) == 1 and proof[0]["reply"]["entity"] == rat, f"delete spawn replies {proof}")
         ev["wire_delete"] = proof
         self.delete_row = proof[0]["reply"]
-        require(not checks.unique_replies(self.observer.rows, "0x6097"), "new spawn before respawn")
+        require(not checks.unique_replies(self.wire_source.rows, "0x6097"), "new spawn before respawn")
         def roster_without_rat():
             st = self.api.state()
             nearby = st["nearby"]
@@ -803,6 +804,11 @@ class Journey:
 
     def m_camp(self, ev):
         camp_at = time.monotonic()
+        if self.evidence_mode == "client-api":
+            # The client's packet history ends with its process: read session 1 now.
+            self.wire_source.refresh()
+            require(not self.wire_source.gap, "packet trace reported gap:true before camp")
+            ev["session1_trace_rows_before_camp"] = len(self.wire_source.raw)
         self.api.command("journey-camp-1", {"kind": "camp"})
         try:
             code = self.client.process.wait(timeout=F.CAMP_TIMEOUT)
@@ -839,8 +845,10 @@ class Journey:
         self.pose, self.pose_raw = pose, raw
 
     def m_restart(self, ev):
-        ev["first_observation"] = self.save_evidence("observer-session1", self.observer.stop())
-        self.observer = None
+        snapshot = (self.wire_source.snapshot() if self.evidence_mode == "observer"
+                    else self.wire_source.snapshot(refresh=False))
+        ev["first_observation"] = self.save_evidence("wire-session1", snapshot)
+        self.wire_source = None
         self.server.exit = self.server.stop(F.SERVER_STOP_TIMEOUT)
         ev["server1_exit"] = self.server.exit
         require(self.server.exit["exit"] in (0, -signal.SIGTERM), f"server1 exit {self.server.exit['exit']}")
@@ -854,11 +862,11 @@ class Journey:
         require(load.kind == "persistence" and load.stage == "load" and load.outcome == "ok", f"load {load.raw}")
         require(checks.pose_line_matches(load, self.pose), "loaded pose differs from saved pose")
         self.endpoints = endpoints
-        self.observer = obs.Observer(endpoints.zone, F.CHARACTER)
-        require(self.observer.error is None, f"observer: {self.observer.error}")
+        self.start_observer()
 
     def m_relog(self, ev):
         self.client = self.start_client("client2", self.endpoints)
+        self.start_client_evidence()
         state = self.await_ready(self.server, self.client)
         ev["client_ready"] = {k: state.get(k) for k in ("phase", "zone", "geometry", "self")}
         ev["attempt"] = self.entry_stages(self.server, ev)
@@ -879,6 +887,7 @@ def main(argv=None) -> int:
     parser.add_argument("--client", required=True)
     parser.add_argument("--maps", required=True)
     parser.add_argument("--variant", choices=sorted(F.VARIANTS), default="routine")
+    parser.add_argument("--evidence", choices=("observer", "client-api"), default="observer")
     args = parser.parse_args(argv)
     os.umask(0o077)
 
