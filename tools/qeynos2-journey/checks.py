@@ -155,5 +155,46 @@ def hit_chain(hits, died, *, attempt: str, player: int, rat: int, incarnation: i
     return damages
 
 
+def melee_wire(hits, proof: list[dict], *, player: int, rat: int, max_hp: int) -> tuple[list, list]:
+    """Each trace hit has exactly one damage and one health reply that match it.
+
+    ``proof`` is correlated replies from either evidence source. Replies are
+    deduplicated by (peer, reliable sequence) and ordered by wrap-aware
+    sequence before pairing with ``hits`` in trace order. Returns the ordered
+    damage and health rows.
+    """
+    replies = [p["reply"] for p in proof]
+    damage_rows = unique_replies(replies, "0x6f15")
+    health_rows = unique_replies(replies, "0x37b1")
+    require(damage_rows and health_rows, "no damage or health reply")
+    # Wrap-aware order: count sequences from the earliest-captured reply.
+    base = min(damage_rows + health_rows, key=lambda r: r["monotonic"])["sequence"]
+
+    def ordered(rows):
+        return sorted(rows, key=lambda r: (r["sequence"] - base) & 0xFFFF)
+
+    damage_rows, health_rows = ordered(damage_rows), ordered(health_rows)
+    require(len(damage_rows) == len(hits) and len(health_rows) == len(hits),
+            f"{len(damage_rows)} damage / {len(health_rows)} health replies for {len(hits)} hits")
+    for line, d, h in zip(hits, damage_rows, health_rows):
+        damage, after = int(line.fields["damage"]), int(line.fields["hp_after"])
+        require((d["target"], d["source"], d["type"], d["spell"], d["damage"]) == (rat, player, 4, 0xFFFF, damage),
+                f"damage packet {d} for {line.raw}")
+        require(h["entity"] == rat and h["percent"] == hp_percent(after, max_hp), f"health packet {h} for {line.raw}")
+    return damage_rows, health_rows
+
+
+def combat_replies_match(rows: list[dict], hits) -> None:
+    """Exactly one damage and one health reply per trace hit, counted again late.
+
+    Catches a duplicate damage or health reply sent under a new sequence after
+    the hit or kill milestone already checked its counts.
+    """
+    damage = unique_replies(rows, "0x6f15")
+    health = unique_replies(rows, "0x37b1")
+    require(len(damage) == len(hits) and len(health) == len(hits),
+            f"{len(damage)} damage / {len(health)} health replies for {len(hits)} hits at the final check")
+
+
 def hp_percent(hp: int, max_hp: int) -> int:
     return hp * 100 // max_hp

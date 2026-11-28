@@ -28,7 +28,7 @@ sys.path.insert(0, str(HERE))
 import fixture as F  # noqa: E402
 
 REPO = HERE.parent.parent
-HARNESS_FILES = ("guest.py", "fixture.py", "servertrace.py", "checks.py", "observer.py", "census.py")
+HARNESS_FILES = ("guest.py", "fixture.py", "servertrace.py", "checks.py", "observer.py", "census.py", "wire.py")
 DEFAULT_STATE_ROOT = Path.home() / ".local/state/eqemu-rust-journey"
 DEFAULT_IMAGE = "sha256:630e294d6568c1b5f253f2967c5704b52ee3d0e5f73db0ba2ab01de77e71e873"
 RESULT_SCHEMA = "qeynos2-journey-result/v1"
@@ -415,6 +415,8 @@ def signals_deferred():
 
 
 def command_run(args) -> int:
+    if args.census and args.evidence == "client-api":
+        raise UsageError("--census opens a raw-socket capture; it cannot be combined with --evidence client-api")
     state_root = Path(args.state_root).expanduser().resolve()
     run_id = stamp() + "-" + secrets.token_hex(3)
     output_root = outside_repo(Path(args.output_root) if args.output_root else state_root / "runs")
@@ -426,6 +428,7 @@ def command_run(args) -> int:
         "harness": harness_identity(), "fixture": fixture_identity(), "image": args.image,
         "variant": args.variant, "server_mode": F.VARIANTS[args.variant]["server_mode"],
         "census": args.census,
+        "evidence_mode": args.evidence, "known_traffic_control": args.evidence == "observer",
     }
     pre: dict = {}
     state = {"run_dir": None, "daemon": None, "container": None}
@@ -477,7 +480,7 @@ def command_run(args) -> int:
                             (out, "/output", False),
                         ], ["python3", "-B", "-s", "-E", "/journey/census.py" if args.census else "/journey/guest.py", "--output", "/output",
                             "--server", "/inputs/server", "--client", "/inputs/client", "--maps", "/inputs/maps",
-                            "--variant", args.variant])
+                            "--variant", args.variant, "--evidence", args.evidence])
                         result["environment"] = {"daemon": daemon.record, "container_argv": container.argv}
                         pre["environment"] = {"name": "environment", "status": "pass",
                                               "seconds": round(time.monotonic() - at, 3)}
@@ -538,7 +541,7 @@ def command_run(args) -> int:
         result["cleanup"] = cleanup
         table = milestone_table(guest_rows, pre, cleanup_ok, args.variant)
         result["milestones"] = table
-        failed = [m for m in table if m["status"] != "pass"]
+        failed = [m for m in table if not F.passing(m, args.evidence)]
         first = next((m for m in failed if m["status"] == "fail"), failed[0] if failed else None)
         if first is None:
             exit_code = EXIT_PASS
@@ -689,6 +692,9 @@ def parser() -> argparse.ArgumentParser:
     run.add_argument("--output-root", help="parent directory for the run directory")
     run.add_argument("--image", default=DEFAULT_IMAGE)
     run.add_argument("--allow-unpinned-maps", action="store_true")
+    run.add_argument("--evidence", choices=("observer", "client-api"), default="observer",
+                     help="wire evidence: the external raw-socket observer (default, independent) or the "
+                          "client's packet API (client-reported; no known-traffic control)")
     run.add_argument("--census", action="store_true",
                      help="also record a passive datagram census (output/evidence/transport-census.json)")
     run.add_argument("--variant", choices=sorted(F.VARIANTS), default="routine",

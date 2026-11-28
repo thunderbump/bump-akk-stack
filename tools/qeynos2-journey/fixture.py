@@ -77,6 +77,15 @@ GUEST = (
 )
 HOST_POST = ("cleanup",)
 MILESTONES = HOST_PRE + GUEST + HOST_POST
+# Milestone statuses that do not fail a run. `not_applicable` is used only for
+# observer_self_check in client-api evidence mode, which has no known-traffic
+# control; the result says so (known_traffic_control: false).
+def passing(milestone: dict, evidence_mode: str) -> bool:
+    """`not_applicable` passes only for observer_self_check in client-api mode."""
+    if milestone.get("status") == "pass":
+        return True
+    return (milestone.get("status") == "not_applicable" and milestone.get("name") == "observer_self_check"
+            and evidence_mode == "client-api")
 
 # Journey variants. "routine" is the default ~40 s run. "kill-respawn" uses the
 # server's fast-respawn mode (bump-eqemu-rust 75e8ffd src/main.rs:22-25,
