@@ -98,6 +98,13 @@ class Table(unittest.TestCase):
         self.assertEqual(table[-1]["status"], "pass")
         self.assertEqual(host.milestone_table(None, pre, None)[-1]["status"], "not_run")
 
+    def test_not_applicable_only_for_api_self_check(self):
+        na = {"name": "observer_self_check", "status": "not_applicable"}
+        self.assertTrue(F.passing(na, "client-api"))
+        self.assertFalse(F.passing(na, "observer"))
+        self.assertFalse(F.passing({"name": "entry", "status": "not_applicable"}, "client-api"))
+        self.assertFalse(F.passing({"name": "entry", "status": "not_run"}, "client-api"))
+
     def test_kill_respawn_table(self):
         table = host.milestone_table(None, {}, None, "kill-respawn")
         names = [m["name"] for m in table]
@@ -248,6 +255,10 @@ class RunVerdict(unittest.TestCase):
         self.assertTrue(result["census"])
         self.assertIn("/journey/census.py", FakeContainer.last_argv)
         self.assertNotIn("/journey/guest.py", FakeContainer.last_argv)
+
+    def test_census_refused_in_client_api_mode(self):
+        code = quiet(host.main, self.argv + ["--census", "--evidence", "client-api"])
+        self.assertEqual(code, host.EXIT_USAGE)
 
     def test_symlinked_result_refused(self):
         target = self.root / "elsewhere.json"

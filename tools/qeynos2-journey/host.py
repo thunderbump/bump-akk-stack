@@ -415,6 +415,8 @@ def signals_deferred():
 
 
 def command_run(args) -> int:
+    if args.census and args.evidence == "client-api":
+        raise UsageError("--census opens a raw-socket capture; it cannot be combined with --evidence client-api")
     state_root = Path(args.state_root).expanduser().resolve()
     run_id = stamp() + "-" + secrets.token_hex(3)
     output_root = outside_repo(Path(args.output_root) if args.output_root else state_root / "runs")
@@ -539,7 +541,7 @@ def command_run(args) -> int:
         result["cleanup"] = cleanup
         table = milestone_table(guest_rows, pre, cleanup_ok, args.variant)
         result["milestones"] = table
-        failed = [m for m in table if m["status"] not in F.PASSING]
+        failed = [m for m in table if not F.passing(m, args.evidence)]
         first = next((m for m in failed if m["status"] == "fail"), failed[0] if failed else None)
         if first is None:
             exit_code = EXIT_PASS

@@ -40,6 +40,10 @@ API_OPCODES = {
 }
 API_SESSION_PORT = 0  # API rows carry no ports: one zone stream per client session
 PAGE_LIMIT = 2000
+# Application body lengths the observer accepts (observer.py decode_datagram);
+# the API's `len` includes the two opcode bytes. 0x6097 depends on the name.
+BODY_BYTES = {"0x7dfc": 24, "0x58e2": 4, "0x6f15": 30, "0x37b1": 3, "0x5089": 430, "0x7280": 5}
+DELETE_TAIL = "000001"  # bytes 2..5 of OP_DeleteSpawn (bump-eqemu-rust src/rof2/wire.rs:252-255)
 
 
 def convert_api_row(row: dict, character: str) -> dict | None:
@@ -53,13 +57,27 @@ def convert_api_row(row: dict, character: str) -> dict | None:
     if label is None or row.get("dir") != "in" or not row.get("reliable") or row.get("wire_seq") is None:
         return None
     f = row.get("fields") or {}
+    body = int(row.get("len", -1)) - 2
+    # Apply the observer's own selection rules, so a malformed reply the
+    # observer would discard is never accepted here either.
+    if label == "0x6097":
+        name = f.get("name")
+        if not isinstance(name, str) or not 1 <= len(name) <= 64 or body != len(name.encode()) + 266:
+            return None
+    elif body != BODY_BYTES[label]:
+        return None
+    if label == "0x7280":
+        payload = row.get("payload_hex")
+        if not isinstance(payload, str) or payload[4:10] != DELETE_TAIL:
+            return None
     base = {
         "direction": "server_to_client",
         "sequence": int(row["wire_seq"]),
         "opcode": label,
         "src_port": API_SESSION_PORT,
         "dst_port": API_SESSION_PORT,
-        "monotonic": row["at_ms"] / 1000.0,
+        # Socket arrival of the first copy (client clock), not delivery time.
+        "monotonic": (row.get("arrived_at_ms") if row.get("arrived_at_ms") is not None else row["at_ms"]) / 1000.0,
         "api_n": row["n"],
         "acked_at_ms": row.get("acked_at_ms"),
         "ack_seq": row.get("ack_seq"),
@@ -76,8 +94,8 @@ def convert_api_row(row: dict, character: str) -> dict | None:
         elif label == "0x37b1":
             extra = {"entity": int(f["entity"]), "percent": int(f["percent"])}
         elif label == "0x5089":
-            if f.get("name") != character:
-                return None
+            if f.get("name") != character or int(f.get("entity", -1)) != 1:
+                return None  # the observer's 0x5089 selection: own name, entity 1
             extra = {"entity": int(f["entity"]), "name": f["name"],
                      "position": [float(v) for v in f["position"]], "heading": int(f["heading"])}
         elif label == "0x7280":
@@ -143,36 +161,83 @@ class ApiSource:
     def __init__(self, api, character: str):
         self.api = api
         self.character = character
-        self.raw: list[dict] = []
+        self.by_n: dict[int, dict] = {}
+        self.payloads: dict[int, str | None] = {}
         self.after = 0
         self.gap = False
         self.counters = None
-        self.session = None
+        self.session = None  # recorded at the first read, once the client reports Ready
 
     @property
     def error(self):
         return "packet trace reported gap:true (rows evicted)" if self.gap else None
 
+    def _check_session(self) -> None:
+        fence = getattr(self.api, "fence", None) or {}
+        current = fence.get("session")
+        if self.session is None:
+            self.session = current
+        elif current is not None and current != self.session:
+            raise obs.ObserverError(f"client session changed under one packet cursor ({self.session} -> {current})")
+
+    def _page(self, after: int) -> dict:
+        # raw=1 is needed for the delete-spawn tail check; payloads stay in
+        # memory only and are stripped before rows are kept or saved.
+        page = self.api.call(f"packets?after={after}&limit={PAGE_LIMIT}&raw=1", timeout=5)
+        self.counters = page.get("counters")
+        if page.get("gap"):
+            self.gap = True
+            raise obs.ObserverError("packet trace reported gap:true (rows evicted)")
+        return page
+
+    def _merge(self, rows: list[dict]) -> None:
+        for row in rows:
+            row = dict(row)
+            self.payloads[row["n"]] = row.pop("payload_hex", None)
+            row.pop("payload_truncated", None)
+            self.by_n[row["n"]] = row
+
     def refresh(self) -> None:
+        """Read new rows, then re-read rows still waiting for an ACK.
+
+        The client fills `acked_at_ms` on an existing row once a deferred ACK
+        reaches its socket, so a row first read without an ACK is read again.
+        Any page with `gap: true` raises, and so does a session change (the
+        cursor belongs to one session; `n` restarts in a new one).
+        """
+        self._check_session()
         while True:
-            page = self.api.call(f"packets?after={self.after}&limit={PAGE_LIMIT}", timeout=5)
-            self.gap = self.gap or bool(page.get("gap"))
-            self.counters = page.get("counters")
+            page = self._page(self.after)
             rows = page.get("packets") or []
-            self.raw.extend(rows)
+            self._merge(rows)
             nxt = int(page.get("next", self.after))
             if not rows or nxt <= self.after:
-                return
+                break
             self.after = nxt
             if len(rows) < PAGE_LIMIT:
-                return
+                break
+        pending = [n for n, row in self.by_n.items()
+                   if row.get("dir") == "in" and row.get("reliable") and row.get("acked_at_ms") is None
+                   and row.get("opcode_name") in API_OPCODES]
+        if pending:
+            cursor = min(pending) - 1
+            while cursor < self.after:
+                rows = self._page(cursor).get("packets") or []
+                if not rows:
+                    break
+                self._merge([r for r in rows if r["n"] <= self.after])
+                cursor = rows[-1]["n"]
+
+    @property
+    def raw(self) -> list[dict]:
+        return [self.by_n[n] for n in sorted(self.by_n)]
 
     @property
     def rows(self) -> list[dict]:
         self.refresh()
         out = []
         for row in self.raw:
-            converted = convert_api_row(row, self.character)
+            converted = convert_api_row({**row, "payload_hex": self.payloads.get(row["n"])}, self.character)
             if converted is not None:
                 out.append(converted)
         return out
@@ -185,7 +250,7 @@ class ApiSource:
         if refresh:
             try:
                 self.refresh()
-            except OSError as error:  # the client may already have exited
+            except (OSError, obs.ObserverError) as error:  # the client may have exited; gap is recorded
                 refresh_error = repr(error)
         return {"evidence_mode": self.mode, "known_traffic_control": False, "gap": self.gap,
                 "counters": self.counters, "rows_read": len(self.raw), "refresh_error": refresh_error,

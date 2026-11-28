@@ -180,18 +180,27 @@ client pin move.
 "Packet trace") and starts no observer:
 
 * Inbound reliable rows of the journey's opcodes are converted to the
-  observer's row shapes (`wire.convert_api_row`). Delivery is the client's own
-  `acked_at_ms`/`ack_seq` report, and each proof is labelled
-  `client_reported`.
+  observer's row shapes (`wire.convert_api_row`) under the observer's own
+  selection rules. Each body must have the observer's exact length. The
+  delete spawn must end `00 00 01`, checked from `raw=1` payload bytes, which
+  are held in memory only and never saved. The self spawn must carry the
+  character's name and entity 1. A new spawn must be a named NPC. Delivery is
+  the client's own `acked_at_ms`/`ack_seq` report, checked for wrap-aware
+  coverage. Rows still waiting for an ACK are read again. Each proof is
+  labelled `client_reported`, and respawn timing uses the client-reported
+  socket arrival (`arrived_at_ms`).
 * `observer_self_check` is `not_applicable`, and `result.json` records
   `evidence_mode: client-api` and `known_traffic_control: false`. This mode's
   controls are offline (`tests/journey/test_wire.py`). A deliberately wrong
   server reply fails both modes, and a hit reported twice under two sequences
   fails.
 * The trace lives in the client process, so session 1 is read before the
-  camp command. Any page with `gap: true` fails the run. The client says a
-  retransmit never adds a row, and the journey still deduplicates by reliable
-  sequence.
+  camp command. Any page with `gap: true` fails the run, and so does a
+  client session change under one cursor. The client says a retransmit never
+  adds a row, and the journey still deduplicates by reliable sequence. Damage
+  and health replies are counted again just before camp in both modes, so a
+  late duplicate fails. `--census` opens a raw socket and is refused with
+  `--evidence client-api`.
 * The milestones and every assertion are the same in both modes.
 
 ## Kill-and-respawn variant

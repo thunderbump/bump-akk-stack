@@ -211,7 +211,11 @@ class Journey:
             error = source.error
             if error:
                 raise obs.ObserverError(f"{source.mode} evidence error: {error}")
-            selected = predicate(source.rows)
+            try:
+                rows = source.rows
+            except OSError:  # a transient client API error: retry until the deadline
+                return None
+            selected = predicate(rows)
             if not selected:
                 return None
             try:
@@ -258,7 +262,7 @@ class Journey:
                     self.result["milestones"].append({"name": name, "status": "not_run"})
             self.result["finished_utc"] = utc()
             self.result["status"] = (
-                "PASS" if all(m["status"] in F.PASSING for m in self.result["milestones"]) else "FAIL"
+                "PASS" if all(F.passing(m, self.evidence_mode) for m in self.result["milestones"]) else "FAIL"
             )
             self.result["command_receipts"] = self.api.receipts if self.api else []
             self.write_json(self.out / "guest-result.json", self.result)
@@ -415,14 +419,15 @@ class Journey:
 
     def m_entry(self, ev):
         self.client = self.start_client("client1", self.endpoints)
-        self.start_client_evidence()
         state = self.await_ready(self.server, self.client)
+        self.start_client_evidence()  # after Ready: the state fence now names this session
         ev["client_ready"] = {k: state.get(k) for k in ("phase", "zone", "geometry", "self")}
         self.attempt = self.entry_stages(self.server, ev)
         ev["attempt"] = self.attempt
         self.player = state["self"]["id"]
         spawn = self.self_spawn("first self spawn ACKed")
         ev["self_spawn"] = spawn
+        require(spawn["reply"]["entity"] == state["self"]["id"], f"self spawn entity {spawn['reply']['entity']}")
         require(spawn["reply"]["position"] == list(F.SEED_XYZ), f"spawn {spawn['reply']['position']}")
         require(spawn["reply"]["heading"] == F.SEED_HEADING, "spawn heading")
         self.start_state = state
@@ -634,6 +639,7 @@ class Journey:
         damage_rows, health_rows = checks.melee_wire(hits, proof, player=self.player, rat=self.rat,
                                                      max_hp=F.RAT_MAX_HP)
         ev["wire_health_percents"] = [h["percent"] for h in health_rows]
+        ev["wire_evidence"] = self.wire_source.mode
         pattern = re.compile(rf"EQ: combat: {F.CHARACTER} hits (\S+) for (\d+) damage")
 
         def client_hits():
@@ -769,6 +775,9 @@ class Journey:
         low, high = F.RESPAWN_DELAY_RANGE
         require(low <= gap <= high, f"respawn {gap:.1f}s after delete")
         ev["wire_new_spawn"] = {k: spawn[k] for k in ("sequence", "entity", "name", "hp_percent", "position")}
+        ev["wire_new_spawn"]["evidence"] = proof[0].get("evidence")
+        ev["respawn_seconds_basis"] = ("client-reported socket arrival (arrived_at_ms)"
+                                       if self.evidence_mode == "client-api" else "observer capture time")
         self.wait(lambda: self.live_rat(self.api.state()), F.ROSTER_TIMEOUT, "client roster regains the rat")
         before = len([l for l in self.client.text().splitlines() if f"server forced target to spawn {rat}" in l])
         attack_on_at_retarget = self.api.state()["self"]["attack_on"]
@@ -809,6 +818,8 @@ class Journey:
             self.wire_source.refresh()
             require(not self.wire_source.gap, "packet trace reported gap:true before camp")
             ev["session1_trace_rows_before_camp"] = len(self.wire_source.raw)
+        # Final session-1 combat count in both modes: a late duplicate reply fails here.
+        checks.combat_replies_match(self.wire_source.rows, self.trace(self.server).gameplay("melee_hit"))
         self.api.command("journey-camp-1", {"kind": "camp"})
         try:
             code = self.client.process.wait(timeout=F.CAMP_TIMEOUT)
@@ -866,12 +877,13 @@ class Journey:
 
     def m_relog(self, ev):
         self.client = self.start_client("client2", self.endpoints)
-        self.start_client_evidence()
         state = self.await_ready(self.server, self.client)
+        self.start_client_evidence()  # after Ready: the state fence now names the new session
         ev["client_ready"] = {k: state.get(k) for k in ("phase", "zone", "geometry", "self")}
         ev["attempt"] = self.entry_stages(self.server, ev)
         spawn = self.self_spawn("relog self spawn ACKed")
         ev["self_spawn"] = spawn
+        require(spawn["reply"]["entity"] == state["self"]["id"], f"relog self spawn entity {spawn['reply']['entity']}")
         require(spawn["reply"]["position"] == self.pose["xyz"] and spawn["reply"]["heading"] == self.pose["heading"],
                 f"relog spawn {spawn['reply']['position']} heading {spawn['reply']['heading']}")
         x, y, z = self.pose["xyz"]

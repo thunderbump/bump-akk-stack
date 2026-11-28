@@ -22,11 +22,25 @@ PEER = 40000
 CHARACTER = "Clientab"
 
 
-def api_row(n, name, fields, wire_seq, *, ack=None, direction="in", reliable=True, at_ms=1000):
+BODY = {"OP_CLIENT_UPDATE": 24, "OP_TARGET_COMMAND": 4, "OP_DAMAGE": 30, "OP_MOB_HEALTH": 3,
+        "OP_ZONE_ENTRY": 430, "OP_DELETE_SPAWN": 5}
+
+
+def api_row(n, name, fields, wire_seq, *, ack=None, direction="in", reliable=True, at_ms=1000, body=None,
+            payload_hex=None):
+    """A packet-trace row shaped as bump-eqoxide 9623e8a returns it (len includes the opcode)."""
     ack = wire_seq if ack is None else ack
-    return {"n": n, "dir": direction, "opcode_name": name, "reliable": reliable, "wire_seq": wire_seq,
-            "at_ms": at_ms + n, "fields": fields, "acked_at_ms": None if ack is False else at_ms + n,
-            "ack_seq": None if ack is False else ack, "ack_exact": ack is not False and ack == wire_seq}
+    if body is None:
+        body = len(fields["name"].encode()) + 266 if name == "OP_NEW_SPAWN" else BODY.get(name, 0)
+    if payload_hex is None and name == "OP_DELETE_SPAWN":
+        payload_hex = fields["entity"].to_bytes(2, "little").hex() + "000001"
+    row = {"n": n, "dir": direction, "opcode_name": name, "reliable": reliable, "wire_seq": wire_seq,
+           "len": body + 2, "at_ms": at_ms + n, "arrived_at_ms": at_ms + n, "fields": fields,
+           "acked_at_ms": None if ack is False else at_ms + n,
+           "ack_seq": None if ack is False else ack, "ack_exact": ack is not False and ack == wire_seq}
+    if payload_hex is not None:
+        row["payload_hex"] = payload_hex
+    return row
 
 
 def observed(seq, opcode, body):
@@ -89,9 +103,30 @@ class Convert(unittest.TestCase):
         self.assertTrue(all(r["evidence"] == "client_reported" and r["dst_port"] == wire.API_SESSION_PORT
                             for r in kept))
 
+    def test_observer_selection_rules_apply(self):
+        short = api_row(1, "OP_DAMAGE", {"target": 2, "source": 1, "type": 4, "spell": 65535, "damage": 2}, 11, body=13)
+        self.assertIsNone(wire.convert_api_row(short, CHARACTER))  # observer requires all 30 bytes
+        bad_tail = api_row(2, "OP_DELETE_SPAWN", {"entity": 2}, 20, payload_hex="0200000000")
+        self.assertIsNone(wire.convert_api_row(bad_tail, CHARACTER))
+        no_payload = api_row(3, "OP_DELETE_SPAWN", {"entity": 2}, 20)
+        del no_payload["payload_hex"]
+        self.assertIsNone(wire.convert_api_row(no_payload, CHARACTER))
+        long_spawn = api_row(4, "OP_NEW_SPAWN", {"entity": 2, "name": "a_large_rat", "npc": 1, "hp_percent": 100,
+                                                 "position": [0, 0, 0], "heading": 0}, 21, body=300)
+        self.assertIsNone(wire.convert_api_row(long_spawn, CHARACTER))
+
+    def test_self_spawn_must_be_entity_one(self):
+        wrong = api_row(1, "OP_ZONE_ENTRY", {"entity": 5, "name": CHARACTER, "position": [0, 0, 0], "heading": 0}, 0)
+        self.assertIsNone(wire.convert_api_row(wrong, CHARACTER))
+
     def test_missing_fields_raise(self):
         with self.assertRaises(observer.ObserverError):
             wire.convert_api_row(api_row(1, "OP_DAMAGE", {"target": 2}, 11), CHARACTER)
+
+    def test_arrival_time_is_used(self):
+        row = api_row(1, "OP_MOB_HEALTH", {"entity": 2, "percent": 81}, 12)
+        row["arrived_at_ms"], row["at_ms"] = 500, 900  # delivered late behind a hole
+        self.assertEqual(wire.convert_api_row(row, CHARACTER)["monotonic"], 0.5)
 
 
 class Correlate(unittest.TestCase):
@@ -127,19 +162,75 @@ class FakeApi:
         return self.pages.pop(0) if self.pages else {"packets": [], "next": 0, "gap": False, "counters": {}}
 
 
+class LiveTrace:
+    """A fake client trace whose rows can gain an ACK later, paged like session.rs."""
+
+    def __init__(self, rows):
+        self.rows = rows
+        self.calls = []
+        self.gap_after = None
+
+    def call(self, path, timeout=2.0):
+        self.calls.append(path)
+        query = dict(part.split("=") for part in path.split("?", 1)[1].split("&"))
+        after, limit = int(query["after"]), int(query["limit"])
+        page = [dict(r) for r in self.rows if r["n"] > after][:limit]
+        last = max((r["n"] for r in self.rows), default=0)
+        nxt = page[-1]["n"] if len(page) == limit else max(after, last)
+        return {"packets": page, "next": nxt, "counters": {},
+                "gap": self.gap_after is not None and after < self.gap_after}
+
+
 class Source(unittest.TestCase):
     def test_paging_and_gap(self):
         first = [api_row(n, "OP_MOB_HEALTH", {"entity": 2, "percent": 81}, n) for n in range(1, 2001)]
         api = FakeApi([{"packets": first, "next": 2000, "gap": False, "counters": {"resent": 0}},
                        {"packets": [api_row(2001, "OP_DELETE_SPAWN", {"entity": 2}, 2001)], "next": 2001,
-                        "gap": True, "counters": {"resent": 1}}])
+                        "gap": False, "counters": {"resent": 1}}])
         source = wire.ApiSource(api, CHARACTER)
         rows = source.rows
         self.assertEqual(len(rows), 2001)
-        self.assertEqual(api.calls[:2], ["packets?after=0&limit=2000", "packets?after=2000&limit=2000"])
-        self.assertIsNotNone(source.error)
+        self.assertEqual(api.calls[:2], ["packets?after=0&limit=2000&raw=1", "packets?after=2000&limit=2000&raw=1"])
         snap = source.snapshot(refresh=False)
-        self.assertEqual((snap["known_traffic_control"], snap["gap"]), (False, True))
+        self.assertFalse(snap["known_traffic_control"])
+        self.assertTrue(all("payload_hex" not in r for r in snap["rows"]))  # payloads never kept
+
+    def test_gap_raises_during_the_refresh_that_finds_it(self):
+        trace = LiveTrace([api_row(1, "OP_ZONE_ENTRY", {"entity": 1, "name": CHARACTER,
+                                                        "position": [-931.875, 1194.0, 3.125], "heading": 1536}, 0)])
+        trace.gap_after = 5
+        source = wire.ApiSource(trace, CHARACTER)
+        with self.assertRaises(observer.ObserverError):
+            source.rows  # no proof may come from a gap page
+        self.assertIsNotNone(source.error)
+
+    def test_session_is_taken_at_first_read(self):
+        trace = LiveTrace([api_row(1, "OP_MOB_HEALTH", {"entity": 2, "percent": 81}, 12)])
+        trace.fence = {"session": "old"}
+        source = wire.ApiSource(trace, CHARACTER)
+        trace.fence = {"session": "new"}  # Ready arrives before the first read
+        source.rows
+        self.assertEqual(source.session, "new")
+
+    def test_session_change_raises(self):
+        trace = LiveTrace([api_row(1, "OP_MOB_HEALTH", {"entity": 2, "percent": 81}, 12)])
+        trace.fence = {"session": "s1"}
+        source = wire.ApiSource(trace, CHARACTER)
+        source.rows
+        trace.fence = {"session": "s2"}  # the client reconnected inside one process
+        with self.assertRaises(observer.ObserverError):
+            source.rows
+
+    def test_deferred_ack_is_read_again(self):
+        late = api_row(1, "OP_MOB_HEALTH", {"entity": 2, "percent": 81}, 12, ack=False)
+        trace = LiveTrace([late, api_row(2, "OP_WEATHER", {}, 13)])
+        source = wire.ApiSource(trace, CHARACTER)
+        first = source.rows
+        with self.assertRaises(observer.ObserverError):
+            wire.api_correlate(first)
+        trace.rows[0] = api_row(1, "OP_MOB_HEALTH", {"entity": 2, "percent": 81}, 12)  # ACK now sent
+        proof = wire.api_correlate(source.rows)
+        self.assertEqual(proof[0]["coverage"], "exact")
 
 
 class DuplicatedHit(unittest.TestCase):
@@ -157,6 +248,37 @@ class DuplicatedHit(unittest.TestCase):
     def test_double_count_under_two_sequences_fails(self):
         with self.assertRaises(checks.CheckFailed):
             checks.melee_wire(HIT, proof(self.rows(11, 12)), player=1, rat=2, max_hp=11)
+
+
+class Ordering(unittest.TestCase):
+    def test_melee_order_is_wrap_aware(self):
+        hits = Trace("".join(
+            f"gameplay attempt=1 outcome=melee_hit source_entity=1 target_entity=2 incarnation=1 spawn_id=10863 "
+            f"npc_type=2011 damage={d} hp_before={b} hp_after={a}\n" for d, b, a in ((2, 11, 9), (3, 9, 6)))
+        ).gameplay("melee_hit")
+        rows = [observed(65534, 0x6F15, damage_body(2, 1, 2)), observed(65535, 0x37B1, struct.pack("<HB", 2, 81)),
+                observed(0, 0x6F15, damage_body(2, 1, 3)), observed(1, 0x37B1, struct.pack("<HB", 2, 54))]
+        for i, r in enumerate(rows):
+            r["monotonic"] = float(i)
+        checks.melee_wire(hits, proof(rows), player=1, rat=2, max_hp=11)
+
+
+class LateDuplicate(unittest.TestCase):
+    """A second health reply under a new sequence after the hit was checked fails the final count."""
+
+    def test_both_modes(self):
+        rows = {"observer": [observed(11, 0x6F15, damage_body(2, 1, 2)), observed(12, 0x37B1, struct.pack("<HB", 2, 81))],
+                "client-api": [wire.convert_api_row(api_row(1, "OP_DAMAGE", {"target": 2, "source": 1, "type": 4,
+                                                                                 "spell": 65535, "damage": 2}, 11), CHARACTER),
+                               wire.convert_api_row(api_row(2, "OP_MOB_HEALTH", {"entity": 2, "percent": 81}, 12),
+                                                    CHARACTER)]}
+        late = {"observer": observed(30, 0x37B1, struct.pack("<HB", 2, 81)),
+                "client-api": wire.convert_api_row(api_row(9, "OP_MOB_HEALTH", {"entity": 2, "percent": 81}, 30),
+                                                   CHARACTER)}
+        for mode in rows:
+            checks.combat_replies_match(rows[mode], HIT)
+            with self.assertRaises(checks.CheckFailed, msg=mode):
+                checks.combat_replies_match(rows[mode] + [late[mode]], HIT)
 
 
 class WrongServerReplyFailsBothModes(unittest.TestCase):

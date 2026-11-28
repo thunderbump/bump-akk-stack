@@ -167,7 +167,8 @@ def melee_wire(hits, proof: list[dict], *, player: int, rat: int, max_hp: int) -
     damage_rows = unique_replies(replies, "0x6f15")
     health_rows = unique_replies(replies, "0x37b1")
     require(damage_rows and health_rows, "no damage or health reply")
-    base = min(r["sequence"] for r in damage_rows + health_rows)
+    # Wrap-aware order: count sequences from the earliest-captured reply.
+    base = min(damage_rows + health_rows, key=lambda r: r["monotonic"])["sequence"]
 
     def ordered(rows):
         return sorted(rows, key=lambda r: (r["sequence"] - base) & 0xFFFF)
@@ -181,6 +182,18 @@ def melee_wire(hits, proof: list[dict], *, player: int, rat: int, max_hp: int) -
                 f"damage packet {d} for {line.raw}")
         require(h["entity"] == rat and h["percent"] == hp_percent(after, max_hp), f"health packet {h} for {line.raw}")
     return damage_rows, health_rows
+
+
+def combat_replies_match(rows: list[dict], hits) -> None:
+    """Exactly one damage and one health reply per trace hit, counted again late.
+
+    Catches a duplicate damage or health reply sent under a new sequence after
+    the hit or kill milestone already checked its counts.
+    """
+    damage = unique_replies(rows, "0x6f15")
+    health = unique_replies(rows, "0x37b1")
+    require(len(damage) == len(hits) and len(health) == len(hits),
+            f"{len(damage)} damage / {len(health)} health replies for {len(hits)} hits at the final check")
 
 
 def hp_percent(hp: int, max_hp: int) -> int:
