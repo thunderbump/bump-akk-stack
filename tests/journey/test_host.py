@@ -56,7 +56,9 @@ class Inputs(unittest.TestCase):
         identity = host.stage_inputs(self.args(allow_unpinned_maps=True), self.run_dir)
         self.assertIsNone(identity["client"]["validation_pin"])
         roles = {v["role"] for v in F.VALIDATION_CLIENTS.values()}
-        self.assertEqual(roles, {"routine", "older_client_check"})
+        self.assertEqual(roles, {"routine", "older_client_check", "previous_routine"})
+        self.assertEqual([v["revision"] for v in F.VALIDATION_CLIENTS.values() if v["role"] == "routine"],
+                         ["9623e8a451b8794ec56649271b738eddb5ca1c20"])
 
     def test_missing_inputs(self):
         with self.assertRaises(host.UsageError):

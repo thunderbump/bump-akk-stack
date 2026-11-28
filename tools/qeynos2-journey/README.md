@@ -30,15 +30,30 @@ Maps must match the pinned fixture hashes in `fixture.py` unless
 
 ### Clients
 
-Routine runs use headless EQOxide `fea4596cd14e9b61883e58966ad7d26150715914`,
-binary SHA-256 `de96afb5d6458fe9c0601cccb02b2d2430891ec98203943da5d68ec2fd14be50`.
+Routine runs use headless EQOxide `9623e8a451b8794ec56649271b738eddb5ca1c20`,
+binary SHA-256 `b8d56995fe2843bea1ccb6687e31f0b15783e393b47ba3cbe066fcda381a6c8b`.
 Also run the older client `d034b7eafae6a0c9cbd4461da6a09a847d61ba4a` (binary
 `6271c614d1668d2966f68867e2cdab50df6b94f4c8339a37c1750c564c460505`) when a
 server change touches wire or transport. `fixture.VALIDATION_CLIENTS` lists
-both. `identity.client.validation_pin` in `result.json` names the matching
-role, or is null for any other client. Any client still runs. The routine
-journey keeps the 200 ms move, because a longer move with the routine client
-can stop past the fixture's accepted strip (X −934 to −924).
+both, plus the previous routine client `fea4596cd14e9b61883e58966ad7d26150715914`
+(binary `de96afb5…`) so that older results still name their role.
+`identity.client.validation_pin` in `result.json` names the matching role, or
+is null for any other client. Any client still runs. The routine journey
+keeps the 200 ms move, because a longer move with the routine client can stop
+past the fixture's accepted strip (X −934 to −924).
+
+At every pin move, compare a census of outbound client datagrams with the
+previous routine client instead of taking a "no wire change" claim on trust.
+Known difference at the 9623e8a pin (2026-11-28): 9623e8a sends three
+`OP_AutoAttack` (`0x109d`) attack-offs (payload byte 0) after each zone entry
+where fea4596 sends two. The extra one comes about 150–180 ms after "zone
+entry complete", just before headless logs "zone-in: armed". The server
+treats it as a no-op, and both journeys pass. Everything else outbound
+matched: the 46-byte `OP_ClientUpdate` stream, ACK, keepalive and session
+datagrams, and every reliable payload size. Census probe and runs:
+`~/.local/state/eqemu-rust-journey/probes/transport-census-v3/` (runs
+`20261128T023827Z-122427`, `…023906Z-c4dfaf`, `…023944Z-1c44cc` and
+`…024045Z-a72a25` against Rust b395aee).
 
 One-time preparation loads the runtime image into the harness data root:
 
@@ -118,7 +133,7 @@ checkpointed in `progress.json` fails instead.
 
 The older client d034b7e reports its resting position only at a 1300 ms
 keepalive, and its first stationary packet about 1300 ms after that. The
-routine client fea4596 sends a rest update on the first step at rest. The stop
+routine client (fea4596 and later) sends a rest update on the first step at rest. The stop
 check therefore waits for the server's `stopped` line and compares against the
 last sample. It passes whether the stop arrives before the stop command, as a
 client that reports rest itself may do, or after it. `stop.evidence` records
